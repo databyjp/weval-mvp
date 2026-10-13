@@ -44,6 +44,11 @@ def no_vectorizer(s: dict) -> None:
     s["collection"]["vectorConfig"] = {"default": {"vectorizer": {"none": {}}}}
 
 
+def legacy_vectorizer(s: dict) -> None:
+    s["collection"].pop("vectorConfig")
+    s["collection"]["vectorizer"] = "text2vec-transformers"
+
+
 def api_key_vectorizer(s: dict) -> None:
     # Observed locally with a collection-level text2vec-openai and no OpenAI key.
     s["vector_probe"] = {
@@ -68,6 +73,7 @@ def test_oracle_passes_every_check():
         (not_ready, "weaviate-ready", "got 503"),
         (old_server, "server-version", "running 1.27.0"),
         (no_vectorizer, "collection-vectorizer", "configures a vectorizer module"),
+        (legacy_vectorizer, "named-vector", "legacy collection-level vectorizer"),
         (api_key_vectorizer, "vectorizer-availability", "no api key found"),
         (no_data_mount, "persistence-configured", "covers the data path /var/lib/weaviate"),
     ],

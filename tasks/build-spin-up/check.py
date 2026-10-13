@@ -95,6 +95,19 @@ def vectorizer_availability(snapshot: dict) -> str:
     return f"vectors: {vectors}"
 
 
+def named_vector(snapshot: dict) -> None:
+    """DocumentChunk configures vectorization as a named vector, not the legacy
+    collection-level vectorizer."""
+    # The named-vector half of greenfield's weaviate-managed-vectorization; module
+    # choice and vector presence are scored separately here.
+    config = collection(snapshot)
+    legacy = config.get("vectorizer", "none")
+    assert config.get("vectorConfig") and legacy == "none", (
+        f"{COLLECTION} configures vectorization as a named vector; it uses the legacy "
+        f"collection-level vectorizer ({legacy}) instead"
+    )
+
+
 def persistence_configured(snapshot: dict) -> str:
     """A volume or bind mount covers the weaviate container's PERSISTENCE_DATA_PATH."""
     config = container(snapshot)
@@ -113,4 +126,4 @@ def auth_posture(snapshot: dict) -> str:
 
 
 REQUIRED = [weaviate_reachable, weaviate_ready, server_version, collection_vectorizer]
-PREFERRED = [vectorizer_availability, persistence_configured, auth_posture]
+PREFERRED = [vectorizer_availability, named_vector, persistence_configured, auth_posture]
