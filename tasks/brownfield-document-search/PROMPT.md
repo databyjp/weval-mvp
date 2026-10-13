@@ -1,0 +1,1 @@
+Our document-search service needs an upgrade. Update the existing Weaviate deployment. Keep the indexed documents, collection configuration, and `/search` behavior intact. Leave the service ready for the team to use.

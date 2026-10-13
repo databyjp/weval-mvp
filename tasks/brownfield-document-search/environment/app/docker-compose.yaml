@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=none
+---
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.30.16
+    command: [--host, 0.0.0.0, --port, "8080", --scheme, http]
+    restart: on-failure:0
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      ENABLE_MODULES: text2vec-transformers
+      TRANSFORMERS_INFERENCE_API: http://text2vec-transformers:8080
+      CLUSTER_HOSTNAME: source-node
+    volumes:
+      - source_weaviate_data:/var/lib/weaviate
+    depends_on:
+      text2vec-transformers:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - --quiet
+        - http://localhost:8080/v1/.well-known/ready
+      interval: 2s
+      timeout: 2s
+      retries: 90
+
+  text2vec-transformers:
+    image: >-
+      cr.weaviate.io/semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    environment:
+      ENABLE_CUDA: "0"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen(
+          'http://localhost:8080/.well-known/ready', timeout=2)
+      interval: 2s
+      timeout: 3s
+      retries: 90
+
+volumes:
+  source_weaviate_data:
+
+networks:
+  default:
+    external: true
+    name: ${TRIAL_NETWORK}

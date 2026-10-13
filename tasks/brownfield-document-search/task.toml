@@ -1,0 +1,21 @@
+# Harbor task config. weval adds instruction.md (from PROMPT.md) and tests/.
+artifacts = [{ source = "/app", destination = "submission" }]
+
+[agent]
+timeout_sec = 1200.0
+
+[verifier]
+timeout_sec = 900.0
+# Score the agent's live stack: its Weaviate volume holds the data under test.
+env = { WEVAL_KEEP_STACK = "1" }
+
+[environment]
+build_timeout_sec = 900.0
+
+# The entrypoint seeds the legacy corpus, then creates this marker. Waiting for
+# it keeps the agent from starting on a half-seeded baseline.
+[environment.healthcheck]
+command = "test -f /tmp/weval-source-ready"
+interval_sec = 5.0
+start_period_sec = 360.0
+retries = 3
