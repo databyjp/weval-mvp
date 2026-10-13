@@ -47,21 +47,14 @@ MODAL = EnvironmentConfig(
 )
 
 
-def load_condition(name: str) -> dict:
-    """Return the named Condition from ``conditions.toml``, with its name added."""
-    conditions = tomllib.loads((ROOT / "conditions.toml").read_text())
-    return {"name": name, **conditions[name]}
-
-
 def package_task(task_dir: Path, destination: Path) -> None:
-    """Build a Harbor task package: ``PROMPT.md`` becomes ``instruction.md``, and
-    ``tests/`` holds the shared verifier with the Task's snapshot and check."""
+    """Build a Harbor task package: the Task directory plus ``tests/``, which
+    holds the shared verifier with the Task's snapshot and check."""
     shutil.copytree(
         task_dir,
         destination,
-        ignore=shutil.ignore_patterns("__pycache__", "PROMPT.md", "snapshot.py", "check.py"),
+        ignore=shutil.ignore_patterns("__pycache__", "snapshot.py", "check.py"),
     )
-    shutil.copy(task_dir / "PROMPT.md", destination / "instruction.md")
     tests = destination / "tests"
     tests.mkdir()
     shutil.copy(Path(verify.__file__), tests / "verify.py")
@@ -81,7 +74,8 @@ def run(task_dir: Path, condition_name: str, attempts: int = 1) -> Path:
     even when Harbor itself raised.
     """
     task_dir = task_dir.resolve()
-    condition = load_condition(condition_name)
+    conditions = tomllib.loads((ROOT / "conditions.toml").read_text())
+    condition = {"name": condition_name, **conditions[condition_name]}
     harness = HARNESSES[condition["harness"]]
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = ROOT / "experiment-outputs" / f"{stamp}-{task_dir.name}-{condition_name}"

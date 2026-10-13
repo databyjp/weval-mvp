@@ -25,7 +25,7 @@ A Task is a directory that runs without framework changes:
 
 | File | Purpose |
 |---|---|
-| `PROMPT.md` | What the agent is told. Becomes Harbor's `instruction.md`. |
+| `instruction.md` | What the agent is told (Harbor's file name for the prompt). |
 | `task.toml` | Harbor task config: timeouts, `/app` artifact, healthcheck, verifier env. |
 | `environment/` | Harbor environment: `Dockerfile`, Compose overlay, starter app, fixtures. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |

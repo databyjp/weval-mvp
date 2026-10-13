@@ -1,4 +1,4 @@
-# Harbor task config. weval adds instruction.md (from PROMPT.md) and tests/.
+# Harbor task config. weval adds tests/.
 artifacts = [{ source = "/app", destination = "submission" }]
 
 [agent]
