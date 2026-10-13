@@ -6,8 +6,9 @@ so it runs on any Task image with Python 3.
 
 Flow: start the submitted Compose stack (unless the Task sets
 ``WEVAL_KEEP_STACK=1`` because the agent's live stack is the thing under test),
-start the submitted app on ``APP_PORT``, call ``snapshot.snapshot(app_url)``,
-then score it with ``check.py``. Everything is written to ``/logs/verifier``.
+start the submitted app on ``APP_PORT`` when the Task sets
+``WEVAL_START_APP=1``, call ``snapshot.snapshot(app_url)`` (``None`` without an
+app), then score it with ``check.py``. Everything is written to ``/logs/verifier``.
 A stack or snapshot failure is recorded in the snapshot and scored as failing
 checks; it is not a verifier crash.
 """
@@ -101,14 +102,18 @@ def main() -> None:
     """Snapshot and score the Trial, always writing reward, snapshot, and checks."""
     sys.path.insert(0, str(Path(__file__).parent))
     keep_stack = os.environ.get("WEVAL_KEEP_STACK") == "1"
+    start_app = os.environ.get("WEVAL_START_APP") == "1"
     app = None
     try:
         if not keep_stack:
             up = _compose("up", "--detach", "--wait", "--wait-timeout", "180")
             if up.returncode != 0:
                 raise RuntimeError(f"docker compose up failed:\n{up.stdout}{up.stderr}")
-        app = _start_app()
-        snapshot = importlib.import_module("snapshot").snapshot(f"http://127.0.0.1:{APP_PORT}")
+        app_url = None
+        if start_app:
+            app = _start_app()
+            app_url = f"http://127.0.0.1:{APP_PORT}"
+        snapshot = importlib.import_module("snapshot").snapshot(app_url)
     except Exception:  # noqa: BLE001
         snapshot = {"error": traceback.format_exc()}
     finally:

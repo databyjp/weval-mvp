@@ -31,13 +31,16 @@ A Task is a directory that runs without framework changes:
 | `task.toml` | Harbor task config: timeouts, `/app` artifact, healthcheck, verifier env. |
 | `environment/` | Harbor environment: `Dockerfile`, Compose overlay, starter app, fixtures. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |
-| `snapshot.py` | `snapshot(app_url) -> dict`: dump the live state to JSON. |
+| `snapshot.py` | `snapshot(app_url) -> dict`: dump the live state to JSON. `app_url` is `None` without an app. |
 | `check.py` | `REQUIRED` and `PREFERRED` lists of check functions over the snapshot. |
 
-`verify.py` starts the submitted Compose stack and the app (`main:app`), calls
-`snapshot()`, and scores the result. Set `WEVAL_KEEP_STACK = "1"` in
-`[verifier] env` when the agent's running stack is itself under test, as in
-the brownfield Task.
+`verify.py` starts the submitted Compose stack, calls `snapshot()`, and scores
+the result. Set these in `[verifier] env` as needed:
+
+- `WEVAL_START_APP = "1"` when the Task has an application: the verifier
+  starts `main:app` from `/app` and passes its URL to `snapshot()`.
+- `WEVAL_KEEP_STACK = "1"` when the agent's running stack is itself under
+  test, as in the brownfield Task.
 
 `snapshot.py` should capture every fact a check needs: Weaviate schema and
 objects (read over REST, with vector presence flags), responses to fixed HTTP
