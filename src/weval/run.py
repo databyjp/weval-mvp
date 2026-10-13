@@ -1,11 +1,11 @@
-"""Run a Task under a Condition with Harbor on Modal, then record each Trial.
+"""Run a Task with an Agent through Harbor on Modal, then record each Trial.
 
 Output layout, one directory per invocation::
 
-    experiment-outputs/<timestamp>-<task>-<condition>/
+    experiment-outputs/<timestamp>-<task>-<agent>/
         task/                 Harbor task package built from tasks/<task>/
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
-        job/<trial>/weval.json  Condition, status, missing logs, check results
+        job/<trial>/weval.json  Agent, status, missing logs, check results
 """
 
 import asyncio
@@ -66,25 +66,25 @@ def package_task(task_dir: Path, destination: Path) -> None:
     (tests / "test.sh").chmod(0o755)
 
 
-def run(task_dir: Path, condition_name: str, attempts: int = 1) -> Path:
-    """Run ``attempts`` Trials of one Task under one Condition; return the run directory.
+def run(task_dir: Path, agent_name: str, attempts: int = 1) -> Path:
+    """Run ``attempts`` Trials of one Task by one Agent; return the run directory.
 
     Harbor failures inside a Trial are recorded as Non-results in ``weval.json``,
     not raised. Retained files are scrubbed of credential values afterwards,
     even when Harbor itself raised.
     """
     task_dir = task_dir.resolve()
-    conditions = tomllib.loads((ROOT / "conditions.toml").read_text())
-    condition = {"name": condition_name, **conditions[condition_name]}
-    harness = HARNESSES[condition["harness"]]
+    agents = tomllib.loads((ROOT / "agents.toml").read_text())
+    agent = {"name": agent_name, **agents[agent_name]}
+    harness = HARNESSES[agent["harness"]]
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir = ROOT / "experiment-outputs" / f"{stamp}-{task_dir.name}-{condition_name}"
+    run_dir = ROOT / "experiment-outputs" / f"{stamp}-{task_dir.name}-{agent_name}"
     package_task(task_dir, run_dir / "task")
     config = JobConfig(
         job_name="job",
         jobs_dir=run_dir,
         tasks=[TaskConfig(path=run_dir / "task")],
-        agents=[harness.agent_config(condition)],
+        agents=[harness.agent_config(agent)],
         n_attempts=attempts,
         n_concurrent_trials=attempts,
         environment=MODAL,
@@ -93,7 +93,7 @@ def run(task_dir: Path, condition_name: str, attempts: int = 1) -> Path:
         asyncio.run(_run_job(config))
     finally:
         for result_file in sorted((run_dir / "job").glob("*/result.json")):
-            record = finalize(result_file.parent, task_dir, condition)
+            record = finalize(result_file.parent, task_dir, agent)
             print(f"{result_file.parent}: {record['status']}")
         redact(run_dir)
     return run_dir
@@ -104,14 +104,14 @@ async def _run_job(config: JobConfig) -> None:
     await job.run()
 
 
-def finalize(trial_dir: Path, task_dir: Path, condition: dict) -> dict:
+def finalize(trial_dir: Path, task_dir: Path, agent: dict) -> dict:
     """Write and return ``weval.json`` for one Harbor Trial directory.
 
     Status is ``non-result`` when Harbor raised or the verifier produced no
     reward, ``incomplete`` when an expected log is missing, otherwise
     ``passed`` or ``failed`` by reward.
     """
-    harness = HARNESSES[condition["harness"]]
+    harness = HARNESSES[agent["harness"]]
     result = json.loads((trial_dir / "result.json").read_text())
     expected = COMMON_LOGS + harness.EXPECTED_LOGS
     missing = [pattern for pattern in expected if not any(trial_dir.glob(pattern))]
@@ -126,7 +126,7 @@ def finalize(trial_dir: Path, task_dir: Path, condition: dict) -> dict:
     record = {
         "status": status,
         "task": str(task_dir),
-        "condition": harness.condition_record(condition),
+        "agent": harness.agent_record(agent),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),
         "exception": (result.get("exception_info") or {}).get("exception_type"),

@@ -38,12 +38,12 @@ EXPECTED_LOGS = (
 )
 
 
-def agent_config(condition: dict) -> AgentConfig:
-    """Build Harbor's agent config for a Pi Condition (``version``, ``model``)."""
+def agent_config(agent: dict) -> AgentConfig:
+    """Build Harbor's agent config for a Pi Agent (``version``, ``model``)."""
     return AgentConfig(
         import_path="weval.harnesses.pi:WebAccessPi",
-        model_name=condition["model"],
-        kwargs={"version": condition["version"]},
+        model_name=agent["model"],
+        kwargs={"version": agent["version"]},
         env={
             # Harbor resolves the template from the host environment.
             "OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}",
@@ -52,9 +52,9 @@ def agent_config(condition: dict) -> AgentConfig:
     )
 
 
-def condition_record(condition: dict) -> dict:
-    """Return the Condition plus the web tooling it ran with, for ``weval.json``."""
-    return {**condition, "web_access": json.loads((ASSETS / "provenance.json").read_text())}
+def agent_record(agent: dict) -> dict:
+    """Return the Agent plus the web tooling it ran with, for ``weval.json``."""
+    return {**agent, "web_access": json.loads((ASSETS / "provenance.json").read_text())}
 
 
 class _Options(PiOptions):

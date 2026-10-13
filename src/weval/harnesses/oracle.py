@@ -5,9 +5,9 @@ from harbor.models.trial.config import AgentConfig
 EXPECTED_LOGS = ("agent/oracle.txt",)
 
 
-def agent_config(condition: dict) -> AgentConfig:
+def agent_config(agent: dict) -> AgentConfig:
     return AgentConfig(name="oracle")
 
 
-def condition_record(condition: dict) -> dict:
-    return dict(condition)
+def agent_record(agent: dict) -> dict:
+    return dict(agent)

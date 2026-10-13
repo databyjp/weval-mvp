@@ -1,4 +1,4 @@
-# Named Conditions: one agent harness plus one model. `weval run --condition <name>`.
+# Named Agents: one agent harness plus one model. `weval run --agent <name>`.
 # Quote names containing dots. Keys other than `harness` are passed to that harness module in src/weval/harnesses/.
 
 [oracle]

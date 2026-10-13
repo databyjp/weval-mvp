@@ -8,7 +8,7 @@ as the domain language.
 ## Layout
 
 - `tasks/<name>/`: one Task each (see below).
-- `conditions.toml`: named Conditions (harness, version, model).
+- `agents.toml`: named Agents (harness, version, model).
 - `src/weval/run.py`: builds the Harbor package, runs it on Modal, writes `weval.json`.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
 - `src/weval/harnesses/<harness>.py`: Harbor agent config, expected logs, and
@@ -91,7 +91,7 @@ Before running agents on a new Task:
 ## Running and reading Trials
 
 ```sh
-uv run --env-file .env weval run tasks/<task> --condition <name> [-n 3]
+uv run --env-file .env weval run tasks/<task> --agent <name> [-n 3]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 ```
 
@@ -99,7 +99,7 @@ Real runs cost money (Modal, OpenRouter). Each Trial directory is Harbor's own
 output plus `weval.json`. Start there:
 
 - `weval.json`: status (`passed`, `failed`, `incomplete`, `non-result`), the
-  Condition, missing logs, and per-check results.
+  Agent, missing logs, and per-check results.
 - `verifier/snapshot.json`, `checks.json`, `test-stdout.txt`,
   `application.log`, `docker-compose.log`.
 - `agent/`: the harness transcript and stdout. Pi writes
@@ -129,7 +129,7 @@ Test check logic and transcript parsing against real retained runs.
 
 While the project version in `pyproject.toml` is below `0.1.0`:
 
-- revise formats (snapshots, `weval.json`, `conditions.toml`) in place;
+- revise formats (snapshots, `weval.json`, `agents.toml`) in place;
 - use schema version `"1"` when a schema becomes necessary;
 - treat schema migrations and version increments as approval-required changes.
 
