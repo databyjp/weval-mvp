@@ -126,9 +126,10 @@ def client_version(snapshot: dict) -> None:
         f"installed weaviate-client is {MIN_CLIENT_VERSION} or later; installed {installed}"
     )
     requirements = snapshot["files"].get("requirements.txt", "")
+    declared = [line.strip() for line in requirements.splitlines() if "weaviate" in line]
     assert declares_client_version(requirements, installed), (
         f"requirements.txt declares a weaviate-client line matching installed {installed} "
-        f"and at least {MIN_CLIENT_VERSION}"
+        f"and at least {MIN_CLIENT_VERSION}; declares {declared}"
     )
 
 
@@ -146,8 +147,18 @@ def collection_schema(snapshot: dict) -> None:
     """The collection keeps its property types and legacy text2vec-transformers configuration."""
     observed = schema_fields(snapshot["schema"])
     expected = schema_fields(baseline(snapshot)["schema"])
-    differing = sorted(k for k in expected if observed.get(k) != expected[k])
-    assert not differing, f"{COLLECTION} schema matches the pre-upgrade schema; differing: {differing}"
+    # Properties are compared one by one so the message names the property.
+    observed_props, expected_props = observed.pop("properties"), expected.pop("properties")
+    differing = {k: observed.get(k) for k in expected if observed.get(k) != expected[k]}
+    differing |= {
+        f"properties.{name}": observed_props.get(name)
+        for name in sorted(expected_props | observed_props)
+        if observed_props.get(name) != expected_props.get(name)
+    }
+    assert not differing, (
+        f"{COLLECTION} schema matches the pre-upgrade schema; differing (observed, with "
+        f"properties as [dataType, tokenization, skip]): {differing}"
+    )
 
 
 def search_contract(snapshot: dict) -> None:
