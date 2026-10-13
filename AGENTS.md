@@ -16,7 +16,9 @@ as the domain language.
 - `experiment-outputs/`: retained runs (git-ignored).
 
 Keep the framework small enough to read in one sitting. Prefer plain functions
-and dicts. Add a shared abstraction only when three Tasks need it. If a change
+and dicts. Add a shared abstraction only when three Tasks need it. Handle
+cases that Trials have shown, not anticipated ones
+([ADR 0001](architecture/adr/0001-handle-observed-cases.md)). If a change
 makes the framework noticeably larger, ask first.
 
 ## Writing a Task
