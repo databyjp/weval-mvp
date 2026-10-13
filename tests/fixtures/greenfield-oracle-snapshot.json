@@ -1,0 +1,1507 @@
+{
+ "weaviate_version": "1.39.5",
+ "schema": {
+  "classes": [
+   {
+    "class": "Product",
+    "invertedIndexConfig": {
+     "bm25": {
+      "b": 0.75,
+      "k1": 1.2
+     },
+     "cleanupIntervalSeconds": 60,
+     "stopwords": {
+      "additions": null,
+      "preset": "en",
+      "removals": null
+     },
+     "usingBlockMaxWAND": true
+    },
+    "multiTenancyConfig": {
+     "autoTenantActivation": false,
+     "autoTenantCreation": false,
+     "enabled": false
+    },
+    "properties": [
+     {
+      "dataType": [
+       "text"
+      ],
+      "indexFilterable": true,
+      "indexRangeFilters": false,
+      "indexSearchable": true,
+      "moduleConfig": {
+       "text2vec-transformers": {
+        "skip": false,
+        "vectorizePropertyName": false
+       }
+      },
+      "name": "sku",
+      "tokenization": "field"
+     },
+     {
+      "dataType": [
+       "text"
+      ],
+      "indexFilterable": true,
+      "indexRangeFilters": false,
+      "indexSearchable": true,
+      "moduleConfig": {
+       "text2vec-transformers": {
+        "skip": false,
+        "vectorizePropertyName": false
+       }
+      },
+      "name": "name",
+      "tokenization": "word"
+     },
+     {
+      "dataType": [
+       "text"
+      ],
+      "indexFilterable": true,
+      "indexRangeFilters": false,
+      "indexSearchable": true,
+      "moduleConfig": {
+       "text2vec-transformers": {
+        "skip": false,
+        "vectorizePropertyName": false
+       }
+      },
+      "name": "description",
+      "tokenization": "word"
+     },
+     {
+      "dataType": [
+       "text"
+      ],
+      "indexFilterable": true,
+      "indexRangeFilters": false,
+      "indexSearchable": true,
+      "moduleConfig": {
+       "text2vec-transformers": {
+        "skip": false,
+        "vectorizePropertyName": false
+       }
+      },
+      "name": "category",
+      "tokenization": "field"
+     },
+     {
+      "dataType": [
+       "number"
+      ],
+      "indexFilterable": true,
+      "indexRangeFilters": false,
+      "indexSearchable": false,
+      "moduleConfig": {
+       "text2vec-transformers": {
+        "skip": false,
+        "vectorizePropertyName": false
+       }
+      },
+      "name": "price"
+     }
+    ],
+    "shardingConfig": {
+     "actualCount": 1,
+     "actualVirtualCount": 128,
+     "desiredCount": 1,
+     "desiredVirtualCount": 128,
+     "function": "murmur3",
+     "key": "_id",
+     "strategy": "hash",
+     "virtualPerPhysical": 128
+    },
+    "vectorConfig": {
+     "default": {
+      "vectorIndexConfig": {
+       "bq": {
+        "enabled": false
+       },
+       "cleanupIntervalSeconds": 300,
+       "distance": "cosine",
+       "dynamicEfFactor": 8,
+       "dynamicEfMax": 500,
+       "dynamicEfMin": 100,
+       "ef": -1,
+       "efConstruction": 128,
+       "filterStrategy": "acorn",
+       "flatSearchCutoff": 40000,
+       "maxConnections": 32,
+       "multivector": {
+        "aggregation": "maxSim",
+        "enabled": false,
+        "muvera": {
+         "dprojections": 16,
+         "enabled": false,
+         "ksim": 4,
+         "repetitions": 10
+        }
+       },
+       "pq": {
+        "bitCompression": false,
+        "centroids": 256,
+        "enabled": false,
+        "encoder": {
+         "distribution": "log-normal",
+         "type": "kmeans"
+        },
+        "segments": 0,
+        "trainingLimit": 100000
+       },
+       "rq": {
+        "bits": 8,
+        "centering": false,
+        "enabled": false,
+        "rescoreLimit": 20,
+        "trainingLimit": 10000
+       },
+       "skip": false,
+       "skipDefaultQuantization": false,
+       "sq": {
+        "enabled": false,
+        "rescoreLimit": 20,
+        "trainingLimit": 100000
+       },
+       "trackDefaultQuantization": false,
+       "vectorCacheMaxObjects": 1000000000000
+      },
+      "vectorIndexType": "hnsw",
+      "vectorizer": {
+       "text2vec-transformers": {
+        "poolingStrategy": "masked_mean",
+        "vectorizeClassName": true
+       }
+      }
+     }
+    },
+    "replicationConfig": {
+     "deletionStrategy": "TimeBasedResolution",
+     "factor": 1,
+     "asyncEnabled": false
+    }
+   }
+  ]
+ },
+ "objects": {
+  "Product": [
+   {
+    "id": "097c7700-fbbd-5b1a-9262-871d286d05f0",
+    "properties": {
+     "category": "home",
+     "description": "A soft washable blanket for adding warmth to a sofa or reading chair.",
+     "name": "CloudRest Throw Blanket",
+     "price": 38,
+     "sku": "HOME-711"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "0c300a0e-0328-5f55-aa3b-6d22895be8b4",
+    "properties": {
+     "category": "footwear",
+     "description": "Lightweight everyday shoes with breathable canvas uppers and flexible rubber soles.",
+     "name": "Metro Canvas Sneakers",
+     "price": 54,
+     "sku": "ZXQ-9917"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "12267a82-0bb7-5d14-9fce-254a8ce4c9a2",
+    "properties": {
+     "category": "home",
+     "description": "Adjustable task lighting with warm and cool modes for office work and reading.",
+     "name": "Focus LED Desk Lamp",
+     "price": 57,
+     "sku": "LIGHT-640"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "17b12ea0-ea4e-51b4-8df0-b907e49e0fb4",
+    "properties": {
+     "category": "home",
+     "description": "Four durable ceramic mugs with comfortable handles for hot drinks.",
+     "name": "Stoneware Coffee Mug Set",
+     "price": 32,
+     "sku": "HOME-221"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "252bd72f-5dcb-56f0-a0d9-0e9ab3ea3272",
+    "properties": {
+     "category": "electronics",
+     "description": "Compact Bluetooth earbuds with a charging case for exercise and calls.",
+     "name": "PocketBeat Earbuds",
+     "price": 69,
+     "sku": "AUDIO-118"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "259b895c-f435-5ac6-8820-e10f0960a820",
+    "properties": {
+     "category": "fitness",
+     "description": "Firm textured roller for post-workout muscle massage and mobility routines.",
+     "name": "Recovery Foam Roller",
+     "price": 28,
+     "sku": "FIT-156"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "29418ad2-49b5-5450-925e-4cc8c59f2c7e",
+    "properties": {
+     "category": "outdoors",
+     "description": "Breathable waterproof shell that folds into its own pocket.",
+     "name": "Packable Rain Jacket",
+     "price": 84,
+     "sku": "OUT-442"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "33cc1f27-bc4f-5161-b5a6-65a37ac2736e",
+    "properties": {
+     "category": "fitness",
+     "description": "Quiet resistance stand that converts a road bicycle into a home workout machine.",
+     "name": "Indoor Cycling Trainer",
+     "price": 249,
+     "sku": "FIT-990"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "34c60418-9b7d-5ff6-86d6-8feaf457f785",
+    "properties": {
+     "category": "travel",
+     "description": "A set of zippered organizers that saves space inside luggage.",
+     "name": "Compression Packing Cubes",
+     "price": 37,
+     "sku": "TRAVEL-145"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "41bc8f6c-a03c-515f-8f0c-1b56a864d256",
+    "properties": {
+     "category": "footwear",
+     "description": "Dry and supportive boots with grippy soles for rocky paths and rainy adventures.",
+     "name": "Summit Waterproof Hiking Boots",
+     "price": 129,
+     "sku": "TRAIL-001"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "484bb049-7920-53d5-8856-b2a8d4528052",
+    "properties": {
+     "category": "electronics",
+     "description": "GPS fitness watch with heart-rate tracking and week-long battery life.",
+     "name": "PulseTrack Sports Watch",
+     "price": 139,
+     "sku": "WATCH-009"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "61fe8681-5b2f-5e22-8655-efe0a2273da3",
+    "properties": {
+     "category": "travel",
+     "description": "Supportive travel cushion for sleeping comfortably on planes and trains.",
+     "name": "Memory Foam Neck Pillow",
+     "price": 31,
+     "sku": "TRAVEL-288"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "679a1244-bef0-5ecd-967c-bf85ac35d6e5",
+    "properties": {
+     "category": "electronics",
+     "description": "A rugged waterproof camera for recording cycling, skiing, and outdoor trips.",
+     "name": "TrailShot Action Camera",
+     "price": 159,
+     "sku": "CAM-420"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "793f7e7b-f24c-57ba-8663-a84017eb6e8d",
+    "properties": {
+     "category": "home",
+     "description": "Expandable drawer storage for utensils and small cooking tools.",
+     "name": "Bamboo Kitchen Organizer",
+     "price": 41,
+     "sku": "HOME-875"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "805ecf24-2d70-5671-8cbb-022934c929c9",
+    "properties": {
+     "category": "footwear",
+     "description": "Cushioned athletic shoes designed for daily pavement training and long-distance comfort.",
+     "name": "Velocity Road Runners",
+     "price": 98,
+     "sku": "RUN-210"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "8e2fb735-4ca2-5482-8978-a14e371f6696",
+    "properties": {
+     "category": "electronics",
+     "description": "Wireless over-ear audio with active noise cancellation for flights and commuting.",
+     "name": "QuietJourney Headphones",
+     "price": 189,
+     "sku": "AUDIO-301"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "a0efe10a-4e77-5a50-a8ee-e7e671c3f94f",
+    "properties": {
+     "category": "travel",
+     "description": "Compact hard-shell luggage with smooth wheels and organized compartments.",
+     "name": "Cabin Spinner Suitcase",
+     "price": 119,
+     "sku": "TRAVEL-510"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "a4a629fd-9ea2-5348-90ab-cc6aed4c2b0d",
+    "properties": {
+     "category": "fitness",
+     "description": "Non-slip exercise mat with dense cushioning for yoga and floor workouts.",
+     "name": "CoreFlex Yoga Mat",
+     "price": 35,
+     "sku": "FIT-332"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "a990390c-2909-54b1-9afc-1a222c59dabb",
+    "properties": {
+     "category": "fitness",
+     "description": "Space-saving dumbbells for strength sessions at home.",
+     "name": "Adjustable Training Weights",
+     "price": 219,
+     "sku": "FIT-804"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "bf866266-c445-5427-acce-3db0ded4e5ea",
+    "properties": {
+     "category": "travel",
+     "description": "Slim document organizer that protects cards and travel documents.",
+     "name": "RFID Passport Wallet",
+     "price": 26,
+     "sku": "TRAVEL-902"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "c20ebd33-169c-5c69-b929-80cacde6f4af",
+    "properties": {
+     "category": "footwear",
+     "description": "Adjustable open footwear for warm weather walks and beach holidays.",
+     "name": "Coast Walking Sandals",
+     "price": 46,
+     "sku": "SAND-044"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "c8726757-14ce-55c5-bfab-c366c88522cc",
+    "properties": {
+     "category": "outdoors",
+     "description": "Nested lightweight pots and pans for preparing meals outdoors.",
+     "name": "Campfire Cook Set",
+     "price": 63,
+     "sku": "OUT-731"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "eddf7148-8bc5-55d0-b1f2-b43ef9bb4e71",
+    "properties": {
+     "category": "outdoors",
+     "description": "Stainless steel bottle that keeps drinks cold during hikes and travel.",
+     "name": "Insulated Trail Bottle",
+     "price": 29,
+     "sku": "OUT-613"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   },
+   {
+    "id": "fefde647-4615-557f-885e-825524edadc5",
+    "properties": {
+     "category": "outdoors",
+     "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+     "name": "Alpine Two-Person Tent",
+     "price": 179,
+     "sku": "OUT-017"
+    },
+    "has_vector": true,
+    "vector_names": [
+     "default"
+    ]
+   }
+  ]
+ },
+ "probes": {
+  "missing-query": {
+   "params": {},
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "missing",
+      "loc": [
+       "query",
+       "query"
+      ],
+      "msg": "Field required",
+      "input": null
+     }
+    ]
+   }
+  },
+  "invalid-page-0": {
+   "params": {
+    "query": "test",
+    "page": 0
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "greater_than_equal",
+      "loc": [
+       "query",
+       "page"
+      ],
+      "msg": "Input should be greater than or equal to 1",
+      "input": "0",
+      "ctx": {
+       "ge": 1
+      }
+     }
+    ]
+   }
+  },
+  "invalid-page--1": {
+   "params": {
+    "query": "test",
+    "page": -1
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "greater_than_equal",
+      "loc": [
+       "query",
+       "page"
+      ],
+      "msg": "Input should be greater than or equal to 1",
+      "input": "-1",
+      "ctx": {
+       "ge": 1
+      }
+     }
+    ]
+   }
+  },
+  "invalid-page-abc": {
+   "params": {
+    "query": "test",
+    "page": "abc"
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "int_parsing",
+      "loc": [
+       "query",
+       "page"
+      ],
+      "msg": "Input should be a valid integer, unable to parse string as an integer",
+      "input": "abc"
+     }
+    ]
+   }
+  },
+  "invalid-page-1.5": {
+   "params": {
+    "query": "test",
+    "page": "1.5"
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "int_parsing",
+      "loc": [
+       "query",
+       "page"
+      ],
+      "msg": "Input should be a valid integer, unable to parse string as an integer",
+      "input": "1.5"
+     }
+    ]
+   }
+  },
+  "invalid-page-size-0": {
+   "params": {
+    "query": "test",
+    "page_size": 0
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "greater_than_equal",
+      "loc": [
+       "query",
+       "page_size"
+      ],
+      "msg": "Input should be greater than or equal to 1",
+      "input": "0",
+      "ctx": {
+       "ge": 1
+      }
+     }
+    ]
+   }
+  },
+  "invalid-page-size--1": {
+   "params": {
+    "query": "test",
+    "page_size": -1
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "greater_than_equal",
+      "loc": [
+       "query",
+       "page_size"
+      ],
+      "msg": "Input should be greater than or equal to 1",
+      "input": "-1",
+      "ctx": {
+       "ge": 1
+      }
+     }
+    ]
+   }
+  },
+  "invalid-page-size-abc": {
+   "params": {
+    "query": "test",
+    "page_size": "abc"
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "int_parsing",
+      "loc": [
+       "query",
+       "page_size"
+      ],
+      "msg": "Input should be a valid integer, unable to parse string as an integer",
+      "input": "abc"
+     }
+    ]
+   }
+  },
+  "invalid-page-size-1.5": {
+   "params": {
+    "query": "test",
+    "page_size": "1.5"
+   },
+   "status": 422,
+   "body": {
+    "detail": [
+     {
+      "type": "int_parsing",
+      "loc": [
+       "query",
+       "page_size"
+      ],
+      "msg": "Input should be a valid integer, unable to parse string as an integer",
+      "input": "1.5"
+     }
+    ]
+   }
+  },
+  "default-page": {
+   "params": {
+    "query": "travel equipment"
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "TRAVEL-902",
+      "name": "RFID Passport Wallet",
+      "description": "Slim document organizer that protects cards and travel documents.",
+      "category": "travel",
+      "price": 26.0
+     },
+     {
+      "sku": "TRAVEL-145",
+      "name": "Compression Packing Cubes",
+      "description": "A set of zippered organizers that saves space inside luggage.",
+      "category": "travel",
+      "price": 37.0
+     },
+     {
+      "sku": "TRAVEL-510",
+      "name": "Cabin Spinner Suitcase",
+      "description": "Compact hard-shell luggage with smooth wheels and organized compartments.",
+      "category": "travel",
+      "price": 119.0
+     },
+     {
+      "sku": "TRAVEL-288",
+      "name": "Memory Foam Neck Pillow",
+      "description": "Supportive travel cushion for sleeping comfortably on planes and trains.",
+      "category": "travel",
+      "price": 31.0
+     },
+     {
+      "sku": "OUT-017",
+      "name": "Alpine Two-Person Tent",
+      "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+      "category": "outdoors",
+      "price": 179.0
+     }
+    ],
+    "page": 1,
+    "page_size": 5
+   }
+  },
+  "exact-sku": {
+   "params": {
+    "query": "ZXQ-9917",
+    "page": 1,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "ZXQ-9917",
+      "name": "Metro Canvas Sneakers",
+      "description": "Lightweight everyday shoes with breathable canvas uppers and flexible rubber soles.",
+      "category": "footwear",
+      "price": 54.0
+     },
+     {
+      "sku": "OUT-731",
+      "name": "Campfire Cook Set",
+      "description": "Nested lightweight pots and pans for preparing meals outdoors.",
+      "category": "outdoors",
+      "price": 63.0
+     },
+     {
+      "sku": "OUT-017",
+      "name": "Alpine Two-Person Tent",
+      "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+      "category": "outdoors",
+      "price": 179.0
+     },
+     {
+      "sku": "TRAVEL-145",
+      "name": "Compression Packing Cubes",
+      "description": "A set of zippered organizers that saves space inside luggage.",
+      "category": "travel",
+      "price": 37.0
+     },
+     {
+      "sku": "RUN-210",
+      "name": "Velocity Road Runners",
+      "description": "Cushioned athletic shoes designed for daily pavement training and long-distance comfort.",
+      "category": "footwear",
+      "price": 98.0
+     }
+    ],
+    "page": 1,
+    "page_size": 5
+   }
+  },
+  "semantic": {
+   "params": {
+    "query": "soggy mountaineering trek",
+    "page": 1,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "TRAIL-001",
+      "name": "Summit Waterproof Hiking Boots",
+      "description": "Dry and supportive boots with grippy soles for rocky paths and rainy adventures.",
+      "category": "footwear",
+      "price": 129.0
+     },
+     {
+      "sku": "OUT-017",
+      "name": "Alpine Two-Person Tent",
+      "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+      "category": "outdoors",
+      "price": 179.0
+     },
+     {
+      "sku": "OUT-442",
+      "name": "Packable Rain Jacket",
+      "description": "Breathable waterproof shell that folds into its own pocket.",
+      "category": "outdoors",
+      "price": 84.0
+     },
+     {
+      "sku": "TRAVEL-145",
+      "name": "Compression Packing Cubes",
+      "description": "A set of zippered organizers that saves space inside luggage.",
+      "category": "travel",
+      "price": 37.0
+     },
+     {
+      "sku": "CAM-420",
+      "name": "TrailShot Action Camera",
+      "description": "A rugged waterproof camera for recording cycling, skiing, and outdoor trips.",
+      "category": "electronics",
+      "price": 159.0
+     }
+    ],
+    "page": 1,
+    "page_size": 5
+   }
+  },
+  "pagination-reference": {
+   "params": {
+    "query": "useful equipment for home and travel",
+    "page": 1,
+    "page_size": 24
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "TRAVEL-145",
+      "name": "Compression Packing Cubes",
+      "description": "A set of zippered organizers that saves space inside luggage.",
+      "category": "travel",
+      "price": 37.0
+     },
+     {
+      "sku": "TRAVEL-510",
+      "name": "Cabin Spinner Suitcase",
+      "description": "Compact hard-shell luggage with smooth wheels and organized compartments.",
+      "category": "travel",
+      "price": 119.0
+     },
+     {
+      "sku": "FIT-804",
+      "name": "Adjustable Training Weights",
+      "description": "Space-saving dumbbells for strength sessions at home.",
+      "category": "fitness",
+      "price": 219.0
+     },
+     {
+      "sku": "OUT-017",
+      "name": "Alpine Two-Person Tent",
+      "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+      "category": "outdoors",
+      "price": 179.0
+     },
+     {
+      "sku": "TRAVEL-902",
+      "name": "RFID Passport Wallet",
+      "description": "Slim document organizer that protects cards and travel documents.",
+      "category": "travel",
+      "price": 26.0
+     },
+     {
+      "sku": "FIT-990",
+      "name": "Indoor Cycling Trainer",
+      "description": "Quiet resistance stand that converts a road bicycle into a home workout machine.",
+      "category": "fitness",
+      "price": 249.0
+     },
+     {
+      "sku": "HOME-875",
+      "name": "Bamboo Kitchen Organizer",
+      "description": "Expandable drawer storage for utensils and small cooking tools.",
+      "category": "home",
+      "price": 41.0
+     },
+     {
+      "sku": "CAM-420",
+      "name": "TrailShot Action Camera",
+      "description": "A rugged waterproof camera for recording cycling, skiing, and outdoor trips.",
+      "category": "electronics",
+      "price": 159.0
+     },
+     {
+      "sku": "OUT-731",
+      "name": "Campfire Cook Set",
+      "description": "Nested lightweight pots and pans for preparing meals outdoors.",
+      "category": "outdoors",
+      "price": 63.0
+     },
+     {
+      "sku": "RUN-210",
+      "name": "Velocity Road Runners",
+      "description": "Cushioned athletic shoes designed for daily pavement training and long-distance comfort.",
+      "category": "footwear",
+      "price": 98.0
+     },
+     {
+      "sku": "OUT-442",
+      "name": "Packable Rain Jacket",
+      "description": "Breathable waterproof shell that folds into its own pocket.",
+      "category": "outdoors",
+      "price": 84.0
+     },
+     {
+      "sku": "TRAVEL-288",
+      "name": "Memory Foam Neck Pillow",
+      "description": "Supportive travel cushion for sleeping comfortably on planes and trains.",
+      "category": "travel",
+      "price": 31.0
+     },
+     {
+      "sku": "TRAIL-001",
+      "name": "Summit Waterproof Hiking Boots",
+      "description": "Dry and supportive boots with grippy soles for rocky paths and rainy adventures.",
+      "category": "footwear",
+      "price": 129.0
+     },
+     {
+      "sku": "WATCH-009",
+      "name": "PulseTrack Sports Watch",
+      "description": "GPS fitness watch with heart-rate tracking and week-long battery life.",
+      "category": "electronics",
+      "price": 139.0
+     },
+     {
+      "sku": "AUDIO-301",
+      "name": "QuietJourney Headphones",
+      "description": "Wireless over-ear audio with active noise cancellation for flights and commuting.",
+      "category": "electronics",
+      "price": 189.0
+     },
+     {
+      "sku": "OUT-613",
+      "name": "Insulated Trail Bottle",
+      "description": "Stainless steel bottle that keeps drinks cold during hikes and travel.",
+      "category": "outdoors",
+      "price": 29.0
+     },
+     {
+      "sku": "HOME-221",
+      "name": "Stoneware Coffee Mug Set",
+      "description": "Four durable ceramic mugs with comfortable handles for hot drinks.",
+      "category": "home",
+      "price": 32.0
+     },
+     {
+      "sku": "SAND-044",
+      "name": "Coast Walking Sandals",
+      "description": "Adjustable open footwear for warm weather walks and beach holidays.",
+      "category": "footwear",
+      "price": 46.0
+     },
+     {
+      "sku": "FIT-156",
+      "name": "Recovery Foam Roller",
+      "description": "Firm textured roller for post-workout muscle massage and mobility routines.",
+      "category": "fitness",
+      "price": 28.0
+     },
+     {
+      "sku": "LIGHT-640",
+      "name": "Focus LED Desk Lamp",
+      "description": "Adjustable task lighting with warm and cool modes for office work and reading.",
+      "category": "home",
+      "price": 57.0
+     },
+     {
+      "sku": "HOME-711",
+      "name": "CloudRest Throw Blanket",
+      "description": "A soft washable blanket for adding warmth to a sofa or reading chair.",
+      "category": "home",
+      "price": 38.0
+     },
+     {
+      "sku": "AUDIO-118",
+      "name": "PocketBeat Earbuds",
+      "description": "Compact Bluetooth earbuds with a charging case for exercise and calls.",
+      "category": "electronics",
+      "price": 69.0
+     },
+     {
+      "sku": "ZXQ-9917",
+      "name": "Metro Canvas Sneakers",
+      "description": "Lightweight everyday shoes with breathable canvas uppers and flexible rubber soles.",
+      "category": "footwear",
+      "price": 54.0
+     },
+     {
+      "sku": "FIT-332",
+      "name": "CoreFlex Yoga Mat",
+      "description": "Non-slip exercise mat with dense cushioning for yoga and floor workouts.",
+      "category": "fitness",
+      "price": 35.0
+     }
+    ],
+    "page": 1,
+    "page_size": 24
+   }
+  },
+  "pagination-page-1": {
+   "params": {
+    "query": "useful equipment for home and travel",
+    "page": 1,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "TRAVEL-145",
+      "name": "Compression Packing Cubes",
+      "description": "A set of zippered organizers that saves space inside luggage.",
+      "category": "travel",
+      "price": 37.0
+     },
+     {
+      "sku": "TRAVEL-510",
+      "name": "Cabin Spinner Suitcase",
+      "description": "Compact hard-shell luggage with smooth wheels and organized compartments.",
+      "category": "travel",
+      "price": 119.0
+     },
+     {
+      "sku": "FIT-804",
+      "name": "Adjustable Training Weights",
+      "description": "Space-saving dumbbells for strength sessions at home.",
+      "category": "fitness",
+      "price": 219.0
+     },
+     {
+      "sku": "OUT-017",
+      "name": "Alpine Two-Person Tent",
+      "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+      "category": "outdoors",
+      "price": 179.0
+     },
+     {
+      "sku": "TRAVEL-902",
+      "name": "RFID Passport Wallet",
+      "description": "Slim document organizer that protects cards and travel documents.",
+      "category": "travel",
+      "price": 26.0
+     }
+    ],
+    "page": 1,
+    "page_size": 5
+   }
+  },
+  "pagination-page-2": {
+   "params": {
+    "query": "useful equipment for home and travel",
+    "page": 2,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "FIT-990",
+      "name": "Indoor Cycling Trainer",
+      "description": "Quiet resistance stand that converts a road bicycle into a home workout machine.",
+      "category": "fitness",
+      "price": 249.0
+     },
+     {
+      "sku": "HOME-875",
+      "name": "Bamboo Kitchen Organizer",
+      "description": "Expandable drawer storage for utensils and small cooking tools.",
+      "category": "home",
+      "price": 41.0
+     },
+     {
+      "sku": "CAM-420",
+      "name": "TrailShot Action Camera",
+      "description": "A rugged waterproof camera for recording cycling, skiing, and outdoor trips.",
+      "category": "electronics",
+      "price": 159.0
+     },
+     {
+      "sku": "OUT-731",
+      "name": "Campfire Cook Set",
+      "description": "Nested lightweight pots and pans for preparing meals outdoors.",
+      "category": "outdoors",
+      "price": 63.0
+     },
+     {
+      "sku": "RUN-210",
+      "name": "Velocity Road Runners",
+      "description": "Cushioned athletic shoes designed for daily pavement training and long-distance comfort.",
+      "category": "footwear",
+      "price": 98.0
+     }
+    ],
+    "page": 2,
+    "page_size": 5
+   }
+  },
+  "pagination-page-3": {
+   "params": {
+    "query": "useful equipment for home and travel",
+    "page": 3,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "OUT-442",
+      "name": "Packable Rain Jacket",
+      "description": "Breathable waterproof shell that folds into its own pocket.",
+      "category": "outdoors",
+      "price": 84.0
+     },
+     {
+      "sku": "TRAVEL-288",
+      "name": "Memory Foam Neck Pillow",
+      "description": "Supportive travel cushion for sleeping comfortably on planes and trains.",
+      "category": "travel",
+      "price": 31.0
+     },
+     {
+      "sku": "TRAIL-001",
+      "name": "Summit Waterproof Hiking Boots",
+      "description": "Dry and supportive boots with grippy soles for rocky paths and rainy adventures.",
+      "category": "footwear",
+      "price": 129.0
+     },
+     {
+      "sku": "WATCH-009",
+      "name": "PulseTrack Sports Watch",
+      "description": "GPS fitness watch with heart-rate tracking and week-long battery life.",
+      "category": "electronics",
+      "price": 139.0
+     },
+     {
+      "sku": "AUDIO-301",
+      "name": "QuietJourney Headphones",
+      "description": "Wireless over-ear audio with active noise cancellation for flights and commuting.",
+      "category": "electronics",
+      "price": 189.0
+     }
+    ],
+    "page": 3,
+    "page_size": 5
+   }
+  },
+  "pagination-page-4": {
+   "params": {
+    "query": "useful equipment for home and travel",
+    "page": 4,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "OUT-613",
+      "name": "Insulated Trail Bottle",
+      "description": "Stainless steel bottle that keeps drinks cold during hikes and travel.",
+      "category": "outdoors",
+      "price": 29.0
+     },
+     {
+      "sku": "HOME-221",
+      "name": "Stoneware Coffee Mug Set",
+      "description": "Four durable ceramic mugs with comfortable handles for hot drinks.",
+      "category": "home",
+      "price": 32.0
+     },
+     {
+      "sku": "SAND-044",
+      "name": "Coast Walking Sandals",
+      "description": "Adjustable open footwear for warm weather walks and beach holidays.",
+      "category": "footwear",
+      "price": 46.0
+     },
+     {
+      "sku": "FIT-156",
+      "name": "Recovery Foam Roller",
+      "description": "Firm textured roller for post-workout muscle massage and mobility routines.",
+      "category": "fitness",
+      "price": 28.0
+     },
+     {
+      "sku": "LIGHT-640",
+      "name": "Focus LED Desk Lamp",
+      "description": "Adjustable task lighting with warm and cool modes for office work and reading.",
+      "category": "home",
+      "price": 57.0
+     }
+    ],
+    "page": 4,
+    "page_size": 5
+   }
+  },
+  "pagination-page-5": {
+   "params": {
+    "query": "useful equipment for home and travel",
+    "page": 5,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "HOME-711",
+      "name": "CloudRest Throw Blanket",
+      "description": "A soft washable blanket for adding warmth to a sofa or reading chair.",
+      "category": "home",
+      "price": 38.0
+     },
+     {
+      "sku": "AUDIO-118",
+      "name": "PocketBeat Earbuds",
+      "description": "Compact Bluetooth earbuds with a charging case for exercise and calls.",
+      "category": "electronics",
+      "price": 69.0
+     },
+     {
+      "sku": "ZXQ-9917",
+      "name": "Metro Canvas Sneakers",
+      "description": "Lightweight everyday shoes with breathable canvas uppers and flexible rubber soles.",
+      "category": "footwear",
+      "price": 54.0
+     },
+     {
+      "sku": "FIT-332",
+      "name": "CoreFlex Yoga Mat",
+      "description": "Non-slip exercise mat with dense cushioning for yoga and floor workouts.",
+      "category": "fitness",
+      "price": 35.0
+     }
+    ],
+    "page": 5,
+    "page_size": 5
+   }
+  },
+  "pagination-page-1-repeat": {
+   "params": {
+    "query": "useful equipment for home and travel",
+    "page": 1,
+    "page_size": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "TRAVEL-145",
+      "name": "Compression Packing Cubes",
+      "description": "A set of zippered organizers that saves space inside luggage.",
+      "category": "travel",
+      "price": 37.0
+     },
+     {
+      "sku": "TRAVEL-510",
+      "name": "Cabin Spinner Suitcase",
+      "description": "Compact hard-shell luggage with smooth wheels and organized compartments.",
+      "category": "travel",
+      "price": 119.0
+     },
+     {
+      "sku": "FIT-804",
+      "name": "Adjustable Training Weights",
+      "description": "Space-saving dumbbells for strength sessions at home.",
+      "category": "fitness",
+      "price": 219.0
+     },
+     {
+      "sku": "OUT-017",
+      "name": "Alpine Two-Person Tent",
+      "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+      "category": "outdoors",
+      "price": 179.0
+     },
+     {
+      "sku": "TRAVEL-902",
+      "name": "RFID Passport Wallet",
+      "description": "Slim document organizer that protects cards and travel documents.",
+      "category": "travel",
+      "price": 26.0
+     }
+    ],
+    "page": 1,
+    "page_size": 5
+   }
+  }
+ },
+ "files": {
+  "docker-compose.yaml": "# yaml-language-server: $schema=none\n---\nservices:\n  weaviate:\n    command:\n      - --host\n      - 0.0.0.0\n      - --port\n      - \"8080\"\n      - --scheme\n      - http\n    image: >-\n      cr.weaviate.io/semitechnologies/weaviate:1.39.5@sha256:c29b501d8fdab55d8b3fbe8c3db78e286ba0708536e7039d894d01a84ca6ba8b\n    restart: on-failure:0\n    environment:\n      QUERY_DEFAULTS_LIMIT: \"25\"\n      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: \"true\"\n      PERSISTENCE_DATA_PATH: /var/lib/weaviate\n      ENABLE_MODULES: text2vec-transformers\n      CLUSTER_HOSTNAME: node1\n      TRANSFORMERS_INFERENCE_API: http://text2vec-transformers:8080\n    depends_on:\n      text2vec-transformers:\n        condition: service_healthy\n    healthcheck:\n      test:\n        - CMD\n        - wget\n        - --spider\n        - --quiet\n        - http://localhost:8080/v1/.well-known/ready\n      interval: 2s\n      timeout: 2s\n      retries: 90\n\n  text2vec-transformers:\n    image: >-\n      cr.weaviate.io/semitechnologies/transformers-inference:snowflake-snowflake-arctic-embed-m@sha256:dc246a0e2119232b0f0adad4f61347ed5a0933a0f37cb6c0fbe6170e8966c2bf\n    environment:\n      ENABLE_CUDA: \"0\"\n    healthcheck:\n      test:\n        - CMD\n        - python\n        - -c\n        - >-\n          import urllib.request;\n          urllib.request.urlopen(\n          'http://localhost:8080/.well-known/ready', timeout=2)\n      interval: 2s\n      timeout: 3s\n      retries: 90\n\nnetworks:\n  default:\n    external: true\n    name: ${TRIAL_NETWORK}\n",
+  "main.py": "\"\"\"Ingest the supplied catalog and serve the Oracle's paginated search API.\"\"\"\n\n# pyright: reportMissingImports=false\n\nimport json\nimport os\nimport time\nfrom collections.abc import AsyncGenerator\nfrom contextlib import asynccontextmanager\nfrom pathlib import Path\nfrom typing import TypedDict, cast\n\nimport weaviate\nfrom fastapi import FastAPI, Query\nfrom search_backend import ProductCollection, ProductProperties, search_products\nfrom weaviate import WeaviateClient\nfrom weaviate.classes.config import Configure, DataType, Property, Tokenization\nfrom weaviate.classes.data import DataObject\nfrom weaviate.util import generate_uuid5\n\n\nclass SearchResponse(TypedDict):\n    \"\"\"Response body returned by the search endpoint.\"\"\"\n\n    items: list[ProductProperties]\n    page: int\n    page_size: int\n\n\ndef connect_to_weaviate() -> WeaviateClient:\n    \"\"\"Connect to the submission-owned Weaviate service.\n\n    Reads ``WEAVIATE_HTTP_HOST``, ``WEAVIATE_HTTP_PORT``,\n    ``WEAVIATE_GRPC_HOST``, and ``WEAVIATE_GRPC_PORT`` from the Task environment.\n    Configuration and connection failures are retried for 60 attempts with a\n    one-second pause after each failure.\n\n    Returns:\n        A connected client that the caller must close.\n\n    Raises:\n        RuntimeError: Weaviate does not become ready within the retry period.\n    \"\"\"\n    last_error = None\n    for _ in range(60):\n        try:\n            return weaviate.connect_to_custom(\n                http_host=os.environ[\"WEAVIATE_HTTP_HOST\"],\n                http_port=int(os.environ[\"WEAVIATE_HTTP_PORT\"]),\n                http_secure=False,\n                grpc_host=os.environ[\"WEAVIATE_GRPC_HOST\"],\n                grpc_port=int(os.environ[\"WEAVIATE_GRPC_PORT\"]),\n                grpc_secure=False,\n            )\n        except Exception as error:  # noqa: BLE001\n            last_error = error\n            time.sleep(1)\n    raise RuntimeError(\"Weaviate did not become ready\") from last_error\n\n\ndef prepare_collection(client: WeaviateClient) -> ProductCollection:\n    \"\"\"Create Product in an empty Trial environment and ingest the catalog.\n\n    The Product schema uses the local vectorizer and field tokenization for SKU.\n    Products come from ``/fixtures/products.json`` and receive deterministic\n    UUIDs derived from their SKUs. A pre-existing Product collection is an error\n    rather than reusable state. Exceptions raised by the Weaviate client during\n    schema creation or insertion propagate unchanged.\n\n    Returns:\n        The collection handle backed by ``client`` after catalog insertion.\n\n    Raises:\n        RuntimeError: The supplied catalog cannot be read or decoded.\n    \"\"\"\n    # A pre-existing collection means state leaked into this Trial. Let creation\n    # fail so the evaluator preserves that evidence instead of hiding the defect.\n    client.collections.create(\n        name=\"Product\",\n        vector_config=Configure.Vectors.text2vec_transformers(),\n        properties=[\n            Property(\n                name=\"sku\",\n                data_type=DataType.TEXT,\n                tokenization=Tokenization.FIELD,\n            ),\n            Property(name=\"name\", data_type=DataType.TEXT),\n            Property(name=\"description\", data_type=DataType.TEXT),\n            Property(\n                name=\"category\",\n                data_type=DataType.TEXT,\n                tokenization=Tokenization.FIELD,\n            ),\n            Property(name=\"price\", data_type=DataType.NUMBER),\n        ],\n    )\n    collection = client.collections.use(\n        \"Product\",\n        data_model_properties=ProductProperties,\n    )\n    try:\n        products = cast(\n            list[ProductProperties],\n            json.loads(Path(\"/fixtures/products.json\").read_text()),\n        )\n    except (OSError, json.JSONDecodeError) as error:\n        raise RuntimeError(\"Could not load the supplied product catalog\") from error\n    catalog_objects = [\n        DataObject(\n            properties=product,\n            uuid=generate_uuid5(product[\"sku\"]),\n        )\n        for product in products\n    ]\n    collection.data.insert_many(catalog_objects)\n    return collection\n\n\n@asynccontextmanager\nasync def lifespan(app: FastAPI) -> AsyncGenerator[None]:\n    \"\"\"Own the Weaviate client and prepared Product collection.\n\n    Closes the client when collection preparation fails or the application\n    exits.\n    \"\"\"\n    client = connect_to_weaviate()\n    try:\n        app.state.weaviate = client\n        app.state.products = prepare_collection(client)\n        yield\n    finally:\n        client.close()\n\n\napp = FastAPI(lifespan=lifespan)\n\n\n@app.get(\"/search\")\ndef search(\n    query: str,\n    page: int = Query(default=1, ge=1),\n    page_size: int = Query(default=5, ge=1),\n) -> SearchResponse:\n    \"\"\"Return one page from the prepared Product collection.\n\n    FastAPI requires ``query`` and rejects page or page size values below one.\n    The one-based page number is translated to a Weaviate result offset.\n    \"\"\"\n    collection: ProductCollection = app.state.products\n    items = search_products(\n        collection,\n        query=query,\n        limit=page_size,\n        offset=(page - 1) * page_size,\n    )\n    return {\n        \"items\": items,\n        \"page\": page,\n        \"page_size\": page_size,\n    }\n",
+  "search_backend.py": "\"\"\"Canonical Weaviate hybrid-search implementation for the Oracle.\"\"\"\n\n# pyright: reportMissingImports=false\n\nfrom typing import TypedDict\n\nfrom weaviate.collections import Collection\n\n\nclass ProductProperties(TypedDict):\n    \"\"\"Product fields stored in Weaviate and returned by the search endpoint.\"\"\"\n\n    sku: str\n    name: str\n    description: str\n    category: str\n    price: float\n\n\ntype ProductCollection = Collection[ProductProperties, None]\n\n\ndef search_products(\n    collection: ProductCollection,\n    *,\n    query: str,\n    limit: int,\n    offset: int,\n) -> list[ProductProperties]:\n    \"\"\"Return one ordered page from Weaviate hybrid search.\n\n    ``query``, ``limit``, and ``offset`` pass unchanged to Weaviate. Returned\n    properties preserve the result order selected by Weaviate.\n    \"\"\"\n    result = collection.query.hybrid(\n        query=query,\n        limit=limit,\n        offset=offset,\n    )\n    return [item.properties for item in result.objects]\n"
+ },
+ "fixture": [
+  {
+   "sku": "TRAIL-001",
+   "name": "Summit Waterproof Hiking Boots",
+   "description": "Dry and supportive boots with grippy soles for rocky paths and rainy adventures.",
+   "category": "footwear",
+   "price": 129.0
+  },
+  {
+   "sku": "ZXQ-9917",
+   "name": "Metro Canvas Sneakers",
+   "description": "Lightweight everyday shoes with breathable canvas uppers and flexible rubber soles.",
+   "category": "footwear",
+   "price": 54.0
+  },
+  {
+   "sku": "RUN-210",
+   "name": "Velocity Road Runners",
+   "description": "Cushioned athletic shoes designed for daily pavement training and long-distance comfort.",
+   "category": "footwear",
+   "price": 98.0
+  },
+  {
+   "sku": "SAND-044",
+   "name": "Coast Walking Sandals",
+   "description": "Adjustable open footwear for warm weather walks and beach holidays.",
+   "category": "footwear",
+   "price": 46.0
+  },
+  {
+   "sku": "AUDIO-301",
+   "name": "QuietJourney Headphones",
+   "description": "Wireless over-ear audio with active noise cancellation for flights and commuting.",
+   "category": "electronics",
+   "price": 189.0
+  },
+  {
+   "sku": "AUDIO-118",
+   "name": "PocketBeat Earbuds",
+   "description": "Compact Bluetooth earbuds with a charging case for exercise and calls.",
+   "category": "electronics",
+   "price": 69.0
+  },
+  {
+   "sku": "CAM-420",
+   "name": "TrailShot Action Camera",
+   "description": "A rugged waterproof camera for recording cycling, skiing, and outdoor trips.",
+   "category": "electronics",
+   "price": 159.0
+  },
+  {
+   "sku": "WATCH-009",
+   "name": "PulseTrack Sports Watch",
+   "description": "GPS fitness watch with heart-rate tracking and week-long battery life.",
+   "category": "electronics",
+   "price": 139.0
+  },
+  {
+   "sku": "HOME-711",
+   "name": "CloudRest Throw Blanket",
+   "description": "A soft washable blanket for adding warmth to a sofa or reading chair.",
+   "category": "home",
+   "price": 38.0
+  },
+  {
+   "sku": "HOME-221",
+   "name": "Stoneware Coffee Mug Set",
+   "description": "Four durable ceramic mugs with comfortable handles for hot drinks.",
+   "category": "home",
+   "price": 32.0
+  },
+  {
+   "sku": "HOME-875",
+   "name": "Bamboo Kitchen Organizer",
+   "description": "Expandable drawer storage for utensils and small cooking tools.",
+   "category": "home",
+   "price": 41.0
+  },
+  {
+   "sku": "LIGHT-640",
+   "name": "Focus LED Desk Lamp",
+   "description": "Adjustable task lighting with warm and cool modes for office work and reading.",
+   "category": "home",
+   "price": 57.0
+  },
+  {
+   "sku": "FIT-332",
+   "name": "CoreFlex Yoga Mat",
+   "description": "Non-slip exercise mat with dense cushioning for yoga and floor workouts.",
+   "category": "fitness",
+   "price": 35.0
+  },
+  {
+   "sku": "FIT-804",
+   "name": "Adjustable Training Weights",
+   "description": "Space-saving dumbbells for strength sessions at home.",
+   "category": "fitness",
+   "price": 219.0
+  },
+  {
+   "sku": "FIT-156",
+   "name": "Recovery Foam Roller",
+   "description": "Firm textured roller for post-workout muscle massage and mobility routines.",
+   "category": "fitness",
+   "price": 28.0
+  },
+  {
+   "sku": "FIT-990",
+   "name": "Indoor Cycling Trainer",
+   "description": "Quiet resistance stand that converts a road bicycle into a home workout machine.",
+   "category": "fitness",
+   "price": 249.0
+  },
+  {
+   "sku": "OUT-017",
+   "name": "Alpine Two-Person Tent",
+   "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+   "category": "outdoors",
+   "price": 179.0
+  },
+  {
+   "sku": "OUT-613",
+   "name": "Insulated Trail Bottle",
+   "description": "Stainless steel bottle that keeps drinks cold during hikes and travel.",
+   "category": "outdoors",
+   "price": 29.0
+  },
+  {
+   "sku": "OUT-442",
+   "name": "Packable Rain Jacket",
+   "description": "Breathable waterproof shell that folds into its own pocket.",
+   "category": "outdoors",
+   "price": 84.0
+  },
+  {
+   "sku": "OUT-731",
+   "name": "Campfire Cook Set",
+   "description": "Nested lightweight pots and pans for preparing meals outdoors.",
+   "category": "outdoors",
+   "price": 63.0
+  },
+  {
+   "sku": "TRAVEL-510",
+   "name": "Cabin Spinner Suitcase",
+   "description": "Compact hard-shell luggage with smooth wheels and organized compartments.",
+   "category": "travel",
+   "price": 119.0
+  },
+  {
+   "sku": "TRAVEL-288",
+   "name": "Memory Foam Neck Pillow",
+   "description": "Supportive travel cushion for sleeping comfortably on planes and trains.",
+   "category": "travel",
+   "price": 31.0
+  },
+  {
+   "sku": "TRAVEL-902",
+   "name": "RFID Passport Wallet",
+   "description": "Slim document organizer that protects cards and travel documents.",
+   "category": "travel",
+   "price": 26.0
+  },
+  {
+   "sku": "TRAVEL-145",
+   "name": "Compression Packing Cubes",
+   "description": "A set of zippered organizers that saves space inside luggage.",
+   "category": "travel",
+   "price": 37.0
+  }
+ ]
+}
