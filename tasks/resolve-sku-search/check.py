@@ -8,8 +8,10 @@ the docstring is its description. Reward requires every ``REQUIRED`` check.
 from uuid import UUID, uuid5
 
 COLLECTION = "Product"
-CATALOG_SIZE = 26
-EXACT_SKU = "ZXQ-9917"
+CATALOG_SIZE = 28
+# ZXQ-9917 is the reported SKU. The others share its segments: the first two
+# tokenize identically under word tokenization, the last two share one token.
+EXACT_SKUS = ("ZXQ-9917", "9917-ZXQ", "9917@ZXQ", "AQ1-9917", "ZXQ-4831")
 KEYWORD_SKU = "TRAIL-001"
 # Matches the seed script, so preserved UUIDs can be recognised.
 NAMESPACE = UUID("6f1c1d0e-3b5a-4f7e-9a51-6c1f0e2d9b17")
@@ -49,9 +51,16 @@ def items(snapshot: dict, label: str) -> list[dict]:
 
 
 def exact_sku_retrieval(snapshot: dict) -> None:
-    """An exact SKU query ranks the matching product first."""
-    found = [i["sku"] for i in items(snapshot, "exact-sku")]
-    assert found[:1] == [EXACT_SKU], f"query {EXACT_SKU!r} ranks it first; got {found}"
+    """An exact SKU query ranks the matching product first, for each SKU sharing segments with ZXQ-9917."""
+    # Greenfield probes ZXQ-9917 alone. A workaround that hoists word-tokenized
+    # filter matches passed that probe only because of seed order
+    # (20261013-214112-resolve-sku-search-pi-glm-5.3-flash, Trial HrrRY7G).
+    misranked = {}
+    for sku in EXACT_SKUS:
+        found = [i["sku"] for i in items(snapshot, f"exact-sku-{sku}")]
+        if found[:1] != [sku]:
+            misranked[sku] = found
+    assert not misranked, f"each SKU query ranks that SKU first; got {misranked}"
 
 
 def search_contract(snapshot: dict) -> None:

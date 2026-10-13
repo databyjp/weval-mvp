@@ -36,12 +36,21 @@ def schema_property(s: dict, name: str) -> dict:
     return next(p for p in s["schema"]["properties"] if p["name"] == name)
 
 
+def set_ranking(s: dict, query: str, skus: tuple[str, ...]) -> None:
+    by_sku = {p["sku"]: p for p in s["catalog"]}
+    s["probes"][f"exact-sku-{query}"]["body"]["items"] = [by_sku[sku] for sku in skus]
+
+
 def word_tokenized_ranking(s: dict) -> None:
     # The seeded baseline's /search order, observed in the local dry run.
-    by_sku = {p["sku"]: p for p in s["catalog"]}
-    s["probes"]["exact-sku"]["body"]["items"] = [
-        by_sku[sku] for sku in ("9917-ZXQ", "ZXQ-9917", "ZXQ-9917-W")
-    ]
+    for query in ("ZXQ-9917", "9917@ZXQ"):
+        set_ranking(s, query, ("9917-ZXQ", "ZXQ-9917", "9917@ZXQ", "ZXQ-4831", "AQ1-9917"))
+
+
+def hoisted_filter_matches(s: dict) -> None:
+    # HrrRY7G's workaround: word-tokenized equal() matches, in seed order, ahead of BM25.
+    for query in ("9917-ZXQ", "9917@ZXQ"):
+        set_ranking(s, query, ("ZXQ-9917", "9917@ZXQ", "9917-ZXQ", "ZXQ-4831", "AQ1-9917"))
 
 
 def exact_match_only_search(s: dict) -> None:
@@ -71,9 +80,10 @@ def test_oracle_passes_every_check():
 @pytest.mark.parametrize(
     ("break_snapshot", "failing_check", "reason"),
     [
-        (word_tokenized_ranking, "exact-sku-retrieval", "got ['9917-ZXQ', 'ZXQ-9917'"),
+        (word_tokenized_ranking, "exact-sku-retrieval", "'ZXQ-9917': ['9917-ZXQ'"),
+        (hoisted_filter_matches, "exact-sku-retrieval", "'9917-ZXQ': ['ZXQ-9917'"),
         (exact_match_only_search, "search-contract", "returns TRAIL-001"),
-        (dropped_catalog, "document-preservation", "holds 26 objects"),
+        (dropped_catalog, "document-preservation", "holds 28 objects"),
         (price_as_text, "collection-schema", "'price': 'text'"),
         (name_field_tokenization, "collection-schema", "changed: {'name': 'field'}"),
         (app_side_workaround, "sku-field-tokenization", "got 'word'"),
@@ -93,7 +103,7 @@ def test_reingest_with_new_uuids_passes_and_is_recorded():
         obj["id"] = f"00000000-0000-4000-8000-{n:012d}"
     preservation = results(snapshot)["document-preservation"]
     assert preservation["passed"]
-    assert preservation["notes"] == "UUIDs preserved: 0/26"
+    assert preservation["notes"] == "UUIDs preserved: 0/28"
 
 
 def test_failed_snapshot_fails_every_check_without_crashing():

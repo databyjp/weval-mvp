@@ -1,7 +1,7 @@
 # Product search workspace
 
 The deployment is defined in `docker-compose.yaml`. Its Weaviate service has a
-persistent volume and a `Product` collection holding the indexed catalog of 26
+persistent volume and a `Product` collection holding the indexed catalog of 28
 products. The application runs from `main.py` on port 8000;
 `requirements.txt` records its Python dependencies.
 

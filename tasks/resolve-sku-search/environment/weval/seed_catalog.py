@@ -1,7 +1,7 @@
 """Seed the evaluator's Product catalog before agent execution.
 
-``sku`` keeps Weaviate's default word tokenization, which splits ``ZXQ-9917``
-and ``9917-ZXQ`` into the same tokens. Object UUIDs derive from the SKU so
+``sku`` keeps Weaviate's default word tokenization, which splits ``ZXQ-9917``,
+``9917-ZXQ``, and ``9917@ZXQ`` into the same tokens. Object UUIDs derive from the SKU so
 ``check.py`` can tell whether the agent preserved them.
 """
 

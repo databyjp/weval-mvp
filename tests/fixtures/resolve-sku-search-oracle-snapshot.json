@@ -163,16 +163,6 @@
    }
   },
   {
-   "id": "26dbef9b-f720-51e6-9dfc-906bf53b1d0c",
-   "properties": {
-    "category": "footwear",
-    "description": "The Metro canvas sneaker in a wider last for extra toe room.",
-    "name": "Metro Canvas Sneakers, Wide Fit",
-    "price": 56,
-    "sku": "ZXQ-9917-W"
-   }
-  },
-  {
    "id": "2a90c46a-2bc5-557f-8c1e-519f98e50920",
    "properties": {
     "category": "fitness",
@@ -216,9 +206,9 @@
    "id": "3eb93d66-ffb0-5f7d-b972-fb22adf9096d",
    "properties": {
     "category": "accessories",
-    "description": "Cleaning foam, a soft brush, and a protective spray for canvas uppers.",
-    "name": "Canvas Shoe Care Kit",
-    "price": 18,
+    "description": "Replacement flat laces in six colours for low-top trainers.",
+    "name": "Cotton Sneaker Laces",
+    "price": 7,
     "sku": "9917-ZXQ"
    }
   },
@@ -240,6 +230,16 @@
     "name": "Bamboo Kitchen Organizer",
     "price": 41,
     "sku": "HOME-875"
+   }
+  },
+  {
+   "id": "497ed3ab-77c1-5dca-aa4e-7d420090b4a3",
+   "properties": {
+    "category": "accessories",
+    "description": "Cleaning foam, a soft brush, and a protective spray for canvas uppers.",
+    "name": "Canvas Shoe Care Kit",
+    "price": 18,
+    "sku": "9917@ZXQ"
    }
   },
   {
@@ -363,6 +363,16 @@
    }
   },
   {
+   "id": "b7569a41-0d0c-5e5a-83d3-bab0464777c2",
+   "properties": {
+    "category": "footwear",
+    "description": "Slip-on leather shoes with a cushioned footbed for office wear.",
+    "name": "Metro Leather Loafers",
+    "price": 88,
+    "sku": "ZXQ-4831"
+   }
+  },
+  {
    "id": "cb5b8de0-d95d-589f-ba49-b503f626e618",
    "properties": {
     "category": "outdoors",
@@ -401,10 +411,20 @@
     "price": 37,
     "sku": "TRAVEL-145"
    }
+  },
+  {
+   "id": "faad3f43-a62a-551c-9e16-ec8f1df93328",
+   "properties": {
+    "category": "outdoor",
+    "description": "Double-wall steel bottle that keeps drinks cold for a full day.",
+    "name": "Aqua Insulated Water Bottle",
+    "price": 32,
+    "sku": "AQ1-9917"
+   }
   }
  ],
  "probes": {
-  "exact-sku": {
+  "exact-sku-ZXQ-9917": {
    "params": {
     "query": "ZXQ-9917",
     "limit": 5
@@ -418,6 +438,78 @@
       "description": "Lightweight everyday shoes with breathable canvas uppers and flexible rubber soles.",
       "category": "footwear",
       "price": 54.0
+     }
+    ]
+   }
+  },
+  "exact-sku-9917-ZXQ": {
+   "params": {
+    "query": "9917-ZXQ",
+    "limit": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "9917-ZXQ",
+      "name": "Cotton Sneaker Laces",
+      "description": "Replacement flat laces in six colours for low-top trainers.",
+      "category": "accessories",
+      "price": 7.0
+     }
+    ]
+   }
+  },
+  "exact-sku-9917@ZXQ": {
+   "params": {
+    "query": "9917@ZXQ",
+    "limit": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "9917@ZXQ",
+      "name": "Canvas Shoe Care Kit",
+      "description": "Cleaning foam, a soft brush, and a protective spray for canvas uppers.",
+      "category": "accessories",
+      "price": 18.0
+     }
+    ]
+   }
+  },
+  "exact-sku-AQ1-9917": {
+   "params": {
+    "query": "AQ1-9917",
+    "limit": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "AQ1-9917",
+      "name": "Aqua Insulated Water Bottle",
+      "description": "Double-wall steel bottle that keeps drinks cold for a full day.",
+      "category": "outdoor",
+      "price": 32.0
+     }
+    ]
+   }
+  },
+  "exact-sku-ZXQ-4831": {
+   "params": {
+    "query": "ZXQ-4831",
+    "limit": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "ZXQ-4831",
+      "name": "Metro Leather Loafers",
+      "description": "Slip-on leather shoes with a cushioned footbed for office wear.",
+      "category": "footwear",
+      "price": 88.0
      }
     ]
    }
@@ -625,18 +717,32 @@
    "price": 37.0
   },
   {
-   "sku": "ZXQ-9917-W",
-   "name": "Metro Canvas Sneakers, Wide Fit",
-   "description": "The Metro canvas sneaker in a wider last for extra toe room.",
-   "category": "footwear",
-   "price": 56.0
+   "sku": "AQ1-9917",
+   "name": "Aqua Insulated Water Bottle",
+   "description": "Double-wall steel bottle that keeps drinks cold for a full day.",
+   "category": "outdoor",
+   "price": 32.0
   },
   {
-   "sku": "9917-ZXQ",
+   "sku": "ZXQ-4831",
+   "name": "Metro Leather Loafers",
+   "description": "Slip-on leather shoes with a cushioned footbed for office wear.",
+   "category": "footwear",
+   "price": 88.0
+  },
+  {
+   "sku": "9917@ZXQ",
    "name": "Canvas Shoe Care Kit",
    "description": "Cleaning foam, a soft brush, and a protective spray for canvas uppers.",
    "category": "accessories",
    "price": 18.0
+  },
+  {
+   "sku": "9917-ZXQ",
+   "name": "Cotton Sneaker Laces",
+   "description": "Replacement flat laces in six colours for low-top trainers.",
+   "category": "accessories",
+   "price": 7.0
   }
  ]
 }

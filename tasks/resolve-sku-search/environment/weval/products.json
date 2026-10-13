@@ -168,17 +168,31 @@
     "price": 37.0
   },
   {
-    "sku": "ZXQ-9917-W",
-    "name": "Metro Canvas Sneakers, Wide Fit",
-    "description": "The Metro canvas sneaker in a wider last for extra toe room.",
-    "category": "footwear",
-    "price": 56.0
+    "sku": "AQ1-9917",
+    "name": "Aqua Insulated Water Bottle",
+    "description": "Double-wall steel bottle that keeps drinks cold for a full day.",
+    "category": "outdoor",
+    "price": 32.0
   },
   {
-    "sku": "9917-ZXQ",
+    "sku": "ZXQ-4831",
+    "name": "Metro Leather Loafers",
+    "description": "Slip-on leather shoes with a cushioned footbed for office wear.",
+    "category": "footwear",
+    "price": 88.0
+  },
+  {
+    "sku": "9917@ZXQ",
     "name": "Canvas Shoe Care Kit",
     "description": "Cleaning foam, a soft brush, and a protective spray for canvas uppers.",
     "category": "accessories",
     "price": 18.0
+  },
+  {
+    "sku": "9917-ZXQ",
+    "name": "Cotton Sneaker Laces",
+    "description": "Replacement flat laces in six colours for low-top trainers.",
+    "category": "accessories",
+    "price": 7.0
   }
 ]

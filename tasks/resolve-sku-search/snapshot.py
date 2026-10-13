@@ -15,8 +15,9 @@ from pathlib import Path
 COLLECTION = "Product"
 WEAVIATE = f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
 # Label -> /search query parameters. check.py reads responses by label.
+EXACT_SKUS = ("ZXQ-9917", "9917-ZXQ", "9917@ZXQ", "AQ1-9917", "ZXQ-4831")
 PROBES = {
-    "exact-sku": {"query": "ZXQ-9917", "limit": 5},
+    **{f"exact-sku-{sku}": {"query": sku, "limit": 5} for sku in EXACT_SKUS},
     "keyword": {"query": "waterproof hiking boots", "limit": 5},
 }
 
