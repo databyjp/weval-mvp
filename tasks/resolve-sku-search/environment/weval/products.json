@@ -1,0 +1,184 @@
+[
+  {
+    "sku": "TRAIL-001",
+    "name": "Summit Waterproof Hiking Boots",
+    "description": "Dry and supportive boots with grippy soles for rocky paths and rainy adventures.",
+    "category": "footwear",
+    "price": 129.0
+  },
+  {
+    "sku": "ZXQ-9917",
+    "name": "Metro Canvas Sneakers",
+    "description": "Lightweight everyday shoes with breathable canvas uppers and flexible rubber soles.",
+    "category": "footwear",
+    "price": 54.0
+  },
+  {
+    "sku": "RUN-210",
+    "name": "Velocity Road Runners",
+    "description": "Cushioned athletic shoes designed for daily pavement training and long-distance comfort.",
+    "category": "footwear",
+    "price": 98.0
+  },
+  {
+    "sku": "SAND-044",
+    "name": "Coast Walking Sandals",
+    "description": "Adjustable open footwear for warm weather walks and beach holidays.",
+    "category": "footwear",
+    "price": 46.0
+  },
+  {
+    "sku": "AUDIO-301",
+    "name": "QuietJourney Headphones",
+    "description": "Wireless over-ear audio with active noise cancellation for flights and commuting.",
+    "category": "electronics",
+    "price": 189.0
+  },
+  {
+    "sku": "AUDIO-118",
+    "name": "PocketBeat Earbuds",
+    "description": "Compact Bluetooth earbuds with a charging case for exercise and calls.",
+    "category": "electronics",
+    "price": 69.0
+  },
+  {
+    "sku": "CAM-420",
+    "name": "TrailShot Action Camera",
+    "description": "A rugged waterproof camera for recording cycling, skiing, and outdoor trips.",
+    "category": "electronics",
+    "price": 159.0
+  },
+  {
+    "sku": "WATCH-009",
+    "name": "PulseTrack Sports Watch",
+    "description": "GPS fitness watch with heart-rate tracking and week-long battery life.",
+    "category": "electronics",
+    "price": 139.0
+  },
+  {
+    "sku": "HOME-711",
+    "name": "CloudRest Throw Blanket",
+    "description": "A soft washable blanket for adding warmth to a sofa or reading chair.",
+    "category": "home",
+    "price": 38.0
+  },
+  {
+    "sku": "HOME-221",
+    "name": "Stoneware Coffee Mug Set",
+    "description": "Four durable ceramic mugs with comfortable handles for hot drinks.",
+    "category": "home",
+    "price": 32.0
+  },
+  {
+    "sku": "HOME-875",
+    "name": "Bamboo Kitchen Organizer",
+    "description": "Expandable drawer storage for utensils and small cooking tools.",
+    "category": "home",
+    "price": 41.0
+  },
+  {
+    "sku": "LIGHT-640",
+    "name": "Focus LED Desk Lamp",
+    "description": "Adjustable task lighting with warm and cool modes for office work and reading.",
+    "category": "home",
+    "price": 57.0
+  },
+  {
+    "sku": "FIT-332",
+    "name": "CoreFlex Yoga Mat",
+    "description": "Non-slip exercise mat with dense cushioning for yoga and floor workouts.",
+    "category": "fitness",
+    "price": 35.0
+  },
+  {
+    "sku": "FIT-804",
+    "name": "Adjustable Training Weights",
+    "description": "Space-saving dumbbells for strength sessions at home.",
+    "category": "fitness",
+    "price": 219.0
+  },
+  {
+    "sku": "FIT-156",
+    "name": "Recovery Foam Roller",
+    "description": "Firm textured roller for post-workout muscle massage and mobility routines.",
+    "category": "fitness",
+    "price": 28.0
+  },
+  {
+    "sku": "FIT-990",
+    "name": "Indoor Cycling Trainer",
+    "description": "Quiet resistance stand that converts a road bicycle into a home workout machine.",
+    "category": "fitness",
+    "price": 249.0
+  },
+  {
+    "sku": "OUT-017",
+    "name": "Alpine Two-Person Tent",
+    "description": "Lightweight weather-resistant shelter for backpacking and weekend camps.",
+    "category": "outdoors",
+    "price": 179.0
+  },
+  {
+    "sku": "OUT-613",
+    "name": "Insulated Trail Bottle",
+    "description": "Stainless steel bottle that keeps drinks cold during hikes and travel.",
+    "category": "outdoors",
+    "price": 29.0
+  },
+  {
+    "sku": "OUT-442",
+    "name": "Packable Rain Jacket",
+    "description": "Breathable waterproof shell that folds into its own pocket.",
+    "category": "outdoors",
+    "price": 84.0
+  },
+  {
+    "sku": "OUT-731",
+    "name": "Campfire Cook Set",
+    "description": "Nested lightweight pots and pans for preparing meals outdoors.",
+    "category": "outdoors",
+    "price": 63.0
+  },
+  {
+    "sku": "TRAVEL-510",
+    "name": "Cabin Spinner Suitcase",
+    "description": "Compact hard-shell luggage with smooth wheels and organized compartments.",
+    "category": "travel",
+    "price": 119.0
+  },
+  {
+    "sku": "TRAVEL-288",
+    "name": "Memory Foam Neck Pillow",
+    "description": "Supportive travel cushion for sleeping comfortably on planes and trains.",
+    "category": "travel",
+    "price": 31.0
+  },
+  {
+    "sku": "TRAVEL-902",
+    "name": "RFID Passport Wallet",
+    "description": "Slim document organizer that protects cards and travel documents.",
+    "category": "travel",
+    "price": 26.0
+  },
+  {
+    "sku": "TRAVEL-145",
+    "name": "Compression Packing Cubes",
+    "description": "A set of zippered organizers that saves space inside luggage.",
+    "category": "travel",
+    "price": 37.0
+  },
+  {
+    "sku": "ZXQ-9917-W",
+    "name": "Metro Canvas Sneakers, Wide Fit",
+    "description": "The Metro canvas sneaker in a wider last for extra toe room.",
+    "category": "footwear",
+    "price": 56.0
+  },
+  {
+    "sku": "9917-ZXQ",
+    "name": "Canvas Shoe Care Kit",
+    "description": "Cleaning foam, a soft brush, and a protective spray for canvas uppers.",
+    "category": "accessories",
+    "price": 18.0
+  }
+]

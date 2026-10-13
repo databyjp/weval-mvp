@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=none
+---
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.39.5
+    command: [--host, 0.0.0.0, --port, "8080", --scheme, http]
+    restart: on-failure:0
+    environment:
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      CLUSTER_HOSTNAME: node1
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - --quiet
+        - http://localhost:8080/v1/.well-known/ready
+      interval: 2s
+      timeout: 2s
+      retries: 90
+
+volumes:
+  weaviate_data:
+
+networks:
+  default:
+    external: true
+    name: ${TRIAL_NETWORK}
