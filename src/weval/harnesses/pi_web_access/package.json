@@ -1,0 +1,8 @@
+{
+  "name": "weval-pi-web-access-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "pi-web-access": "0.30.0"
+  }
+}

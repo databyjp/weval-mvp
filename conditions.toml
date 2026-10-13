@@ -1,0 +1,10 @@
+# Named Conditions: one agent harness plus one model. `weval run --condition <name>`.
+# Quote names containing dots. Keys other than `harness` are passed to that harness module in src/weval/harnesses/.
+
+[oracle]
+harness = "oracle"
+
+["pi-glm-5.3-flash"]
+harness = "pi"
+version = "0.85.1"
+model = "openrouter/z-ai/glm-5.3-flash"

@@ -1,0 +1,70 @@
+{
+  "provider": "exa",
+  "workflow": "none",
+  "webSearch": {
+    "enabled": true,
+    "allowedProviders": [
+      "exa"
+    ]
+  },
+  "tools": {
+    "webSearch": {
+      "enabled": true
+    },
+    "sourceCheck": {
+      "enabled": false
+    },
+    "fetchContent": {
+      "enabled": true
+    },
+    "getSearchContent": {
+      "enabled": true
+    }
+  },
+  "commands": {
+    "websearch": {
+      "enabled": false
+    },
+    "curator": {
+      "enabled": false
+    },
+    "search": {
+      "enabled": false
+    },
+    "google-account": {
+      "enabled": false
+    }
+  },
+  "allowBrowserCookies": false,
+  "fetchRouting": {
+    "providers": [
+      "http"
+    ],
+    "allowRemoteHostedProviders": false
+  },
+  "fetch": {
+    "defaultMode": "readable",
+    "allowedModes": [
+      "readable",
+      "raw"
+    ]
+  },
+  "image": {
+    "enabled": false
+  },
+  "githubClone": {
+    "enabled": false
+  },
+  "githubPrIssue": {
+    "enabled": false
+  },
+  "youtube": {
+    "enabled": false
+  },
+  "video": {
+    "enabled": false
+  },
+  "pdf": {
+    "enabled": false
+  }
+}

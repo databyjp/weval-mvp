@@ -7,7 +7,9 @@ authors = [
     { name = "JP Hwang", email = "me@jphwang.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "harbor[modal]>=0.23.0",
+]
 
 [project.scripts]
 weval = "weval:main"

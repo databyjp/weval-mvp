@@ -1,0 +1,11 @@
+# Harbor task config. weval adds instruction.md (from PROMPT.md) and tests/.
+artifacts = [{ source = "/app", destination = "submission" }]
+
+[agent]
+timeout_sec = 1200.0
+
+[verifier]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 900.0

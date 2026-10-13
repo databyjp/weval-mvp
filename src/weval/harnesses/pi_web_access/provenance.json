@@ -1,0 +1,8 @@
+{
+  "profile": "pi-web-access-exa-v1",
+  "package": "pi-web-access",
+  "version": "0.30.0",
+  "source_commit": "6c5afa1d0d43eef8552284ad73f4bd9f0612a378",
+  "npm_integrity": "sha512-BvqLP36JXfH9OBrmLiJ6IXeeCi9LVqJdLxpexeODM+LoVdCBV13vYiVEG8SQ3J+p+egbGmfPxdDQJ6V631LLUg==",
+  "provider": "exa-mcp-keyless"
+}
