@@ -1,0 +1,1 @@
+Spin up a Weaviate instance for the team to prototype semantic search against, using the Docker environment in this workspace. Create a `DocumentChunk` collection for storing text chunks, with Weaviate generating vectors through a vectorizer. Leave it running and reachable.

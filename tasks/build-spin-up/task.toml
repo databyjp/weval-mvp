@@ -1,0 +1,13 @@
+# Harbor task config. weval adds tests/.
+artifacts = [{ source = "/app", destination = "submission" }]
+
+[agent]
+timeout_sec = 1200.0
+
+[verifier]
+timeout_sec = 900.0
+# The running stack is the artifact under test; there is no application.
+env = { WEVAL_KEEP_STACK = "1" }
+
+[environment]
+build_timeout_sec = 900.0
