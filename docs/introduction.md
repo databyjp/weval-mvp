@@ -16,9 +16,12 @@ Think of `weval` as a set of Weaviate-related "Tasks" that agents are to perform
 
 A "Trial" is an attempt at a Task, and thus it requires an agent definition. An "Experiment" defines a plan comprising one or more Trials. An Experiment may also include "Treatments", such as additional agent skills, MCPs or other tools to be given to the agent.
 
+[Task runs](concepts/task-runs.md) describes how a run moves between `weval`, Harbor, and the verifier.
+
 ## Docs
 
 These docs follow the diataxis framework.
+- [Task runs](concepts/task-runs.md)
 - [How to define a Task](how-to/define-a-task.md)
 - [How to run a Trial](how-to/run-a-trial.md)
 - [How to read a Trial](how-to/read-a-trial.md)
