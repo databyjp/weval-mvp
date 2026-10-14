@@ -20,14 +20,23 @@ Set in `[verifier] env` per Task; a Task sets neither, either, or both.
 
 - `WEVAL_START_APP = "1"`: the Task has an application. The verifier starts
   `main:app` from `/app` and passes its base URL to `snapshot()`. Without
-  the flag, `snapshot()` receives `None`. The start recipe is fixed: a
-  Python ASGI application exposing `app` in `main.py`. A Task whose
+  the flag, `snapshot()` receives `None`. The start recipe is fixed:
+  uvicorn serves `main:app` on port 18000, and the verifier waits up to
+  120 s for `/openapi.json` to answer 2xx. FastAPI serves that route by
+  default; another ASGI application must serve it too. A Task whose
   application does not fit can start it from `environment/` instead and
   probe fixed URLs in `snapshot.py`.
 - `WEVAL_KEEP_STACK = "1"`: the agent's running stack is itself under test,
   for example because its Weaviate volume holds the data being scored. The
-  verifier scores that stack instead of starting a fresh one from the
-  submission.
+  verifier skips `docker compose up` and scores whatever the agent left
+  running.
+
+Without `WEVAL_KEEP_STACK`, the verifier runs `docker compose up --wait` on
+the submitted `/app/docker-compose.yaml`. Compose leaves running containers
+with unchanged configuration in place, so the verifier also scores the agent's
+stack and data whenever the agent left them running. The stack is fresh only
+when the agent stopped it. Either way, the verifier saves the Compose logs and
+then runs `docker compose down --volumes`.
 
 An environment that starts an application before the agent runs writes its
 process ID to `/tmp/application.pid`. The shared instructions tell the agent

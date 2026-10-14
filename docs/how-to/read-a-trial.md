@@ -22,3 +22,5 @@ Re-score a retained Trial offline from its snapshot (e.g. after changing the che
 ```sh
 uv run weval check experiment-outputs/<run>/job/<trial>
 ```
+
+`weval check` loads the Task's current `check.py` from the Task path recorded in `weval.json`. That path is absolute, so on another machine, pass `--task tasks/<name>`.

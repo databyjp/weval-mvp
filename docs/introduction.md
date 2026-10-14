@@ -1,6 +1,6 @@
 # Weval
 
-We are building `weval` to assess and improve Weaviate's "agent experience". It runs Weaviate coding Tasks against agent harnesses and score its outputs against a predefined rubric.
+We are building `weval` to assess and improve Weaviate's "agent experience". It runs Weaviate coding Tasks against agent harnesses and scores each Trial against the Task's checks.
 
 Domain terms (e.g. Task, Agent, Trial, Non-result) are defined in [`GLOSSARY.md`](../GLOSSARY.md).
 
@@ -14,8 +14,12 @@ For convenient orchestration of Docker-in-Docker and Trial parallelisation, `wev
 
 Think of `weval` as a set of Weaviate-related "Tasks" that agents are to perform, which will be then evaluated by `weval`.
 
-A "Trial" is an attempt at a Task, and thus it requires an agent definition. An "Experiment" defines a plan comprising one or more Trials. An experiment may also include "Treatments", such as additional agent skills, MCPs or other tools to be given to the agent.
+A "Trial" is an attempt at a Task, and thus it requires an agent definition. An "Experiment" defines a plan comprising one or more Trials. An Experiment may also include "Treatments", such as additional agent skills, MCPs or other tools to be given to the agent.
 
 ## Docs
 
 These docs follow the diataxis framework.
+- [How to define a Task](how-to/define-a-task.md)
+- [How to run a Trial](how-to/run-a-trial.md)
+- [How to read a Trial](how-to/read-a-trial.md)
+- [Reference](reference.md): `task.toml`, verifier flags, and the Trial directory
