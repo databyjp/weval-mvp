@@ -28,6 +28,9 @@ from weval.harnesses import oracle, pi
 
 ROOT = Path(__file__).resolve().parents[2]
 HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi}
+# Appended to every packaged prompt: facts about the Trial environment that no
+# single Task owns.
+SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
 SECRET_VARS = ("OPENROUTER_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
@@ -49,12 +52,15 @@ MODAL = EnvironmentConfig(
 
 def package_task(task_dir: Path, destination: Path) -> None:
     """Build a Harbor task package: the Task directory plus ``tests/``, which
-    holds the shared verifier with the Task's snapshot and check."""
+    holds the shared verifier with the Task's snapshot and check. The packaged
+    ``instruction.md`` ends with the shared instructions."""
     shutil.copytree(
         task_dir,
         destination,
         ignore=shutil.ignore_patterns("__pycache__", "snapshot.py", "check.py"),
     )
+    instruction = destination / "instruction.md"
+    instruction.write_text(f"{instruction.read_text()}\n{SHARED_INSTRUCTIONS.read_text()}")
     tests = destination / "tests"
     tests.mkdir()
     shutil.copy(Path(verify.__file__), tests / "verify.py")

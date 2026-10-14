@@ -7,7 +7,7 @@ docker compose --project-directory /app up --detach --wait --wait-timeout 180
 python /app/scripts/seed_source.py
 uvicorn main:app --app-dir /app --host 127.0.0.1 --port 8000 \
   >/tmp/source-application.log 2>&1 &
-printf '%s\n' "$!" >/tmp/source-application.pid
+printf '%s\n' "$!" >/tmp/application.pid
 
 # The source application and its client must answer a real search before the
 # agent gets a Trial. A broken evaluator baseline is not an agent failure.

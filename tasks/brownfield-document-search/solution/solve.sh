@@ -50,7 +50,7 @@ PY
 uv pip install --system -r /app/requirements.txt
 
 # Restart the application so it imports the upgraded client package.
-kill "$(cat /tmp/source-application.pid)"
+kill "$(cat /tmp/application.pid)"
 uvicorn main:app --app-dir /app --host 127.0.0.1 --port 8000 \
   >/tmp/source-application.log 2>&1 &
-printf '%s\n' "$!" >/tmp/source-application.pid
+printf '%s\n' "$!" >/tmp/application.pid

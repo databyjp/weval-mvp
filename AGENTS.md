@@ -11,6 +11,8 @@ as the domain language.
 - `agents.toml`: named Agents (harness, version, model).
 - `src/weval/run.py`: builds the Harbor package, runs it on Modal, writes `weval.json`.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
+- `src/weval/shared-instructions.md`: Trial-environment notes appended to every
+  Task's prompt when it is packaged.
 - `src/weval/harnesses/<harness>.py`: Harbor agent config, expected logs, and
   any harness-specific setup (for example, Pi's pinned `pi-web-access`).
 - `experiment-outputs/`: retained runs (git-ignored).
@@ -27,7 +29,7 @@ A Task is a directory that runs without framework changes:
 
 | File | Purpose |
 |---|---|
-| `instruction.md` | What the agent is told (Harbor's file name for the prompt). |
+| `instruction.md` | What the agent is told (Harbor's file name for the prompt). Packaging appends `src/weval/shared-instructions.md`. |
 | `task.toml` | Harbor task config: timeouts, `/app` artifact, healthcheck, verifier env. |
 | `environment/` | Harbor environment: `Dockerfile`, Compose overlay, starter app, fixtures. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |
@@ -41,6 +43,9 @@ the result. Set these in `[verifier] env` as needed:
   starts `main:app` from `/app` and passes its URL to `snapshot()`.
 - `WEVAL_KEEP_STACK = "1"` when the agent's running stack is itself under
   test, as in the brownfield Task.
+
+An environment that starts an application before the agent runs writes its
+process ID to `/tmp/application.pid`, as the shared instructions tell the agent.
 
 `snapshot.py` should capture every fact a check needs: Weaviate schema and
 objects (read over REST, with vector presence flags), responses to fixed HTTP
