@@ -29,7 +29,8 @@ VECTOR_PROBE = {
 
 
 def request(url: str, method: str = "GET", payload: object = None) -> tuple[int, object]:
-    """Send a request; return the status and JSON body (or raw text if not JSON)."""
+    """Send a request; return the status and JSON body (or raw text if not JSON).
+    Connection failures and timeouts raise."""
     data = None if payload is None else json.dumps(payload).encode()
     req = urllib.request.Request(
         url, data=data, method=method, headers={"Content-Type": "application/json"}

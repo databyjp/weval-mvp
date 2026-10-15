@@ -17,7 +17,7 @@ as the domain language.
   environment: the Trial network, `WEAVIATE_*` settings, and Docker socket.
 - `src/weval/harnesses/<harness>.py`: Harbor agent config, expected logs, and
   any harness-specific setup (for example, Pi's pinned `pi-web-access`).
-- `experiment-outputs/`: retained runs (git-ignored).
+- `experiment-outputs/`: retained Experiment runs (git-ignored).
 
 Keep the framework small enough to read in one sitting. Prefer plain functions
 and dicts. Add a shared abstraction only when three Tasks need it. Handle

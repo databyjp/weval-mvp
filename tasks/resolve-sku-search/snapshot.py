@@ -23,7 +23,8 @@ PROBES = {
 
 
 def request(url: str) -> tuple[int, object]:
-    """GET a URL; return the status and JSON body (or raw text if not JSON)."""
+    """GET a URL; return the status and JSON body (or raw text if not JSON).
+    Connection failures and timeouts raise."""
     try:
         with urllib.request.urlopen(url, timeout=60) as response:
             status, raw = response.status, response.read()

@@ -8,6 +8,6 @@ Run a trial by specifying an env file, task, agent definition, and the number of
 uv run --env-file .env weval run tasks/<task> --agent <name> [-n 3]
 ```
 
-The run writes `experiment-outputs/<timestamp>-<task>-<agent>/` and prints each Trial's status.
+Each `weval run` is one Experiment run. It writes `experiment-outputs/<timestamp>-<task>-<agent>/` and prints each Trial's status.
 
 Agents are defined and named in `agents.toml`. Use `--agent oracle` to run the Task's own `solution/solve.sh` instead of a model.

@@ -26,7 +26,8 @@ SECRET_ENV = re.compile(r"(KEYS?|APIKEY|SECRET|TOKEN|PASSWORD)$")
 
 def request(url: str, method: str = "GET", body: dict | None = None,
             key: str | None = None) -> tuple[int, object]:
-    """Send a request; return the status and JSON body (or raw text if not JSON)."""
+    """Send a request; return the status and JSON body (or raw text if not JSON).
+    Connection failures and timeouts raise."""
     headers = {"Content-Type": "application/json"}
     if key:
         headers["Authorization"] = f"Bearer {key}"
