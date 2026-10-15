@@ -8,7 +8,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="weval")
     commands = parser.add_subparsers(dest="command", required=True)
     run_parser = commands.add_parser("run", help="run a Task with an Agent on Modal")
-    run_parser.add_argument("task", type=Path, help="Task directory, e.g. tasks/greenfield-ecommerce-search")
+    run_parser.add_argument("task", type=Path, help="Task directory, e.g. tasks/build/ecommerce-search")
     run_parser.add_argument("--agent", required=True, help="name from agents.toml")
     run_parser.add_argument("-n", type=int, default=1, help="number of Trials")
     check_parser = commands.add_parser("check", help="re-score a retained Trial's snapshot")

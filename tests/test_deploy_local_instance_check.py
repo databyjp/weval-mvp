@@ -1,7 +1,7 @@
-"""Calibrate build-spin-up checks: the Oracle snapshot passes, and each broken
+"""Calibrate deploy/local-instance checks: the Oracle snapshot passes, and each broken
 variant fails exactly the check aimed at it, for the stated reason.
 
-``fixtures/build-spin-up-oracle-snapshot.json`` is a real snapshot retained
+``fixtures/deploy-local-instance-oracle-snapshot.json`` is a real snapshot retained
 from a Modal Oracle Trial.
 """
 
@@ -15,10 +15,10 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/build-spin-up-oracle-snapshot.json").read_text())
+ORACLE = json.loads((ROOT / "tests/fixtures/deploy-local-instance-oracle-snapshot.json").read_text())
 
 _spec = importlib.util.spec_from_file_location(
-    "build_spin_up_check", ROOT / "tasks/build-spin-up/check.py"
+    "deploy_local_instance_check", ROOT / "tasks/deploy/local-instance/check.py"
 )
 check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)

@@ -2,7 +2,7 @@
 
 ## task.toml
 
-`tasks/<name>/task.toml` is the Harbor task config for one Task. Harbor
+`tasks/<stage>/<scenario>/task.toml` is the Harbor task config for one Task. Harbor
 reads it directly; weval passes it through unchanged at packaging.
 
 | Key | Function (Harbor-defined) |

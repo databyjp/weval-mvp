@@ -1,6 +1,6 @@
 # How to define a Task
 
-Each task is defined as a unique directory under `tasks/<name>/`.
+Each task is defined as a unique directory under `tasks/<stage>/<scenario>/`. The stage is `build`, `deploy`, or `resolve`; [`AGENTS.md`](../../AGENTS.md#writing-a-task) defines each.
 
 A task consists of `instruction.md` (the prompt), `environment/` (what the agent is provided), `task.toml` (task meta-parameters such as timeouts, used directly by Harbor), `snapshot.py` (what to capture from the live stack after the agent finishes), `check.py` (what to check for scoring), and `solution/solve.sh` (the Oracle solution).
 
@@ -10,10 +10,10 @@ See the [reference](../reference.md) for details on each parameter.
 
 Each task must have an Oracle solution that passes every check.
 
-It also needs "calibrations": known-to-fail variations on the Oracle snapshot. They live in a test module under `tests/`, not in the Task directory. See `tests/test_build_spin_up_check.py` for an example.
+It also needs "calibrations": known-to-fail variations on the Oracle snapshot. They live in a test module under `tests/`, not in the Task directory. See `tests/test_deploy_local_instance_check.py` for an example.
 
 To write the calibrations:
 
-1. Run the Oracle (`--agent oracle`) and copy the Trial's `verifier/snapshot.json` under `tests/fixtures/`, as in `build-spin-up-oracle-snapshot.json`.
+1. Run the Oracle (`--agent oracle`) and copy the Trial's `verifier/snapshot.json` under `tests/fixtures/`, as in `deploy-local-instance-oracle-snapshot.json`.
 2. For each check, write a function that changes the snapshot the way a plausible wrong solution would, such as a legacy vectorizer or a missing object.
 3. Assert that the Oracle snapshot passes every check, and that each broken variant fails only its targeted check, for the stated reason.

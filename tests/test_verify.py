@@ -13,7 +13,17 @@ from weval.verify import score
 ROOT = Path(__file__).parents[1]
 
 
-@pytest.mark.parametrize("check_file", sorted(ROOT.glob("tasks/*/check.py")), ids=lambda p: p.parent.name)
+# The stages defined in AGENTS.md; each Task lives at tasks/<stage>/<scenario>/.
+STAGES = {"build", "deploy", "resolve"}
+CHECK_FILES = sorted(ROOT.glob("tasks/*/*/check.py"))
+
+
+def test_every_task_directory_is_under_a_known_stage():
+    found = {p.name for p in (ROOT / "tasks").iterdir() if p.is_dir()}
+    assert found <= STAGES, f"unknown stage directories under tasks/: {sorted(found - STAGES)}"
+
+
+@pytest.mark.parametrize("check_file", CHECK_FILES, ids=lambda p: f"{p.parent.parent.name}/{p.parent.name}")
 def test_failed_snapshot_fails_every_check(check_file):
     spec = importlib.util.spec_from_file_location(f"{check_file.parent.name}_check", check_file)
     assert spec and spec.loader

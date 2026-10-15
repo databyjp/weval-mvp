@@ -1,4 +1,4 @@
-"""Calibrate resolve-sku-search checks: the Oracle snapshot passes, and each
+"""Calibrate resolve/sku-search checks: the Oracle snapshot passes, and each
 broken variant fails exactly the check aimed at it, for the stated reason.
 
 ``fixtures/resolve-sku-search-oracle-snapshot.json`` is a real snapshot
@@ -18,7 +18,7 @@ ROOT = Path(__file__).parents[1]
 ORACLE = json.loads((ROOT / "tests/fixtures/resolve-sku-search-oracle-snapshot.json").read_text())
 
 _spec = importlib.util.spec_from_file_location(
-    "resolve_sku_search_check", ROOT / "tasks/resolve-sku-search/check.py"
+    "resolve_sku_search_check", ROOT / "tasks/resolve/sku-search/check.py"
 )
 check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)

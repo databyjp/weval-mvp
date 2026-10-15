@@ -1,4 +1,4 @@
-"""Greenfield ecommerce search checks over the snapshot from ``snapshot.py``.
+"""build/ecommerce-search checks over the snapshot from ``snapshot.py``.
 
 Each check passes by returning and fails by raising ``AssertionError`` whose
 message names the constraint. The check ID is the function name with dashes;
@@ -153,8 +153,8 @@ def sku_category_field_tokenization(snapshot: dict) -> None:
 
 def hybrid_query(snapshot: dict) -> None:
     """The submitted code calls collection.query.hybrid(...)."""
-    # Trade-off: a substring match over submitted files, not weval4's check that
-    # the /search route itself makes the call.
+    # Trade-off: a substring match over submitted files, so a hybrid call
+    # outside the /search route also passes.
     callers = [name for name, text in snapshot["files"].items()
                if name.endswith(".py") and ".query.hybrid(" in text]
     assert callers, "submitted Python code calls .query.hybrid(...)"

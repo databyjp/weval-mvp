@@ -1,4 +1,4 @@
-"""Capture the brownfield Trial's live, agent-upgraded stack for ``check.py``.
+"""Capture the deploy/document-search-upgrade Trial's live, agent-upgraded stack for ``check.py``.
 
 The verifier keeps the agent's running stack (``WEVAL_KEEP_STACK=1`` in
 ``task.toml``) because its Weaviate volume holds the data under test.

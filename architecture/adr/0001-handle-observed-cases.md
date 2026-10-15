@@ -14,6 +14,12 @@ When a retained Trial shows a new case, handle it then and name that Trial in
 the commit message. For example, if a broken submission crashes the verifier
 instead of failing its checks, that Trial justifies the fix.
 
+This rule covers anticipated cases, not committed direction. When the
+maintainer states that something will happen, such as the number of Tasks
+growing to tens, design for it now and cite that statement in the commit
+message. Do not cite this ADR to defer that work. Only the maintainer's
+statement counts as committed; an agent's prediction does not.
+
 ## Considered options
 
 Handling failure modes up front, for example by guarding every subprocess call

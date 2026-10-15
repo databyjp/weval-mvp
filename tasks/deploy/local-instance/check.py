@@ -1,4 +1,4 @@
-"""Build-spin-up checks over the snapshot from ``snapshot.py``.
+"""deploy/local-instance checks over the snapshot from ``snapshot.py``.
 
 Each check passes by returning and fails by raising ``AssertionError`` whose
 message names the constraint. The check ID is the function name with dashes;
@@ -50,7 +50,7 @@ def weaviate_ready(snapshot: dict) -> None:
 
 def server_version(snapshot: dict) -> str:
     """The running backend reports Weaviate 1.39.0 or later."""
-    # Brownfield's check and threshold; this Task reads the version from meta.
+    # Reads the version the running server reports in /v1/meta.
     version = snapshot["meta"]["version"]
     assert release_at_least(version, MIN_SERVER_VERSION), (
         f"Weaviate is {MIN_SERVER_VERSION} or later; running {version}"
@@ -80,7 +80,7 @@ def collection_vectorizer(snapshot: dict) -> str:
 
 def vectorizer_availability(snapshot: dict) -> str:
     """A probe object inserted into DocumentChunk gets a non-zero vector."""
-    # Adapted from brownfield: the agent picks the model, so no fixed dimension.
+    # The agent picks the model, so any non-zero dimension passes.
     # Preferred because a vectorizer needing an API key cannot run in the Trial.
     collection(snapshot)
     probe = snapshot["vector_probe"]
@@ -98,8 +98,8 @@ def vectorizer_availability(snapshot: dict) -> str:
 def named_vector(snapshot: dict) -> None:
     """DocumentChunk configures vectorization as a named vector, not the legacy
     collection-level vectorizer."""
-    # The named-vector half of greenfield's weaviate-managed-vectorization; module
-    # choice and vector presence are scored separately here.
+    # Scores only the configuration shape; collection-vectorizer and
+    # vectorizer-availability score the module and vector presence.
     config = collection(snapshot)
     legacy = config.get("vectorizer", "none")
     assert config.get("vectorConfig") and legacy == "none", (

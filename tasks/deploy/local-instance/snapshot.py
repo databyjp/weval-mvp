@@ -1,4 +1,4 @@
-"""Capture the build-spin-up Trial's live state for ``check.py``.
+"""Capture the deploy/local-instance Trial's live state for ``check.py``.
 
 There is no application: the agent's running Weaviate is the artifact. The
 snapshot reads the ``weaviate`` service container's configuration through the

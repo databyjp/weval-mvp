@@ -1,4 +1,4 @@
-"""Brownfield document-search upgrade checks over the snapshot from ``snapshot.py``.
+"""deploy/document-search-upgrade checks over the snapshot from ``snapshot.py``.
 
 Each check passes by returning and fails by raising ``AssertionError`` whose
 message names the constraint. The check ID is the function name with dashes;

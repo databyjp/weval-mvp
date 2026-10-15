@@ -1,4 +1,4 @@
-# resolve-sku-search
+# resolve/sku-search
 
 ## Motivation
 

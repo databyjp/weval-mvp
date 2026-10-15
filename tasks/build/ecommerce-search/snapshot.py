@@ -1,4 +1,4 @@
-"""Capture the greenfield Trial's live state for ``check.py``.
+"""Capture the build/ecommerce-search Trial's live state for ``check.py``.
 
 Weaviate is read over REST rather than the Python client so the snapshot does
 not depend on the client version the agent installed. Vectors are reduced to

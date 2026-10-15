@@ -1,4 +1,4 @@
-"""Capture the resolve-sku-search Trial's live, agent-fixed stack for ``check.py``.
+"""Capture the resolve/sku-search Trial's live, agent-fixed stack for ``check.py``.
 
 The verifier keeps the agent's running stack (``WEVAL_KEEP_STACK=1``) because
 its Weaviate volume holds the catalog under test. When ``Product`` is an alias,

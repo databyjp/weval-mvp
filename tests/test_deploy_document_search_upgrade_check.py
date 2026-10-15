@@ -1,7 +1,7 @@
-"""Calibrate brownfield checks: the Oracle snapshot passes, and each broken
+"""Calibrate deploy/document-search-upgrade checks: the Oracle snapshot passes, and each broken
 variant fails exactly the check aimed at it, for the stated reason.
 
-``fixtures/brownfield-oracle-snapshot.json`` is a real snapshot retained from a
+``fixtures/deploy-document-search-upgrade-oracle-snapshot.json`` is a real snapshot retained from a
 Modal Oracle Trial. The starting stack is Weaviate 1.30.16 with
 weaviate-client 4.12.1.
 """
@@ -17,10 +17,10 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/brownfield-oracle-snapshot.json").read_text())
+ORACLE = json.loads((ROOT / "tests/fixtures/deploy-document-search-upgrade-oracle-snapshot.json").read_text())
 
 _spec = importlib.util.spec_from_file_location(
-    "brownfield_check", ROOT / "tasks/brownfield-document-search/check.py"
+    "deploy_document_search_upgrade_check", ROOT / "tasks/deploy/document-search-upgrade/check.py"
 )
 check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)

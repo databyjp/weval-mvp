@@ -2,8 +2,8 @@
 
 Output layout, one directory per invocation::
 
-    experiment-outputs/<timestamp>-<task>-<agent>/
-        task/                 Harbor task package built from tasks/<task>/
+    experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/
+        task/                 Harbor task package built from tasks/<stage>/<scenario>/
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
         job/<trial>/weval.json  Agent, status, missing logs, check results
 """
@@ -87,7 +87,9 @@ def run(task_dir: Path, agent_name: str, attempts: int = 1) -> Path:
     agent = {"name": agent_name, **agents[agent_name]}
     harness = HARNESSES[agent["harness"]]
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir = ROOT / "experiment-outputs" / f"{stamp}-{task_dir.name}-{agent_name}"
+    # Task and Agent names contain dashes; Harbor's "__" keeps the parts separable.
+    run_name = f"{stamp}__{task_dir.parent.name}__{task_dir.name}__{agent_name}"
+    run_dir = ROOT / "experiment-outputs" / run_name
     package_task(task_dir, run_dir / "task")
     config = JobConfig(
         job_name="job",

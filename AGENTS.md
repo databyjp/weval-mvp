@@ -7,7 +7,7 @@ as the domain language.
 
 ## Layout
 
-- `tasks/<name>/`: one Task each (see below).
+- `tasks/<stage>/<scenario>/`: one Task each (see below).
 - `agents.toml`: named Agents (harness, version, model).
 - `src/weval/run.py`: builds the Harbor package, runs it on Modal, writes `weval.json`.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
@@ -21,7 +21,8 @@ as the domain language.
 
 Keep the framework small enough to read in one sitting. Prefer plain functions
 and dicts. Add a shared abstraction only when three Tasks need it. Handle
-cases that Trials have shown, not anticipated ones
+cases that Trials have shown, not anticipated ones, but design for direction
+the maintainer has stated will happen
 ([ADR 0001](architecture/adr/0001-handle-observed-cases.md)). If a change
 makes the framework noticeably larger, ask first.
 
@@ -44,6 +45,15 @@ the Task's question needs, and the Oracle must pass it.
 
 ## Writing a Task
 
+A Task lives at `tasks/<stage>/<scenario>/`. The stage is the kind of job:
+
+- `build`: write new application code;
+- `deploy`: stand up or change running infrastructure;
+- `resolve`: fix a reported fault on a running system.
+
+The scenario names the use case in a few words, such as `sku-search`. Add a
+stage when a Task needs one, and add it to `STAGES` in `tests/test_verify.py`.
+
 A Task is a directory that runs without framework changes:
 
 | File | Purpose |
@@ -61,7 +71,7 @@ the result. Set these in `[verifier] env` as needed:
 - `WEVAL_START_APP = "1"` when the Task has an application: the verifier
   starts `main:app` from `/app` and passes its URL to `snapshot()`.
 - `WEVAL_KEEP_STACK = "1"` when the agent's running stack is itself under
-  test, as in the brownfield Task.
+  test, as in `deploy/document-search-upgrade`.
 
 An environment that starts an application before the agent runs writes its
 process ID to `/tmp/application.pid`, as the shared instructions tell the agent.
@@ -104,7 +114,7 @@ is whether the agent applies current practice unprompted; stating it would
 convert the measurement into instruction-following. They must still name the
 constraint in the check description and failure message, and the workspace
 should make current practice the natural path through pinned server and client
-versions, starter code, or supporting-stack defaults. The greenfield Task's
+versions, starter code, or supporting-stack defaults. `build/ecommerce-search`'s
 `weaviate-managed-vectorization` check is one: the prompt says only "local
 vectorizer", while the check requires a named vector from `text2vec-ollama` or
 `text2vec-transformers` because collection-level vectorizers are the legacy
@@ -123,7 +133,7 @@ Before running agents on a new Task:
 ## Running and reading Trials
 
 ```sh
-uv run --env-file .env weval run tasks/<task> --agent <name> [-n 3]
+uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 ```
 

@@ -1,7 +1,7 @@
-"""Calibrate greenfield checks: the Oracle snapshot passes, and each broken
+"""Calibrate build/ecommerce-search checks: the Oracle snapshot passes, and each broken
 variant fails exactly the check aimed at it, for the stated reason.
 
-``fixtures/greenfield-oracle-snapshot.json`` is a real snapshot retained from a
+``fixtures/build-ecommerce-search-oracle-snapshot.json`` is a real snapshot retained from a
 Modal Oracle Trial.
 """
 
@@ -15,10 +15,10 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/greenfield-oracle-snapshot.json").read_text())
+ORACLE = json.loads((ROOT / "tests/fixtures/build-ecommerce-search-oracle-snapshot.json").read_text())
 
 _spec = importlib.util.spec_from_file_location(
-    "greenfield_check", ROOT / "tasks/greenfield-ecommerce-search/check.py"
+    "build_ecommerce_search_check", ROOT / "tasks/build/ecommerce-search/check.py"
 )
 check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)

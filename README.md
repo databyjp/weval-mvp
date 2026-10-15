@@ -18,16 +18,16 @@ of these values found in retained output with `<redacted:NAME>`.
 
 ```sh
 # One Oracle Trial (runs solution/solve.sh; checks the Task itself)
-uv run --env-file .env weval run tasks/greenfield-ecommerce-search --agent oracle
+uv run --env-file .env weval run tasks/build/ecommerce-search --agent oracle
 
 # Three Pi + GLM Trials
-uv run --env-file .env weval run tasks/greenfield-ecommerce-search --agent pi-glm-5.3-flash -n 3
+uv run --env-file .env weval run tasks/build/ecommerce-search --agent pi-glm-5.3-flash -n 3
 
 # Re-score a retained Trial with the Task's current check.py
 uv run weval check experiment-outputs/<run>/job/<trial>
 ```
 
-Each run writes `experiment-outputs/<timestamp>-<task>-<agent>/`. Each
+Each run writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/`. Each
 Trial in `job/` has a `weval.json` with its status, Agent, and per-check
 results.
 
