@@ -35,32 +35,32 @@ def baseline(snapshot: dict) -> dict:
     digest = hashlib.sha256(
         json.dumps(record["objects"], sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    if digest != CORPUS_SHA256 or not is_legacy_schema(record["schema"]):
-        raise RuntimeError("baseline.json is not the authored corpus and legacy schema")
+    if digest != CORPUS_SHA256 or not is_legacy_definition(record["schema"]):
+        raise RuntimeError("baseline.json is not the authored corpus and legacy collection definition")
     return record
 
 
-def schema_fields(schema: dict) -> dict:
-    """Select the authored schema fields, ignoring version-dependent defaults."""
+def definition_fields(definition: dict) -> dict:
+    """Select the authored definition fields, ignoring version-dependent defaults."""
     module = "text2vec-transformers"
     return {
-        "class": schema.get("class"),
-        "vectorizer": schema.get("vectorizer"),
-        "vectorIndexType": schema.get("vectorIndexType"),
-        "vectorDistance": schema.get("vectorIndexConfig", {}).get("distance"),
-        "vectorConfig": schema.get("vectorConfig") or None,
-        "vectorizeClassName": schema.get("moduleConfig", {}).get(module, {}).get("vectorizeClassName"),
+        "class": definition.get("class"),
+        "vectorizer": definition.get("vectorizer"),
+        "vectorIndexType": definition.get("vectorIndexType"),
+        "vectorDistance": definition.get("vectorIndexConfig", {}).get("distance"),
+        "vectorConfig": definition.get("vectorConfig") or None,
+        "vectorizeClassName": definition.get("moduleConfig", {}).get(module, {}).get("vectorizeClassName"),
         "properties": {
             p["name"]: [p["dataType"], p.get("tokenization"),
                         p.get("moduleConfig", {}).get(module, {}).get("skip")]
-            for p in schema["properties"]
+            for p in definition["properties"]
         },
     }
 
 
-def is_legacy_schema(schema: dict) -> bool:
-    """Whether ``schema`` is the authored single-vector text2vec-transformers collection."""
-    fields = schema_fields(schema)
+def is_legacy_definition(definition: dict) -> bool:
+    """Whether ``definition`` is the authored single-vector text2vec-transformers collection."""
+    fields = definition_fields(definition)
     props = fields["properties"]
     return (
         fields["class"] == COLLECTION
@@ -143,10 +143,10 @@ def document_preservation(snapshot: dict) -> None:
     assert not changed, f"original chunks keep their UUIDs and properties; {len(changed)} differ"
 
 
-def collection_schema(snapshot: dict) -> None:
+def collection_definition(snapshot: dict) -> None:
     """The collection keeps its property types and legacy text2vec-transformers configuration."""
-    observed = schema_fields(snapshot["schema"])
-    expected = schema_fields(baseline(snapshot)["schema"])
+    observed = definition_fields(snapshot["schema"])
+    expected = definition_fields(baseline(snapshot)["schema"])
     # Properties are compared one by one so the message names the property.
     observed_props, expected_props = observed.pop("properties"), expected.pop("properties")
     differing = {k: observed.get(k) for k in expected if observed.get(k) != expected[k]}
@@ -156,7 +156,7 @@ def collection_schema(snapshot: dict) -> None:
         if observed_props.get(name) != expected_props.get(name)
     }
     assert not differing, (
-        f"{COLLECTION} schema matches the pre-upgrade schema; differing (observed, with "
+        f"{COLLECTION} definition matches the pre-upgrade definition; differing (observed, with "
         f"properties as [dataType, tokenization, skip]): {differing}"
     )
 
@@ -191,7 +191,7 @@ REQUIRED = [
     server_version,
     client_version,
     document_preservation,
-    collection_schema,
+    collection_definition,
     search_contract,
     vectorizer_availability,
 ]

@@ -84,7 +84,7 @@ def test_oracle_passes_every_check():
         (hoisted_filter_matches, "exact-sku-retrieval", "'9917-ZXQ': ['ZXQ-9917'"),
         (exact_match_only_search, "search-contract", "returns TRAIL-001"),
         (dropped_catalog, "document-preservation", "holds 28 objects"),
-        (price_as_text, "collection-schema", "'price': 'text'"),
+        (price_as_text, "collection-definition", "'price': 'text'"),
         (name_field_tokenization, "other-properties-word-tokenization", "changed: {'name': 'field'}"),
         (app_side_workaround, "sku-field-tokenization", "got 'word'"),
     ],

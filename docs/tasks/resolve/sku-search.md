@@ -41,7 +41,7 @@ so BM25 may rank other products that share those tokens ahead of the exact match
 | `exact-sku-retrieval` | REQUIRED | The reported fault is fixed: `/search` for each of the five colliding SKUs ranks that SKU first. |
 | `search-contract` | REQUIRED | Non-SKU search still works: `/search` for "waterproof hiking boots" returns `TRAIL-001` with the documented fields. |
 | `document-preservation` | REQUIRED | The catalog survived the fix: `Product` holds each originally seeded product exactly once, with its property values. UUIDs may change. |
-| `collection-schema` | REQUIRED | The schema survived the fix: property names and data types are unchanged. `Product` may be an alias. |
+| `collection-definition` | REQUIRED | The schema survived the fix: property names and data types are unchanged. `Product` may be an alias. |
 | `sku-field-tokenization` | REQUIRED | The fix is in Weaviate, not the app: `sku` uses field tokenization. |
 | `other-properties-word-tokenization` | PREFERRED | The fix changed only `sku`: every other seeded text property keeps word tokenization. |
 
@@ -57,6 +57,6 @@ tokenization, and replaces `Product` with an alias to it.
 | `hoisted_filter_matches` | `exact-sku-retrieval` | Trial `HrrRY7G`'s workaround: word-tokenized filter matches, in seed order, ahead of BM25 results. |
 | `exact_match_only_search` | `search-contract` | A descriptive query returns nothing. |
 | `dropped_catalog` | `document-preservation` | The collection is empty. |
-| `price_as_text` | `collection-schema` | `price` re-created as text. |
+| `price_as_text` | `collection-definition` | `price` re-created as text. |
 | `name_field_tokenization` | `other-properties-word-tokenization` | Field tokenization applied to `name` as well as `sku`. |
 | `app_side_workaround` | `sku-field-tokenization` | Correct ranking with `sku` still on word tokenization. |

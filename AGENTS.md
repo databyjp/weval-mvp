@@ -79,7 +79,7 @@ the result. Set these in `[verifier] env` as needed:
 An environment that starts an application before the agent runs writes its
 process ID to `/tmp/application.pid`, as the shared instructions tell the agent.
 
-`snapshot.py` should capture every fact a check needs: Weaviate schema and
+`snapshot.py` should capture every fact a check needs: Weaviate collection definition and
 objects (read over REST, with vector presence flags), responses to fixed HTTP
 probes, and relevant submitted files. Outcome facts must come from the live
 stack because nothing can reconstruct them after teardown. `check.py` reads

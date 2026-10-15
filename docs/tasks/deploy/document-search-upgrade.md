@@ -36,7 +36,7 @@ collection configuration, and `/search` behavior.
 - Starts the stack and seeds `DocumentChunk` with 500 chunks. The collection
   uses a collection-level `text2vec-transformers` vectorizer, and
   `document_id` uses field tokenization and is skipped by the vectorizer.
-- Records the seeded objects and schema as the baseline in
+- Records the seeded objects and collection definition as the baseline in
   `/logs/verifier/baseline.json`, outside `/app`.
 - Starts the app and confirms that `/search` answers before the agent starts.
 
@@ -47,7 +47,7 @@ collection configuration, and `/search` behavior.
 | `server-version` | REQUIRED | The server reports Weaviate 1.39.0 or later. |
 | `client-version` | REQUIRED | The app runs weaviate-client 4.23.0 or later, and `requirements.txt` declares a line that includes it. |
 | `document-preservation` | REQUIRED | All 500 baseline chunks remain exactly once, with their UUIDs and property values. |
-| `collection-schema` | REQUIRED | The schema matches the baseline: property types and tokenization, the collection-level vectorizer, and its module settings. |
+| `collection-definition` | REQUIRED | The definition matches the baseline: property types and tokenization, the collection-level vectorizer, and its module settings. |
 | `search-contract` | REQUIRED | `/search` for "bread dough yeast fermentation" and "coral reefs ocean fish" returns 1 to 5 items with the documented fields, including a chunk with the expected title. |
 | `vectorizer-availability` | REQUIRED | A new chunk gets a non-zero 384-dimension vector from the local `text2vec-transformers`. |
 
@@ -62,6 +62,6 @@ the same volume, pins `weaviate-client==4.23.1`, and restarts the app.
 | `server_not_upgraded` | `server-version` | Weaviate left on 1.30.16. |
 | `requirements_not_updated` | `client-version` | The client upgraded, but `requirements.txt` still pins 4.12.1. |
 | `reimported_with_new_uuids` | `document-preservation` | The chunks re-imported under new UUIDs. |
-| `recreated_with_default_tokenization` | `collection-schema` | The collection re-created with `document_id` on word tokenization. |
+| `recreated_with_default_tokenization` | `collection-definition` | The collection re-created with `document_id` on word tokenization. |
 | `search_returns_server_error` | `search-contract` | `/search` answers 500. |
 | `inference_service_removed` | `vectorizer-availability` | The inference service is gone, so inserts fail. |

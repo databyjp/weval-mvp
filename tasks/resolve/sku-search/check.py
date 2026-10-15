@@ -83,7 +83,7 @@ def document_preservation(snapshot: dict) -> None:
     assert not unmatched, f"each catalog product is stored exactly once; not so for {unmatched}"
 
 
-def collection_schema(snapshot: dict) -> str:
+def collection_definition(snapshot: dict) -> str:
     """Product keeps its property names and data types."""
     actual = {name: p["dataType"][0] for name, p in properties(snapshot).items()}
     assert actual == PROPERTY_TYPES, (
@@ -108,7 +108,7 @@ def other_properties_word_tokenization(snapshot: dict) -> None:
     """Every seeded text property but sku keeps word tokenization."""
     # The fault is confined to sku. Preferred because neither the prompt nor
     # the workspace says to leave the other properties alone. A property whose
-    # data type changed is collection-schema's failure, not this check's.
+    # data type changed is collection-definition's failure, not this check's.
     props = properties(snapshot)
     changed = {name: props.get(name, {}).get("tokenization") for name, data_type in PROPERTY_TYPES.items()
                if name != "sku" and data_type == "text"
@@ -120,7 +120,7 @@ REQUIRED = [
     exact_sku_retrieval,
     search_contract,
     document_preservation,
-    collection_schema,
+    collection_definition,
     sku_field_tokenization,
 ]
 PREFERRED = [other_properties_word_tokenization]

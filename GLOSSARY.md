@@ -1,5 +1,7 @@
 # Glossary
 
+## General
+
 These definitions are authoritative for `weval`. Add a term only when the project uses it to distinguish concepts that would otherwise be ambiguous.
 
 **Experiment.** A plan comprising one or more Trials; for running one Task by one or more Agents, with or without Treatments, for a fixed number of repetitions.
@@ -21,3 +23,9 @@ These definitions are authoritative for `weval`. Add a term only when the projec
 **Trial.** One attempt to complete a Task by one Agent, with or without a Treatment.
 
 **Non-result.** A Trial for which evaluation infrastructure prevented a valid Task outcome from being observed. A Non-result records the cause.
+
+## Weaviate
+
+**Schema.** A collection's property names and data types.
+
+**Collection definition.** A collection's full configuration: its schema, property tokenization, vectorizer, vector index, and module settings. Snapshots store it under the key `schema`, after Weaviate's `/v1/schema` endpoint.

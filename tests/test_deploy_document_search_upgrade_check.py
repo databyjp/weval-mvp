@@ -75,7 +75,7 @@ def test_oracle_passes_every_check():
         (reimported_with_new_uuids, "document-preservation", "500 differ"),
         (
             recreated_with_default_tokenization,
-            "collection-schema",
+            "collection-definition",
             "'properties.document_id': [['text'], 'word', True]",
         ),
         (search_returns_server_error, "search-contract", "got 500"),
