@@ -83,6 +83,9 @@ def run(task_dir: Path, agent_name: str, attempts: int = 1) -> Path:
     even when Harbor itself raised.
     """
     task_dir = task_dir.resolve()
+    # weval.json records the Task path relative to the repo, so a Task outside
+    # it fails here rather than after the Trials have run.
+    task_path = task_dir.relative_to(ROOT)
     agents = tomllib.loads((ROOT / "agents.toml").read_text())
     agent = {"name": agent_name, **agents[agent_name]}
     harness = HARNESSES[agent["harness"]]
@@ -104,7 +107,7 @@ def run(task_dir: Path, agent_name: str, attempts: int = 1) -> Path:
         asyncio.run(_run_job(config))
     finally:
         for result_file in sorted((run_dir / "job").glob("*/result.json")):
-            record = finalize(result_file.parent, task_dir, agent)
+            record = finalize(result_file.parent, task_path, agent)
             print(f"{result_file.parent}: {record['status']}")
         redact(run_dir)
     return run_dir
@@ -115,8 +118,11 @@ async def _run_job(config: JobConfig) -> None:
     await job.run()
 
 
-def finalize(trial_dir: Path, task_dir: Path, agent: dict) -> dict:
+def finalize(trial_dir: Path, task_path: Path, agent: dict) -> dict:
     """Write and return ``weval.json`` for one Harbor Trial directory.
+
+    ``task_path`` is recorded as given; ``run()`` passes it relative to the
+    repository root.
 
     Status is ``non-result`` when Harbor raised or the verifier produced no
     reward, ``incomplete`` when an expected log is missing, otherwise
@@ -136,7 +142,7 @@ def finalize(trial_dir: Path, task_dir: Path, agent: dict) -> dict:
         status = "passed" if rewards["reward"] == 1 else "failed"
     record = {
         "status": status,
-        "task": str(task_dir),
+        "task": str(task_path),
         "agent": harness.agent_record(agent),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),
@@ -166,11 +172,11 @@ def redact(run_dir: Path) -> None:
 def rescore(trial_dir: Path, task_dir: Path | None = None) -> list[dict]:
     """Re-score a retained ``snapshot.json`` with a Task's current ``check.py``.
 
-    ``task_dir`` defaults to the Task recorded in the Trial's ``weval.json``.
-    Retained files are not modified.
+    ``task_dir`` defaults to the Task recorded in the Trial's ``weval.json``,
+    resolved against the repository root. Retained files are not modified.
     """
     if task_dir is None:
-        task_dir = Path(json.loads((trial_dir / "weval.json").read_text())["task"])
+        task_dir = ROOT / json.loads((trial_dir / "weval.json").read_text())["task"]
     spec = importlib.util.spec_from_file_location("check", task_dir / "check.py")
     assert spec and spec.loader
     check = importlib.util.module_from_spec(spec)
