@@ -5,16 +5,12 @@ message names the constraint. The check ID is the function name with dashes;
 the docstring is its description. Reward requires every ``REQUIRED`` check.
 """
 
-from uuid import UUID, uuid5
-
 COLLECTION = "Product"
 CATALOG_SIZE = 28
 # ZXQ-9917 is the reported SKU. The others share its segments: the first two
 # tokenize identically under word tokenization, the last two share one token.
 EXACT_SKUS = ("ZXQ-9917", "9917-ZXQ", "9917@ZXQ", "AQ1-9917", "ZXQ-4831")
 KEYWORD_SKU = "TRAIL-001"
-# Matches the seed script, so preserved UUIDs can be recognised.
-NAMESPACE = UUID("6f1c1d0e-3b5a-4f7e-9a51-6c1f0e2d9b17")
 PROPERTY_TYPES = {"sku": "text", "name": "text", "description": "text",
                   "category": "text", "price": "number"}
 ITEM_TYPES = {"sku": str, "name": str, "description": str, "category": str,
@@ -52,8 +48,9 @@ def items(snapshot: dict, label: str) -> list[dict]:
 
 def exact_sku_retrieval(snapshot: dict) -> None:
     """An exact SKU query ranks the matching product first, for each SKU sharing segments with ZXQ-9917."""
-    # Greenfield probes ZXQ-9917 alone. A workaround that hoists word-tokenized
-    # filter matches passed that probe only because of seed order
+    # Probes every colliding SKU, not ZXQ-9917 alone. A workaround that hoisted
+    # word-tokenized filter matches ahead of BM25 results ranked ZXQ-9917 first
+    # only because of seed order
     # (20261013-214112-resolve-sku-search-pi-glm-5.3-flash, Trial HrrRY7G).
     misranked = {}
     for sku in EXACT_SKUS:
@@ -65,18 +62,17 @@ def exact_sku_retrieval(snapshot: dict) -> None:
 
 def search_contract(snapshot: dict) -> None:
     """A descriptive keyword query still returns the matching product with the documented fields."""
-    # Not in greenfield or brownfield: guards against fixing SKU lookup by
-    # turning /search into exact-match only.
+    # Rejects fixing SKU lookup by turning /search into exact-match only.
     found = [i["sku"] for i in items(snapshot, "keyword")]
     assert KEYWORD_SKU in found, (
         f"query 'waterproof hiking boots' returns {KEYWORD_SKU}; got {found}"
     )
 
 
-def document_preservation(snapshot: dict) -> str:
+def document_preservation(snapshot: dict) -> None:
     """Product holds every seeded catalog product exactly once with its property values."""
-    # Adapted from brownfield: re-ingesting under new UUIDs is accepted; the
-    # note records how many UUIDs survived.
+    # Matches objects by property values, not UUID, so re-ingesting under new
+    # UUIDs passes.
     stored = snapshot["objects"]
     catalog = snapshot["catalog"]
     assert len(stored) == CATALOG_SIZE, (
@@ -85,14 +81,11 @@ def document_preservation(snapshot: dict) -> str:
     unmatched = [p["sku"] for p in catalog
                  if sum(p.items() <= o["properties"].items() for o in stored) != 1]
     assert not unmatched, f"each catalog product is stored exactly once; not so for {unmatched}"
-    ids = {o["id"] for o in stored}
-    kept = sum(str(uuid5(NAMESPACE, p["sku"])) in ids for p in catalog)
-    return f"UUIDs preserved: {kept}/{CATALOG_SIZE}"
 
 
 def collection_schema(snapshot: dict) -> str:
     """Product keeps its property names and data types, and every property but sku keeps word tokenization."""
-    # Adapted from brownfield: only sku's tokenization may change.
+    # Only sku's tokenization may change: the fault is confined to sku.
     props = properties(snapshot)
     actual = {name: p["dataType"][0] for name, p in props.items()}
     assert actual == PROPERTY_TYPES, (
@@ -105,16 +98,19 @@ def collection_schema(snapshot: dict) -> str:
     return f"Product is an alias for {target}" if target else "Product is a collection"
 
 
-# --- Preferred ---------------------------------------------------------------
-
-
 def sku_field_tokenization(snapshot: dict) -> None:
     """sku uses field tokenization."""
-    # Greenfield's sku-category-field-tokenization narrowed to sku: category is
-    # not part of this Task's failure.
+    # Required, so a fix that only reorders results in the app fails the Trial.
+    # category is not checked: it is not part of this Task's fault.
     actual = properties(snapshot).get("sku", {}).get("tokenization")
     assert actual == "field", f"sku uses field tokenization; got {actual!r}"
 
 
-REQUIRED = [exact_sku_retrieval, search_contract, document_preservation, collection_schema]
-PREFERRED = [sku_field_tokenization]
+REQUIRED = [
+    exact_sku_retrieval,
+    search_contract,
+    document_preservation,
+    collection_schema,
+    sku_field_tokenization,
+]
+PREFERRED: list = []

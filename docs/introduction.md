@@ -26,3 +26,4 @@ These docs follow the diataxis framework.
 - [How to run a Trial](how-to/run-a-trial.md)
 - [How to read a Trial](how-to/read-a-trial.md)
 - [Reference](reference.md): `task.toml`, verifier flags, and the Trial directory
+- Tasks: [resolve-sku-search](tasks/resolve-sku-search.md)

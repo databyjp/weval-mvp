@@ -77,6 +77,9 @@ raising `AssertionError`. Its name, with underscores replaced by dashes, is
 the check ID. Its docstring is the description. Its failure message names the
 constraint checked and what was observed instead. Reward is 1 only when every
 `REQUIRED` check passes; `PREFERRED` checks are reported but do not affect it.
+When the snapshot fails, the verifier scores `{"error": <traceback>}`, so
+every check must fail on it: read snapshot keys directly rather than with
+defaults that could pass. `tests/test_verify.py` enforces this for every Task.
 
 ### Task requirements and verification recipes
 
