@@ -25,6 +25,23 @@ cases that Trials have shown, not anticipated ones
 ([ADR 0001](architecture/adr/0001-handle-observed-cases.md)). If a change
 makes the framework noticeably larger, ask first.
 
+## Failed checks are findings
+
+weval exists to find where agents fall short, so a failed check on an agent
+Trial is a good result that identifies an opportunity, not a defect to remove.
+Classify each failure before acting on it:
+
+- agent gap: the agent missed something it could have discovered;
+- Weaviate gap: the product or its docs led the agent astray;
+- scorer bug: `snapshot.py` or `check.py` misjudged a correct solution;
+- Task defect: the prompt or workspace hid or contradicted a scored
+  constraint.
+
+Only scorer bugs and Task defects call for a weval change. Do not loosen a
+check, reword a prompt, or demote a check to make agent Trials pass. Do not
+add checks to manufacture failures either: every check must test something
+the Task's question needs, and the Oracle must pass it.
+
 ## Writing a Task
 
 A Task is a directory that runs without framework changes:
