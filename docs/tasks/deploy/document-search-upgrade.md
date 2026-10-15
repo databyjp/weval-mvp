@@ -6,12 +6,10 @@ motivation: >
 
 # deploy/document-search-upgrade
 
-The stack starts on Weaviate 1.30.16 with weaviate-client 4.12.1. The prompt
-names no target version. The checks require Weaviate 1.39.0 or later and
-weaviate-client 4.23.0 or later, declared in `requirements.txt`. The
-collection uses a legacy collection-level vectorizer, and the prompt asks the
-agent to keep the collection configuration, so the upgrade must not migrate
-it to a named vector.
+A document-search app runs on Weaviate 1.30.16 with weaviate-client 4.12.1,
+over 500 chunks in a collection with a legacy collection-level vectorizer. The
+agent is asked to upgrade the deployment while keeping the documents,
+collection configuration, and `/search` behavior.
 
 ## Boundary conditions
 

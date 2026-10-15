@@ -6,11 +6,9 @@ motivation: >
 
 # deploy/local-instance
 
-The prompt names no Weaviate version, vectorizer module, or vector
-configuration. The required checks accept any vectorizer module on Weaviate
-1.39.0 or later. The preferred checks record whether the vectorizer produces
-vectors, whether it is configured as a named vector, whether data persists,
-and how access is authenticated.
+The workspace has Docker and the Weaviate Python client, and nothing is
+running. The agent is asked to stand up Weaviate and create a `DocumentChunk`
+collection that Weaviate vectorizes.
 
 ## Boundary conditions
 

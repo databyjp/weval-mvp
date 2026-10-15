@@ -6,12 +6,10 @@ motivation: >
 
 # build/ecommerce-search
 
-The prompt asks for "a local vectorizer" without saying how to configure it.
-`weaviate-managed-vectorization` requires a named vector, because
-collection-level vectorizers are the legacy path in current Weaviate. The
-catalog has no other SKU sharing a token with `ZXQ-9917`, so exact SKU lookup
-passes under word tokenization. Field tokenization is scored separately, as
-preferred.
+The workspace holds a 24-product catalog and an empty FastAPI app whose
+docstring documents a `/search` contract. Nothing is running. The agent is
+asked to build search on Weaviate with a local vectorizer, supporting exact
+SKU lookup, product search, and pagination.
 
 ## Boundary conditions
 
