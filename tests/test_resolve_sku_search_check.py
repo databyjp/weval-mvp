@@ -85,7 +85,7 @@ def test_oracle_passes_every_check():
         (exact_match_only_search, "search-contract", "returns TRAIL-001"),
         (dropped_catalog, "document-preservation", "holds 28 objects"),
         (price_as_text, "collection-schema", "'price': 'text'"),
-        (name_field_tokenization, "collection-schema", "changed: {'name': 'field'}"),
+        (name_field_tokenization, "other-properties-word-tokenization", "changed: {'name': 'field'}"),
         (app_side_workaround, "sku-field-tokenization", "got 'word'"),
     ],
 )

@@ -6,6 +6,13 @@ A task consists of `instruction.md` (the prompt), `environment/` (what the agent
 
 See the [reference](../reference.md) for details on each parameter.
 
+## Task page
+
+Each Task also needs a page at `docs/tasks/<stage>/<scenario>.md`, shaped like [resolve/sku-search](../tasks/resolve/sku-search.md). `tests/test_task_pages.py` fails unless the page has:
+
+- a `motivation` in its YAML frontmatter;
+- a checks table whose rows, such as ``| `check-id` | REQUIRED | ... |``, list exactly the checks and tiers in `check.py`.
+
 ## Oracle and calibration
 
 Each task must have an Oracle solution that passes every check.

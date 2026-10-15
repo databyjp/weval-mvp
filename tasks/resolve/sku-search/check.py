@@ -84,16 +84,11 @@ def document_preservation(snapshot: dict) -> None:
 
 
 def collection_schema(snapshot: dict) -> str:
-    """Product keeps its property names and data types, and every property but sku keeps word tokenization."""
-    # Only sku's tokenization may change: the fault is confined to sku.
-    props = properties(snapshot)
-    actual = {name: p["dataType"][0] for name, p in props.items()}
+    """Product keeps its property names and data types."""
+    actual = {name: p["dataType"][0] for name, p in properties(snapshot).items()}
     assert actual == PROPERTY_TYPES, (
         f"{COLLECTION} properties and data types are {PROPERTY_TYPES}; got {actual}"
     )
-    changed = {name: p.get("tokenization") for name, p in props.items()
-               if name != "sku" and p["dataType"] == ["text"] and p.get("tokenization") != "word"}
-    assert not changed, f"text properties other than sku keep word tokenization; changed: {changed}"
     target = snapshot["alias_target"]
     return f"Product is an alias for {target}" if target else "Product is a collection"
 
@@ -106,6 +101,21 @@ def sku_field_tokenization(snapshot: dict) -> None:
     assert actual == "field", f"sku uses field tokenization; got {actual!r}"
 
 
+# --- Preferred ---------------------------------------------------------------
+
+
+def other_properties_word_tokenization(snapshot: dict) -> None:
+    """Every seeded text property but sku keeps word tokenization."""
+    # The fault is confined to sku. Preferred because neither the prompt nor
+    # the workspace says to leave the other properties alone. A property whose
+    # data type changed is collection-schema's failure, not this check's.
+    props = properties(snapshot)
+    changed = {name: props.get(name, {}).get("tokenization") for name, data_type in PROPERTY_TYPES.items()
+               if name != "sku" and data_type == "text"
+               and props.get(name, {}).get("tokenization") != "word"}
+    assert not changed, f"text properties other than sku keep word tokenization; changed: {changed}"
+
+
 REQUIRED = [
     exact_sku_retrieval,
     search_contract,
@@ -113,4 +123,4 @@ REQUIRED = [
     collection_schema,
     sku_field_tokenization,
 ]
-PREFERRED: list = []
+PREFERRED = [other_properties_word_tokenization]

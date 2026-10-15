@@ -65,6 +65,9 @@ A Task is a directory that runs without framework changes:
 | `snapshot.py` | `snapshot(app_url) -> dict`: dump the live state to JSON. `app_url` is `None` without an app. |
 | `check.py` | `REQUIRED` and `PREFERRED` lists of check functions over the snapshot. |
 
+Each Task also has a page at `docs/tasks/<stage>/<scenario>.md`
+([how to define a Task](docs/how-to/define-a-task.md#task-page)).
+
 `verify.py` starts the submitted Compose stack, calls `snapshot()`, and scores
 the result. Set these in `[verifier] env` as needed:
 
