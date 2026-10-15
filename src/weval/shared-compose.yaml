@@ -1,4 +1,8 @@
 # yaml-language-server: $schema=none
+# Compose overlay applied to every Trial environment after the Task's own
+# environment/docker-compose.yaml. It defines the workspace contract that each
+# Task's WORKSPACE.md describes to the agent and that verify.py and snapshot.py
+# rely on.
 ---
 services:
   main:

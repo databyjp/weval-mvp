@@ -13,6 +13,8 @@ as the domain language.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
 - `src/weval/shared-instructions.md`: Trial-environment notes appended to every
   Task's prompt when it is packaged.
+- `src/weval/shared-compose.yaml`: Compose overlay applied to every Trial
+  environment: the Trial network, `WEAVIATE_*` settings, and Docker socket.
 - `src/weval/harnesses/<harness>.py`: Harbor agent config, expected logs, and
   any harness-specific setup (for example, Pi's pinned `pi-web-access`).
 - `experiment-outputs/`: retained runs (git-ignored).
@@ -31,7 +33,7 @@ A Task is a directory that runs without framework changes:
 |---|---|
 | `instruction.md` | What the agent is told (Harbor's file name for the prompt). Packaging appends `src/weval/shared-instructions.md`. |
 | `task.toml` | Harbor task config: timeouts, `/app` artifact, healthcheck, verifier env. |
-| `environment/` | Harbor environment: `Dockerfile`, Compose overlay, starter app, fixtures. |
+| `environment/` | Harbor environment: `Dockerfile`, starter app, fixtures, and an optional Compose overlay for Task-specific settings such as a healthcheck. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |
 | `snapshot.py` | `snapshot(app_url) -> dict`: dump the live state to JSON. `app_url` is `None` without an app. |
 | `check.py` | `REQUIRED` and `PREFERRED` lists of check functions over the snapshot. |

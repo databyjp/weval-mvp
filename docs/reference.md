@@ -42,6 +42,26 @@ An environment that starts an application before the agent runs writes its
 process ID to `/tmp/application.pid`. The shared instructions tell the agent
 this is how to find and restart it.
 
+## Trial environment
+
+Every Trial environment's `main` service, where the agent works, gets these
+settings from `src/weval/shared-compose.yaml`:
+
+| Setting | Value |
+|---|---|
+| `COMPOSE_PROJECT_NAME` | `<Harbor project>_submission`, so the agent's stack is a separate Compose project. |
+| `TRIAL_NETWORK` | `<Harbor project>_default`, the network the agent's stack must join. |
+| `WEAVIATE_HTTP_HOST`, `WEAVIATE_HTTP_PORT` | `weaviate`, `8080` |
+| `WEAVIATE_GRPC_HOST`, `WEAVIATE_GRPC_PORT` | `weaviate`, `50051` |
+| `/var/run/docker.sock` | The Docker socket, mounted so the agent and verifier can run Compose. |
+
+`weval` passes this file to Harbor as an extra Compose overlay
+(`extra_docker_compose`); Harbor applies it after the Task's own overlay.
+
+A Task's `environment/` supplies the `Dockerfile` and anything specific to that
+Task. Its optional `docker-compose.yaml` overlay is applied before the shared
+one, for example to add a healthcheck on `main`.
+
 ## The Trial directory
 
 Each retained Trial directory is Harbor's own output plus weval's

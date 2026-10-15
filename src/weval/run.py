@@ -31,6 +31,8 @@ HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi}
 # Appended to every packaged prompt: facts about the Trial environment that no
 # single Task owns.
 SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
+# Applied to every Trial environment: the workspace contract no single Task owns.
+SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
 SECRET_VARS = ("OPENROUTER_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
@@ -41,6 +43,7 @@ MODAL = EnvironmentConfig(
     delete=True,
     override_cpus=4,
     override_memory_mb=8192,
+    extra_docker_compose=[SHARED_COMPOSE],
     kwargs={
         "modal_vm_runtime": True,
         "region": "eu",
