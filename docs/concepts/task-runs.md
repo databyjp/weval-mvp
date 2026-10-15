@@ -14,4 +14,4 @@ Harbor copies the exact submission before verification to `artifacts/submission/
 
 Scoring is done on a snapshot. So `weval check` can re-score a retained Trial even after its environment is gone.
 
-A broken stack results in a `failed` Trial. A Harbor exception or a verifier writing no reward is a `non-result`. A missing expected log or submission makes the Trial `incomplete`.
+A broken stack results in a `failed` Trial. If preparing the stack or taking the snapshot raises, `verify.py` saves the traceback as `snapshot.json`, and every check fails with the note `(snapshot failed; see snapshot.json)`. Read that traceback before attributing the failure to the agent: a slow sandbox can cause one too. A Harbor exception or a verifier writing no reward is a `non-result`. A missing expected log or submission makes the Trial `incomplete`.

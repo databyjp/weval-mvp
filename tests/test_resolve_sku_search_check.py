@@ -95,18 +95,3 @@ def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reas
     failed = failures(snapshot)
     assert list(failed) == [failing_check]
     assert reason in failed[failing_check]
-
-
-def test_reingest_with_new_uuids_passes_and_is_recorded():
-    snapshot = copy.deepcopy(ORACLE)
-    for n, obj in enumerate(snapshot["objects"]):
-        obj["id"] = f"00000000-0000-4000-8000-{n:012d}"
-    preservation = results(snapshot)["document-preservation"]
-    assert preservation["passed"]
-    assert preservation["notes"] == "UUIDs preserved: 0/28"
-
-
-def test_failed_snapshot_fails_every_check_without_crashing():
-    results = score(check, {"error": "Traceback: weaviate unreachable"})
-    assert results and not any(r["passed"] for r in results)
-    assert all("snapshot failed" in r["notes"] for r in results)

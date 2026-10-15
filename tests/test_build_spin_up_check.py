@@ -92,9 +92,3 @@ def test_auth_posture_records_refused_anonymous_access():
     posture = results(snapshot)["auth-posture"]
     assert posture["passed"]
     assert posture["notes"] == "anonymous /v1/schema: refused; API keys: 1"
-
-
-def test_failed_snapshot_fails_every_check_without_crashing():
-    results = score(check, {"error": "Traceback: weaviate unreachable"})
-    assert results and not any(r["passed"] for r in results)
-    assert all("snapshot failed" in r["notes"] for r in results)

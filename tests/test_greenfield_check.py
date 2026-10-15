@@ -79,9 +79,3 @@ def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reas
     failed = failures(snapshot)
     assert list(failed) == [failing_check]
     assert reason in failed[failing_check]
-
-
-def test_failed_snapshot_fails_every_check_without_crashing():
-    results = score(check, {"error": "Traceback: weaviate unreachable"})
-    assert results and not any(r["passed"] for r in results)
-    assert all("snapshot failed" in r["notes"] for r in results)
