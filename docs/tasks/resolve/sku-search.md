@@ -1,11 +1,13 @@
+---
+motivation: >
+  Can an agent diagnose and fix a tokenization fault on a running stack
+  without losing the indexed data?
+---
+
 # resolve/sku-search
 
-## Motivation
-
-Can an agent diagnose and fix a tokenization fault on a running stack without
-losing the indexed data? Word tokenization on a SKU property splits `ZXQ-9917`
-into `zxq` and `9917`, so BM25 ranks other products that share those tokens
-ahead of the exact match.
+Word tokenization on a SKU property splits `ZXQ-9917` into `zxq` and `9917`,
+so BM25 ranks other products that share those tokens ahead of the exact match.
 
 ## Boundary Conditions
 
