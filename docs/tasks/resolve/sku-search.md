@@ -7,7 +7,7 @@ motivation: >
 # resolve/sku-search
 
 Word tokenization on a SKU property splits `ZXQ-9917` into `zxq` and `9917`,
-so BM25 ranks other products that share those tokens ahead of the exact match.
+so BM25 may rank other products that share those tokens ahead of the exact match. The agent is asked to fix this.
 
 ## Boundary Conditions
 
