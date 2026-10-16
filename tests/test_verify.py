@@ -14,7 +14,7 @@ ROOT = Path(__file__).parents[1]
 
 
 # The stages defined in AGENTS.md; each Task lives at tasks/<stage>/<scenario>/.
-STAGES = {"build", "deploy", "resolve"}
+STAGES = {"build", "deploy", "resolve", "investigate"}
 CHECK_FILES = sorted(ROOT.glob("tasks/*/*/check.py"))
 
 

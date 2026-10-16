@@ -36,29 +36,30 @@ Remaining work, roughly in order. Delete items when done.
 - Costs one Modal Oracle run to regenerate
   `tests/fixtures/build-ecommerce-search-oracle-snapshot.json`.
 
-## New Task: latest version and best practices
+## investigate/current-practices
 
-Ask an agent to find the latest Weaviate version and current best practices.
-The question is whether it consults the canonical docs. A PREFERRED criterion
-records the tokens consumed, as a baseline to optimise later.
+In progress. The spec is `docs/tasks/investigate/current-practices.md`.
 
-Open design questions:
+Deferred until the observation layer has been seen working in real Trials:
 
-- Stage: this fits none of `build`, `deploy`, or `resolve`. A new stage, such
-  as `investigate`, goes in `AGENTS.md` and `STAGES` in `tests/test_verify.py`.
-- Deliverable: what the agent writes (for example, an answer file in `/app`)
-  so `snapshot.py` can capture it.
-- Evidence of investigation: which canonical sources count, and where the
-  check reads them from. Pi's transcript records fetches, but `check.py`
-  reads only the snapshot, which the verifier takes inside the Trial
-  environment.
-- Token use: Harbor records `n_input_tokens`, `n_cache_tokens`,
-  `n_output_tokens`, and `cost_usd` in `result.json` after the Trial, outside
-  the snapshot. Scoring it means either reading `result.json` in
-  `finalize()` or reporting it as a metric rather than a check. Either is a
-  framework change, so ask first.
-- A pass threshold, or a note-only check that always passes and records the
-  count, as `deploy/local-instance`'s `auth-posture` does.
+- Criteria for each answer. Candidate expected answers are in the Task
+  page's Calibration table.
+- Whether each answer must cite a canonical domain (`docs.weaviate.io`,
+  `weaviate.io`, `github.com/weaviate`, `pypi.org`).
+- Checks over the logs, such as "the agent fetched the page it cited". These
+  need host-side scoring in `finalize()`, which makes `weval.json` the
+  authoritative result and can disagree with Harbor's in-environment reward.
+- Pages read through `get_search_content` appear in the transcript as a
+  search-result ID, not a URL, so fetched-URL extraction undercounts them.
+  Find a way to observe them, possibly from the tool results.
+
+Later: vague questions here can measure uplift from skills as a Treatment.
+
+## Compare docs-site versions
+
+Run Tasks against different versions of the docs site to see whether changes
+reduce token use. Needs the `usage` metrics in `weval.json` and a way to point
+the agent's fetches at a site variant.
 
 ## Smaller items
 

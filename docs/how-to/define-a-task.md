@@ -1,6 +1,6 @@
 # How to define a Task
 
-Each task is defined as a unique directory under `tasks/<stage>/<scenario>/`. The stage is `build`, `deploy`, or `resolve`; [`AGENTS.md`](../../AGENTS.md#writing-a-task) defines each.
+Each task is defined as a unique directory under `tasks/<stage>/<scenario>/`. The stage is `build`, `deploy`, `resolve`, or `investigate`; [`AGENTS.md`](../../AGENTS.md#writing-a-task) defines each.
 
 A task consists of `instruction.md` (the prompt), `environment/` (what the agent is provided), `task.toml` (task meta-parameters such as timeouts, used directly by Harbor), `snapshot.py` (what to capture from the live stack after the agent finishes), `check.py` (what to check for scoring), and `solution/solve.sh` (the Oracle solution).
 

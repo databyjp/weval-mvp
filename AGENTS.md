@@ -49,7 +49,8 @@ A Task lives at `tasks/<stage>/<scenario>/`. The stage is the kind of job:
 
 - `build`: write new application code;
 - `deploy`: stand up or change running infrastructure;
-- `resolve`: fix a reported fault on a running system.
+- `resolve`: fix a reported fault on a running system;
+- `investigate`: answer a question by research, without changing a system.
 
 The scenario names the use case in a few words, such as `sku-search`. Add a
 stage when a Task needs one, and add it to `STAGES` in `tests/test_verify.py`.
