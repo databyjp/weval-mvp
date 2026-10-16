@@ -5,9 +5,12 @@ import json
 import shutil
 from pathlib import Path
 
-from weval.run import ROOT, finalize, rescore
+import pytest
+
+from weval.run import ROOT, finalize, package_task, rescore
 
 TASK_PATH = Path("tasks/resolve/sku-search")
+VARIANT_TASK = ROOT / "tasks/investigate/current-practices"
 ORACLE_SNAPSHOT = ROOT / "tests/fixtures/resolve-sku-search-oracle-snapshot.json"
 
 
@@ -82,3 +85,26 @@ def test_finalize_takes_claude_code_tokens_from_its_model_usage(tmp_path):
         "n_input_tokens": 601577, "n_cache_tokens": 383347, "n_cache_creation_tokens": 54342,
         "n_output_tokens": 35401, "cost_usd": None,
     }
+
+
+def test_package_task_uses_the_variant_prompt_and_tells_the_verifier(tmp_path):
+    package_task(VARIANT_TASK, tmp_path / "package", "legal-archive")
+
+    prompt = (VARIANT_TASK / "prompts/legal-archive.md").read_text()
+    assert (tmp_path / "package/instruction.md").read_text().startswith(prompt)
+    assert (tmp_path / "package/tests/variant").read_text() == "legal-archive"
+    assert not (tmp_path / "package/prompts").exists()
+
+
+def test_package_task_default_variant_uses_instruction_md(tmp_path):
+    package_task(VARIANT_TASK, tmp_path / "package")
+
+    prompt = (VARIANT_TASK / "instruction.md").read_text()
+    assert (tmp_path / "package/instruction.md").read_text().startswith(prompt)
+    assert (tmp_path / "package/tests/variant").read_text() == "default"
+
+
+def test_package_task_rejects_an_unknown_variant(tmp_path):
+    with pytest.raises(FileNotFoundError, match="no-such-variant"):
+        package_task(VARIANT_TASK, tmp_path / "package", "no-such-variant")
+    assert not (tmp_path / "package").exists()

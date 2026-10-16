@@ -2,7 +2,7 @@
 
 Output layout, one directory per invocation::
 
-    experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/
+    experiment-outputs/<timestamp>__<stage>__<scenario>[@<variant>]__<agent>/
         task/                 Harbor task package built from tasks/<stage>/<scenario>/
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
         job/<trial>/weval.json  Agent, status, missing logs, check results
@@ -66,19 +66,26 @@ LOCAL = EnvironmentConfig(
 )
 
 
-def package_task(task_dir: Path, destination: Path) -> None:
+def package_task(task_dir: Path, destination: Path, variant: str = "default") -> None:
     """Build a Harbor task package: the Task directory plus ``tests/``, which
     holds the shared verifier with the Task's snapshot and check. The packaged
-    ``instruction.md`` ends with the shared instructions."""
+    ``instruction.md`` is the variant's prompt followed by the shared
+    instructions: the Task's ``instruction.md`` for ``default``, otherwise
+    ``prompts/<variant>.md``, which must exist. ``tests/variant`` holds the
+    variant name for the verifier."""
+    prompt = task_dir / ("instruction.md" if variant == "default" else f"prompts/{variant}.md")
+    if not prompt.exists():
+        raise FileNotFoundError(f"no prompt for variant {variant!r}: {prompt}")
     shutil.copytree(
         task_dir,
         destination,
-        ignore=shutil.ignore_patterns("__pycache__", "snapshot.py", "check.py"),
+        ignore=shutil.ignore_patterns("__pycache__", "snapshot.py", "check.py", "prompts"),
     )
     instruction = destination / "instruction.md"
-    instruction.write_text(f"{instruction.read_text()}\n{SHARED_INSTRUCTIONS.read_text()}")
+    instruction.write_text(f"{prompt.read_text()}\n{SHARED_INSTRUCTIONS.read_text()}")
     tests = destination / "tests"
     tests.mkdir()
+    (tests / "variant").write_text(variant)
     shutil.copy(Path(verify.__file__), tests / "verify.py")
     shutil.copy(task_dir / "snapshot.py", tests)
     shutil.copy(task_dir / "check.py", tests)
@@ -88,9 +95,12 @@ def package_task(task_dir: Path, destination: Path) -> None:
     (tests / "test.sh").chmod(0o755)
 
 
-def run(task_dir: Path, agent_name: str, attempts: int = 1, local: bool = False) -> Path:
-    """Run ``attempts`` Trials of one Task by one Agent on Modal, or on the local
-    Docker daemon when ``local``; return the run directory.
+def run(
+    task_dir: Path, agent_name: str, attempts: int = 1, local: bool = False, variant: str = "default"
+) -> Path:
+    """Run ``attempts`` Trials of one Task's prompt variant by one Agent on
+    Modal, or on the local Docker daemon when ``local``; return the run
+    directory.
 
     Harbor failures inside a Trial are recorded as Non-results in ``weval.json``,
     not raised. Retained files are scrubbed of credential values afterwards,
@@ -105,9 +115,10 @@ def run(task_dir: Path, agent_name: str, attempts: int = 1, local: bool = False)
     harness = HARNESSES[agent["harness"]]
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     # Task and Agent names contain dashes; Harbor's "__" keeps the parts separable.
-    run_name = f"{stamp}__{task_dir.parent.name}__{task_dir.name}__{agent_name}"
+    scenario = task_dir.name if variant == "default" else f"{task_dir.name}@{variant}"
+    run_name = f"{stamp}__{task_dir.parent.name}__{scenario}__{agent_name}"
     run_dir = ROOT / "experiment-outputs" / run_name
-    package_task(task_dir, run_dir / "task")
+    package_task(task_dir, run_dir / "task", variant)
     config = JobConfig(
         job_name="job",
         jobs_dir=run_dir,
@@ -121,7 +132,7 @@ def run(task_dir: Path, agent_name: str, attempts: int = 1, local: bool = False)
         asyncio.run(_run_job(config))
     finally:
         for result_file in sorted((run_dir / "job").glob("*/result.json")):
-            record = finalize(result_file.parent, task_path, agent)
+            record = finalize(result_file.parent, task_path, agent, variant)
             print(f"{result_file.parent}: {record['status']}")
         redact(run_dir)
     return run_dir
@@ -132,7 +143,7 @@ async def _run_job(config: JobConfig) -> None:
     await job.run()
 
 
-def finalize(trial_dir: Path, task_path: Path, agent: dict) -> dict:
+def finalize(trial_dir: Path, task_path: Path, agent: dict, variant: str = "default") -> dict:
     """Write and return ``weval.json`` for one Harbor Trial directory.
 
     ``task_path`` is recorded as given; ``run()`` passes it relative to the
@@ -157,6 +168,7 @@ def finalize(trial_dir: Path, task_path: Path, agent: dict) -> dict:
     record = {
         "status": status,
         "task": str(task_path),
+        "variant": variant,
         "agent": harness.agent_record(agent),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),

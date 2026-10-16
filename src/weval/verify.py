@@ -9,7 +9,8 @@ Flow: start the submitted Compose stack (unless the Task sets
 or the submitted ``/app`` has no ``docker-compose.yaml``),
 start the submitted app on ``APP_PORT`` when the Task sets
 ``WEVAL_START_APP=1``, call ``snapshot.snapshot(app_url)`` (``None`` without an
-app), then score it with ``check.py``. Everything is written to ``/logs/verifier``.
+app), add the prompt variant from ``variant`` beside this file, then score it
+with ``check.py``. Everything is written to ``/logs/verifier``.
 A stack or snapshot failure is recorded in the snapshot and scored as failing
 checks; it is not a verifier crash.
 """
@@ -39,9 +40,17 @@ def score(check: ModuleType, snapshot: dict) -> list[dict]:
     raising ``AssertionError`` whose message names the constraint. Any other
     exception, such as a missing snapshot section, fails the check with a
     "could not evaluate" note instead of aborting scoring.
+
+    A Task with prompt variants also defines ``VARIANT_REQUIRED`` and
+    ``VARIANT_PREFERRED``, mapping each variant name to more check functions;
+    the snapshot's ``variant`` picks them. A snapshot without ``variant``,
+    retained from before it was recorded, is the ``default`` variant.
     """
+    variant = snapshot.get("variant", "default")
+    required_checks = check.REQUIRED + getattr(check, "VARIANT_REQUIRED", {}).get(variant, [])
+    preferred_checks = check.PREFERRED + getattr(check, "VARIANT_PREFERRED", {}).get(variant, [])
     results = []
-    for required, functions in ((True, check.REQUIRED), (False, check.PREFERRED)):
+    for required, functions in ((True, required_checks), (False, preferred_checks)):
         for function in functions:
             try:
                 passed, notes = True, function(snapshot) or ""
@@ -127,6 +136,9 @@ def main() -> None:
             # Matters for local Docker, where the stack would outlive the Trial.
             _compose("down", "--volumes", timeout=120)
 
+    # Recorded even on failure, so the failed snapshot is scored on the
+    # variant's checks too.
+    snapshot["variant"] = Path(__file__).with_name("variant").read_text().strip()
     (LOG_DIR / "snapshot.json").write_text(json.dumps(snapshot, indent=1))
     results = score(importlib.import_module("check"), snapshot)
     (LOG_DIR / "checks.json").write_text(json.dumps(results, indent=1))

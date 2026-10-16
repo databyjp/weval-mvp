@@ -1,10 +1,11 @@
 """Scoring a failed snapshot: when stack preparation or ``snapshot()`` raises,
 ``verify.py`` scores ``{"error": <traceback>}`` instead. Every check of every
-Task must then fail, with a note pointing to ``snapshot.json``.
+Task and prompt variant must then fail, with a note pointing to ``snapshot.json``.
 """
 
 import importlib.util
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -23,16 +24,59 @@ def test_every_task_directory_is_under_a_known_stage():
     assert found <= STAGES, f"unknown stage directories under tasks/: {sorted(found - STAGES)}"
 
 
-@pytest.mark.parametrize("check_file", CHECK_FILES, ids=lambda p: f"{p.parent.parent.name}/{p.parent.name}")
-def test_failed_snapshot_fails_every_check(check_file):
+def load_check(check_file: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location(f"{check_file.parent.name}_check", check_file)
     assert spec and spec.loader
     check = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(check)
+    return check
 
-    results = score(check, {"error": "Traceback: weaviate unreachable"})
 
-    assert results
-    passed = [r["name"] for r in results if r["passed"]]
-    assert not passed, f"checks passed on a failed snapshot: {passed}"
-    assert all("snapshot failed" in r["notes"] for r in results)
+def task_id(check_file: Path) -> str:
+    return f"{check_file.parent.parent.name}/{check_file.parent.name}"
+
+
+@pytest.mark.parametrize("check_file", CHECK_FILES, ids=task_id)
+def test_failed_snapshot_fails_every_check(check_file):
+    check = load_check(check_file)
+
+    for variant in getattr(check, "VARIANT_REQUIRED", {"default": []}):
+        results = score(check, {"error": "Traceback: weaviate unreachable", "variant": variant})
+
+        assert results
+        passed = [r["name"] for r in results if r["passed"]]
+        assert not passed, f"{variant}: checks passed on a failed snapshot: {passed}"
+        assert all("snapshot failed" in r["notes"] for r in results)
+
+
+@pytest.mark.parametrize("check_file", CHECK_FILES, ids=task_id)
+def test_variant_check_lists_name_exactly_the_tasks_prompt_variants(check_file):
+    check = load_check(check_file)
+    prompts = {p.stem for p in (check_file.parent / "prompts").glob("*.md")}
+    if not prompts:
+        assert not hasattr(check, "VARIANT_REQUIRED") and not hasattr(check, "VARIANT_PREFERRED")
+        return
+
+    assert set(check.VARIANT_REQUIRED) == {"default"} | prompts
+    assert set(check.VARIANT_PREFERRED) == {"default"} | prompts
+
+
+def test_score_adds_the_snapshot_variants_checks():
+    def shared(snapshot): """Shared."""
+    def legal_only(snapshot): """legal-archive only."""
+    def legal_preferred(snapshot): """legal-archive, preferred."""
+    check = SimpleNamespace(
+        REQUIRED=[shared], PREFERRED=[],
+        VARIANT_REQUIRED={"default": [], "legal-archive": [legal_only]},
+        VARIANT_PREFERRED={"default": [], "legal-archive": [legal_preferred]},
+    )
+
+    def scored(snapshot):
+        return [(r["name"], r["required"]) for r in score(check, snapshot)]
+
+    assert scored({"variant": "legal-archive"}) == [
+        ("shared", True), ("legal-only", True), ("legal-preferred", False),
+    ]
+    assert scored({"variant": "default"}) == [("shared", True)]
+    # Snapshots retained from before the variant was recorded.
+    assert scored({}) == [("shared", True)]

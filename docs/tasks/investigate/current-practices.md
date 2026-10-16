@@ -19,6 +19,15 @@ recommended way to deploy, vectorize, index, and search, citing its sources.
 > `WORKSPACE.md`. Write your findings to `/app/findings.json` in the format
 > described there, citing the page each answer came from.
 
+The [prompt variants](../../reference.md#prompt-variants) in `prompts/` name a
+use case in the first sentence and are otherwise identical:
+
+| Variant | First sentence |
+|---|---|
+| `help-chatbot` | We're starting a new project with Weaviate: a customer-facing help chatbot. |
+| `shopping-search` | We're starting a new project with Weaviate: the product search engine for an e-commerce store. |
+| `legal-archive` | We're starting a new project with Weaviate: cost-effective search over a very large archive of legal documents. |
+
 ### Workspace
 
 - `WORKSPACE.md`: the `findings.json` format. It has six items
@@ -45,7 +54,9 @@ read through search results without its own fetch is not listed.
 ## Checks
 
 Criteria for the answers and their sources are deferred until the
-observations above have been seen in real Trials.
+observations above have been seen in real Trials. Every variant is scored on
+the checks below; `VARIANT_REQUIRED` and `VARIANT_PREFERRED` in `check.py` are
+empty placeholders for checks that differ by use case.
 
 | Check | Tier | Validation |
 |---|---|---|

@@ -4,6 +4,8 @@ Each task is defined as a unique directory under `tasks/<stage>/<scenario>/`. Th
 
 A task consists of `instruction.md` (the prompt), `environment/` (what the agent is provided), `task.toml` (task meta-parameters such as timeouts, used directly by Harbor), `snapshot.py` (what to capture from the live stack after the agent finishes), `check.py` (what to check for scoring), and `solution/solve.sh` (the Oracle solution).
 
+A task may also have [prompt variants](../reference.md#prompt-variants): alternative prompts in `prompts/`, each scored on the shared checks plus its own.
+
 See the [reference](../reference.md) for details on each parameter.
 
 ## Task page

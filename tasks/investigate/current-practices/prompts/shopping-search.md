@@ -1,0 +1,1 @@
+We're starting a new project with Weaviate: the product search engine for an e-commerce store. Find the latest Weaviate versions to use, and the recommended way to do each item listed in `WORKSPACE.md`. Write your findings to `/app/findings.json` in the format described there, citing the page each answer came from.

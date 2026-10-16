@@ -47,6 +47,22 @@ An environment that starts an application before the agent runs writes its
 process ID to `/tmp/application.pid`. The shared instructions tell the agent
 this is how to find and restart it.
 
+## Prompt variants
+
+A Task may keep alternative prompts at `prompts/<variant>.md`;
+`instruction.md` is the `default` variant. `weval run --variant <variant>`
+packages that prompt as the Task's `instruction.md`, writes the variant name to
+the package's `tests/variant`, and adds `@<variant>` to the run directory's
+scenario part. An unknown variant fails before anything runs.
+
+The verifier adds the variant to the snapshot as `variant`, also when the
+snapshot failed. `check.py` then defines `VARIANT_REQUIRED` and
+`VARIANT_PREFERRED`, mapping `default` and every variant name to check
+functions scored after the shared `REQUIRED` and `PREFERRED` lists.
+`tests/test_verify.py` fails unless both dicts name exactly `default` and the
+files in `prompts/`. A snapshot without `variant`, retained from before it was
+recorded, is scored as `default`.
+
 ## Trial environment
 
 Every Trial environment's `main` service, where the agent works, gets these
@@ -74,7 +90,7 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `non-result`), the Agent, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is `null` because it has no price for OpenRouter model names. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `non-result`), the Agent, the prompt variant, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is `null` because it has no price for OpenRouter model names. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
 | `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |
