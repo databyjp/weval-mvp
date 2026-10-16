@@ -55,7 +55,7 @@ read through search results without its own fetch is not listed.
 
 Criteria for the answers and their sources are deferred until the
 observations above have been seen in real Trials. Every variant is scored on
-the checks below; `VARIANT_REQUIRED` and `VARIANT_PREFERRED` in `check.py` are
+the checks below; `PROMPT_VARIANT_REQUIRED` and `PROMPT_VARIANT_PREFERRED` in `check.py` are
 empty placeholders for checks that differ by use case.
 
 | Check | Tier | Validation |

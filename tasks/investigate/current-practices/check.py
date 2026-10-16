@@ -3,9 +3,10 @@
 Each check passes by returning and fails by raising ``AssertionError`` whose
 message names the constraint. The check ID is the function name with dashes;
 the docstring is its description. Reward requires every ``REQUIRED`` check.
-A Trial of a prompt variant is also scored on that variant's
-``VARIANT_REQUIRED`` and ``VARIANT_PREFERRED`` lists; ``default`` is
-``instruction.md``, the others are ``prompts/<variant>.md``.
+A Trial of a prompt variant is also scored on that prompt variant's
+``PROMPT_VARIANT_REQUIRED`` and ``PROMPT_VARIANT_PREFERRED`` lists;
+``default`` is ``instruction.md``, the others are
+``prompts/<prompt-variant>.md``.
 Criteria for the answers are deferred; see the Task page.
 """
 
@@ -43,13 +44,13 @@ def findings_file(snapshot: dict) -> None:
 REQUIRED = [findings_file]
 PREFERRED: list = []
 # Placeholders until the criteria are designed.
-VARIANT_REQUIRED: dict[str, list] = {
+PROMPT_VARIANT_REQUIRED: dict[str, list] = {
     "default": [],
     "help-chatbot": [],
     "shopping-search": [],
     "legal-archive": [],
 }
-VARIANT_PREFERRED: dict[str, list] = {
+PROMPT_VARIANT_PREFERRED: dict[str, list] = {
     "default": [],
     "help-chatbot": [],
     "shopping-search": [],

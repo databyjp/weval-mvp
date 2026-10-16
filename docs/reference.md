@@ -49,19 +49,20 @@ this is how to find and restart it.
 
 ## Prompt variants
 
-A Task may keep alternative prompts at `prompts/<variant>.md`;
-`instruction.md` is the `default` variant. `weval run --variant <variant>`
-packages that prompt as the Task's `instruction.md`, writes the variant name to
-the package's `tests/variant`, and adds `@<variant>` to the run directory's
-scenario part. An unknown variant fails before anything runs.
+A Task may keep alternative prompts at `prompts/<prompt-variant>.md`;
+`instruction.md` is the `default` prompt variant.
+`weval run --prompt-variant <prompt-variant>` packages that prompt as the
+Task's `instruction.md`, writes its name to the package's
+`tests/prompt_variant`, and adds `@<prompt-variant>` to the run directory's
+scenario part. An unknown prompt variant fails before anything runs.
 
-The verifier adds the variant to the snapshot as `variant`, also when the
-snapshot failed. `check.py` then defines `VARIANT_REQUIRED` and
-`VARIANT_PREFERRED`, mapping `default` and every variant name to check
-functions scored after the shared `REQUIRED` and `PREFERRED` lists.
+The verifier adds the name to the snapshot as `prompt_variant`, also when the
+snapshot failed. `check.py` then defines `PROMPT_VARIANT_REQUIRED` and
+`PROMPT_VARIANT_PREFERRED`, mapping `default` and every prompt variant name to
+check functions scored after the shared `REQUIRED` and `PREFERRED` lists.
 `tests/test_verify.py` fails unless both dicts name exactly `default` and the
-files in `prompts/`. A snapshot without `variant`, retained from before it was
-recorded, is scored as `default`.
+files in `prompts/`. A snapshot without `prompt_variant`, retained from before
+it was recorded, is scored as `default`.
 
 ## Trial environment
 

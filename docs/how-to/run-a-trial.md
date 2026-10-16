@@ -5,13 +5,13 @@ Trials run on Modal unless you pass `--local`. Pi Agents use OpenRouter for infe
 Run a trial by specifying an env file, task, agent definition, and the number of trials to run (e.g. for higher sample size). The env file must define the credentials listed in the [README](../../README.md#setup). The `-n` Trials run concurrently, each in its own Modal sandbox.
 
 ```sh
-uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--variant <variant>]
+uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>]
 ```
 
 `--local` runs the Trials on the local Docker daemon instead, at no Modal cost. Use it for Tasks that don't need Docker-in-Docker, such as `investigate/current-practices`.
 
-`--variant` runs one of the Task's [prompt variants](../reference.md#prompt-variants), named after a file in its `prompts/` directory without `.md`.
+`--prompt-variant` runs one of the Task's [prompt variants](../reference.md#prompt-variants), named after a file in its `prompts/` directory without `.md`.
 
-Each `weval run` is one Experiment run. It writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/`, with `<scenario>@<variant>` in place of `<scenario>` for a prompt variant, and prints each Trial's status.
+Each `weval run` is one Experiment run. It writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/`, with `<scenario>@<prompt-variant>` in place of `<scenario>` for a prompt variant, and prints each Trial's status.
 
 Agents are defined and named in `agents.toml`. Use `--agent oracle` to run the Task's own `solution/solve.sh` instead of a model.

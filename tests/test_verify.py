@@ -40,12 +40,12 @@ def task_id(check_file: Path) -> str:
 def test_failed_snapshot_fails_every_check(check_file):
     check = load_check(check_file)
 
-    for variant in getattr(check, "VARIANT_REQUIRED", {"default": []}):
-        results = score(check, {"error": "Traceback: weaviate unreachable", "variant": variant})
+    for prompt_variant in getattr(check, "PROMPT_VARIANT_REQUIRED", {"default": []}):
+        results = score(check, {"error": "Traceback: weaviate unreachable", "prompt_variant": prompt_variant})
 
         assert results
         passed = [r["name"] for r in results if r["passed"]]
-        assert not passed, f"{variant}: checks passed on a failed snapshot: {passed}"
+        assert not passed, f"{prompt_variant}: checks passed on a failed snapshot: {passed}"
         assert all("snapshot failed" in r["notes"] for r in results)
 
 
@@ -54,29 +54,29 @@ def test_variant_check_lists_name_exactly_the_tasks_prompt_variants(check_file):
     check = load_check(check_file)
     prompts = {p.stem for p in (check_file.parent / "prompts").glob("*.md")}
     if not prompts:
-        assert not hasattr(check, "VARIANT_REQUIRED") and not hasattr(check, "VARIANT_PREFERRED")
+        assert not hasattr(check, "PROMPT_VARIANT_REQUIRED") and not hasattr(check, "PROMPT_VARIANT_PREFERRED")
         return
 
-    assert set(check.VARIANT_REQUIRED) == {"default"} | prompts
-    assert set(check.VARIANT_PREFERRED) == {"default"} | prompts
+    assert set(check.PROMPT_VARIANT_REQUIRED) == {"default"} | prompts
+    assert set(check.PROMPT_VARIANT_PREFERRED) == {"default"} | prompts
 
 
-def test_score_adds_the_snapshot_variants_checks():
+def test_score_adds_the_snapshot_prompt_variants_checks():
     def shared(snapshot): """Shared."""
     def legal_only(snapshot): """legal-archive only."""
     def legal_preferred(snapshot): """legal-archive, preferred."""
     check = SimpleNamespace(
         REQUIRED=[shared], PREFERRED=[],
-        VARIANT_REQUIRED={"default": [], "legal-archive": [legal_only]},
-        VARIANT_PREFERRED={"default": [], "legal-archive": [legal_preferred]},
+        PROMPT_VARIANT_REQUIRED={"default": [], "legal-archive": [legal_only]},
+        PROMPT_VARIANT_PREFERRED={"default": [], "legal-archive": [legal_preferred]},
     )
 
     def scored(snapshot):
         return [(r["name"], r["required"]) for r in score(check, snapshot)]
 
-    assert scored({"variant": "legal-archive"}) == [
+    assert scored({"prompt_variant": "legal-archive"}) == [
         ("shared", True), ("legal-only", True), ("legal-preferred", False),
     ]
-    assert scored({"variant": "default"}) == [("shared", True)]
-    # Snapshots retained from before the variant was recorded.
+    assert scored({"prompt_variant": "default"}) == [("shared", True)]
+    # Snapshots retained from before the prompt variant was recorded.
     assert scored({}) == [("shared", True)]

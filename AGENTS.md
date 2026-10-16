@@ -60,7 +60,7 @@ A Task is a directory that runs without framework changes:
 | File | Purpose |
 |---|---|
 | `instruction.md` | What the agent is told (Harbor's file name for the prompt). Packaging appends `src/weval/shared-instructions.md`. |
-| `prompts/<variant>.md` | Optional prompt variants, used instead of `instruction.md` with `weval run --variant <variant>`. `check.py` then lists each variant's own checks ([reference](docs/reference.md#prompt-variants)). |
+| `prompts/<prompt-variant>.md` | Optional prompt variants, used instead of `instruction.md` with `weval run --prompt-variant <prompt-variant>`. `check.py` then lists each prompt variant's own checks ([reference](docs/reference.md#prompt-variants)). |
 | `task.toml` | Harbor task config: timeouts, `/app` artifact, healthcheck, verifier env. |
 | `environment/` | Harbor environment: `Dockerfile`, starter app, fixtures, and an optional Compose overlay for Task-specific settings such as a healthcheck. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |
@@ -138,7 +138,7 @@ Before running agents on a new Task:
 ## Running and reading Trials
 
 ```sh
-uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--variant <variant>]
+uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 ```
 
