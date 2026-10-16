@@ -168,8 +168,8 @@ scored result.
 - Keep each check's ID, description, and logic together in one function.
 - A leading underscore means a private helper, nothing more. All code is
   human-reviewed.
-- Files marked vendored (such as `harnesses/pi_web_access/`) are not
-  hand-edited.
+- Generated files, such as `harnesses/pi_web_access/package-lock.json`, are
+  not hand-edited.
 
 Test check logic and transcript parsing against real retained runs.
 

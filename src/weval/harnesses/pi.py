@@ -1,7 +1,7 @@
 """Pi with the pinned ``pi-web-access`` extension for web search and fetch.
 
 ``WebAccessPi`` extends Harbor's Pi adapter: after Harbor installs Pi, it
-installs ``pi-web-access`` with ``npm ci`` from the vendored lockfile in
+installs ``pi-web-access`` with ``npm ci`` from the pinned lockfile in
 ``pi_web_access/`` and fails setup unless the exact pinned version resolved.
 Copies of the lockfile, search config, and provenance go to ``/logs/agent`` so
 each Trial records the web tooling it ran with.
