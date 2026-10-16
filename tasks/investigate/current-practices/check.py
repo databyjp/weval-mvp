@@ -10,8 +10,8 @@ A Trial of a prompt variant is also scored on that prompt variant's
 Criteria for the answers are deferred; see the Task page.
 """
 
-ITEMS = ("weaviate_version", "python_client_version", "deployment",
-         "vectorization", "indexing", "search")
+ITEMS = ("weaviate_version", "client_library_versions", "deployment",
+         "config_ingestion", "search")
 
 
 # --- Required ----------------------------------------------------------------

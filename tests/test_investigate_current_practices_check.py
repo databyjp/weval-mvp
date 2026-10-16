@@ -38,7 +38,7 @@ def missing_item(s: dict) -> None:
 
 
 def answer_not_string(s: dict) -> None:
-    s["findings"]["parsed"]["indexing"]["answer"] = {"index": "hnsw", "quantization": "rq"}
+    s["findings"]["parsed"]["config_ingestion"]["answer"] = {"index": "hnsw", "quantization": "rq"}
 
 
 def test_oracle_passes_every_check():
@@ -50,7 +50,7 @@ def test_oracle_passes_every_check():
     [
         (missing_file, "findings-file", "does not exist"),
         (missing_item, "findings-file", "missing ['search']"),
-        (answer_not_string, "findings-file", "malformed ['indexing']"),
+        (answer_not_string, "findings-file", "malformed ['config_ingestion']"),
     ],
 )
 def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):

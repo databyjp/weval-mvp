@@ -1,5 +1,8 @@
 """Write the Oracle's findings: the latest releases, looked up at run time, and
-the recommendations from the docs pages cited with each answer."""
+the recommendations from the docs pages cited with each answer.
+
+The answers are placeholders that satisfy ``findings-file`` until the
+criteria are designed; they are the same for every prompt variant."""
 
 import json
 import re
@@ -30,21 +33,24 @@ findings = {
         "answer": latest_server_release(),
         "sources": ["https://github.com/weaviate/weaviate/releases"],
     },
-    "python_client_version": {
-        "answer": get_json("https://pypi.org/pypi/weaviate-client/json")["info"]["version"],
+    "client_library_versions": {
+        "answer": "Python weaviate-client "
+        + get_json("https://pypi.org/pypi/weaviate-client/json")["info"]["version"],
         "sources": ["https://pypi.org/project/weaviate-client/"],
     },
     "deployment": {
         "answer": "Docker for local development; Kubernetes or Weaviate Cloud for production.",
         "sources": [f"{DOCS}/deploy"],
     },
-    "vectorization": {
-        "answer": "vector_config=Configure.Vectors.<module>(), the API since Python client 4.16.",
-        "sources": [f"{DOCS}/weaviate/manage-collections/vector-config"],
-    },
-    "indexing": {
-        "answer": "HNSW for most cases; rotational quantization (RQ) as a starting point for compression.",
-        "sources": [f"{DOCS}/weaviate/best-practices"],
+    "config_ingestion": {
+        "answer": "Define each collection with vector_config=Configure.Vectors.<module>() (Python "
+        "client 4.16 and later) and an HNSW index, starting with rotational quantization (RQ) "
+        "for compression; import objects with client-side batching.",
+        "sources": [
+            f"{DOCS}/weaviate/manage-collections/vector-config",
+            f"{DOCS}/weaviate/best-practices",
+            f"{DOCS}/weaviate/manage-objects/import",
+        ],
     },
     "search": {
         "answer": "Hybrid search as the starting point.",

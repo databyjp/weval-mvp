@@ -3,10 +3,9 @@
 Write `/app/findings.json` as one JSON object with these keys:
 
 - `weaviate_version`: the latest Weaviate server release.
-- `python_client_version`: the latest Weaviate Python client release.
+- `client_library_versions`: the corresponding Weaviate client versions.
 - `deployment`: how to deploy Weaviate.
-- `vectorization`: how to vectorize data.
-- `indexing`: which indexing settings to use.
+- `config_ingestion`: how to configure the DB & ingest data
 - `search`: how to search.
 
 Each value is an object with two keys:

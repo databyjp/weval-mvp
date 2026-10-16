@@ -8,7 +8,8 @@ motivation: >
 
 The workspace holds only a description of the findings file. Nothing is
 running. The agent is asked to find the latest Weaviate versions and the
-recommended way to deploy, vectorize, index, and search, citing its sources.
+recommended way to deploy, configure and ingest, and search, citing its
+sources.
 
 ## Boundary conditions
 
@@ -19,21 +20,22 @@ recommended way to deploy, vectorize, index, and search, citing its sources.
 > `WORKSPACE.md`. Write your findings to `/app/findings.json` in the format
 > described there, citing the page each answer came from.
 
-The [prompt variants](../../reference.md#prompt-variants) in `prompts/` name a
-use case in the first sentence and are otherwise identical:
+The [prompt variants](../../reference.md#prompt-variants) in `prompts/`
+replace the first sentence with a use case and are otherwise identical:
 
-| Variant | First sentence |
+| Variant | In place of the first sentence |
 |---|---|
-| `help-chatbot` | We're starting a new project with Weaviate: a customer-facing help chatbot. |
-| `shopping-search` | We're starting a new project with Weaviate: the product search engine for an e-commerce store. |
-| `legal-archive` | We're starting a new project with Weaviate: cost-effective search over a very large archive of legal documents. |
+| `help-chatbot` | We're building a customer-facing help chatbot with Weaviate as the vector database. |
+| `shopping-search` | We're building an e-commerce store with Weaviate as the vector database. |
+| `legal-archive` | We're building a search app to look through a very large archive of legal documents with Weaviate as the vector database. Being cost-effective is important to us. |
 
 ### Workspace
 
-- `WORKSPACE.md`: the `findings.json` format. It has six items
-  (`weaviate_version`, `python_client_version`, `deployment`,
-  `vectorization`, `indexing`, `search`), each with an `answer` string and a
-  `sources` list of URLs. It names each item without suggesting answers.
+- `WORKSPACE.md`: the `findings.json` format. It has five items
+  (`weaviate_version`, `client_library_versions`, `deployment`,
+  `config_ingestion`, `search`), each with an `answer` string and a `sources`
+  list of URLs. It names each item without suggesting answers, and leaves
+  open which client libraries to cover and what "configure" includes.
 
 ### Initial state
 
@@ -66,13 +68,14 @@ empty placeholders for checks that differ by use case.
 
 Variants are in `tests/test_investigate_current_practices_check.py`. The
 Oracle looks up the latest releases at run time and writes the answers below,
-each citing the page it came from.
+each citing the page it came from. They are placeholders that pass
+`findings-file`, the same for every prompt variant, until the criteria are
+designed.
 
 | Item | Oracle answer | Source |
 |---|---|---|
 | `deployment` | Docker for local development; Kubernetes or Weaviate Cloud for production. | `docs.weaviate.io/deploy` |
-| `vectorization` | `vector_config=Configure.Vectors.<module>()`, the API since Python client 4.16. | `docs.weaviate.io/weaviate/manage-collections/vector-config` |
-| `indexing` | HNSW for most cases; rotational quantization (RQ) as a starting point for compression. | `docs.weaviate.io/weaviate/best-practices` |
+| `config_ingestion` | `vector_config=Configure.Vectors.<module>()` (Python client 4.16 and later) and an HNSW index, starting with rotational quantization (RQ) for compression; client-side batch import. | `docs.weaviate.io/weaviate/manage-collections/vector-config`, `.../best-practices`, `.../manage-objects/import` |
 | `search` | Hybrid search as the starting point. | `docs.weaviate.io/weaviate/concepts/search` |
 
 | Variant | Fails | Models |
