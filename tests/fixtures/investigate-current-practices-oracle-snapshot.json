@@ -1,0 +1,56 @@
+{
+ "findings": {
+  "text": "{\n  \"weaviate_version\": {\n    \"answer\": \"1.40.1\",\n    \"sources\": [\n      \"https://github.com/weaviate/weaviate/releases\"\n    ]\n  },\n  \"python_client_version\": {\n    \"answer\": \"4.23.1\",\n    \"sources\": [\n      \"https://pypi.org/project/weaviate-client/\"\n    ]\n  },\n  \"deployment\": {\n    \"answer\": \"Docker for local development; Kubernetes or Weaviate Cloud for production.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/deploy\"\n    ]\n  },\n  \"vectorization\": {\n    \"answer\": \"vector_config=Configure.Vectors.<module>(), the API since Python client 4.16.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/manage-collections/vector-config\"\n    ]\n  },\n  \"indexing\": {\n    \"answer\": \"HNSW for most cases; rotational quantization (RQ) as a starting point for compression.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/best-practices\"\n    ]\n  },\n  \"search\": {\n    \"answer\": \"Hybrid search as the starting point.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/concepts/search\"\n    ]\n  }\n}",
+  "parsed": {
+   "weaviate_version": {
+    "answer": "1.40.1",
+    "sources": [
+     "https://github.com/weaviate/weaviate/releases"
+    ]
+   },
+   "python_client_version": {
+    "answer": "4.23.1",
+    "sources": [
+     "https://pypi.org/project/weaviate-client/"
+    ]
+   },
+   "deployment": {
+    "answer": "Docker for local development; Kubernetes or Weaviate Cloud for production.",
+    "sources": [
+     "https://docs.weaviate.io/deploy"
+    ]
+   },
+   "vectorization": {
+    "answer": "vector_config=Configure.Vectors.<module>(), the API since Python client 4.16.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/manage-collections/vector-config"
+    ]
+   },
+   "indexing": {
+    "answer": "HNSW for most cases; rotational quantization (RQ) as a starting point for compression.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/best-practices"
+    ]
+   },
+   "search": {
+    "answer": "Hybrid search as the starting point.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/concepts/search"
+    ]
+   }
+  },
+  "error": null
+ },
+ "latest_releases": {
+  "weaviate": {
+   "version": "1.40.1",
+   "status": 200,
+   "error": null
+  },
+  "weaviate-client": {
+   "version": "4.23.1",
+   "status": 200,
+   "error": null
+  }
+ }
+}

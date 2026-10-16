@@ -38,6 +38,11 @@ stack and data whenever the agent left them running. The stack is fresh only
 when the agent stopped it. Either way, the verifier saves the Compose logs and
 then runs `docker compose down --volumes`.
 
+When the submitted `/app` has no `docker-compose.yaml`, the verifier skips
+Compose entirely and writes no `docker-compose.log`. That is normal for a Task
+with no stack. In a Task where the agent should have written the file, the
+Trial fails at the snapshot, typically because Weaviate is unreachable.
+
 An environment that starts an application before the agent runs writes its
 process ID to `/tmp/application.pid`. The shared instructions tell the agent
 this is how to find and restart it.
@@ -69,9 +74,9 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `non-result`), the Agent, missing logs, and per-check results. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `non-result`), the Agent, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is `null` because it has no price for OpenRouter model names. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
-| `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. |
+| `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |
 | `result.json`, `config.json`, `trial.log` | Harbor's record, including the harness version and timings. |
 

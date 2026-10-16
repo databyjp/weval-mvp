@@ -5,7 +5,8 @@ the Task's ``snapshot.py`` and ``check.py``. It uses only the standard library
 so it runs on any Task image with Python 3.
 
 Flow: start the submitted Compose stack (unless the Task sets
-``WEVAL_KEEP_STACK=1`` because the agent's live stack is the thing under test),
+``WEVAL_KEEP_STACK=1`` because the agent's live stack is the thing under test,
+or the submitted ``/app`` has no ``docker-compose.yaml``),
 start the submitted app on ``APP_PORT`` when the Task sets
 ``WEVAL_START_APP=1``, call ``snapshot.snapshot(app_url)`` (``None`` without an
 app), then score it with ``check.py``. Everything is written to ``/logs/verifier``.
@@ -102,10 +103,11 @@ def main() -> None:
     """Snapshot and score the Trial, always writing reward, snapshot, and checks."""
     sys.path.insert(0, str(Path(__file__).parent))
     keep_stack = os.environ.get("WEVAL_KEEP_STACK") == "1"
+    has_stack = (APP_DIR / "docker-compose.yaml").exists()
     start_app = os.environ.get("WEVAL_START_APP") == "1"
     app = None
     try:
-        if not keep_stack:
+        if has_stack and not keep_stack:
             up = _compose("up", "--detach", "--wait", "--wait-timeout", "180")
             if up.returncode != 0:
                 raise RuntimeError(f"docker compose up failed:\n{up.stdout}{up.stderr}")
@@ -119,10 +121,11 @@ def main() -> None:
     finally:
         if app is not None:
             app.terminate()
-        logs = _compose("logs", "--no-color", "--timestamps", timeout=60)
-        (LOG_DIR / "docker-compose.log").write_text(logs.stdout + logs.stderr)
-        # Matters for local Docker, where the stack would outlive the Trial.
-        _compose("down", "--volumes", timeout=120)
+        if has_stack:
+            logs = _compose("logs", "--no-color", "--timestamps", timeout=60)
+            (LOG_DIR / "docker-compose.log").write_text(logs.stdout + logs.stderr)
+            # Matters for local Docker, where the stack would outlive the Trial.
+            _compose("down", "--volumes", timeout=120)
 
     (LOG_DIR / "snapshot.json").write_text(json.dumps(snapshot, indent=1))
     results = score(importlib.import_module("check"), snapshot)

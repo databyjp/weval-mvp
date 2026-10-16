@@ -12,6 +12,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import re
 import shutil
 import tomllib
 from datetime import datetime
@@ -24,10 +25,10 @@ from harbor.models.job.config import JobConfig
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig
 
 from weval import verify
-from weval.harnesses import oracle, pi
+from weval.harnesses import claude_code, oracle, pi
 
 ROOT = Path(__file__).resolve().parents[2]
-HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi}
+HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi, "claude-code": claude_code}
 # Appended to every packaged prompt: facts about the Trial environment that no
 # single Task owns.
 SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
@@ -36,6 +37,12 @@ SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
 SECRET_VARS = ("OPENROUTER_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
+# Harbor's per-Trial token and cost fields in result.json's agent_result.
+USAGE_FIELDS = ("n_input_tokens", "n_cache_tokens", "n_output_tokens", "cost_usd")
+# A URL's host must contain a dot, which excludes Compose service names such as
+# weaviate:8080 and localhost; loopback addresses are excluded separately.
+# Backslashes end a URL because arguments are matched in their JSON encoding.
+URL = re.compile(r"https?://(?!127\.0\.0\.1|0\.0\.0\.0)[^\s/'\"`:\\]+\.[^\s/'\"`:\\]+[^\s'\"`<>)\]}\\]*")
 
 # VM with Docker-in-Docker so Tasks can run their own Compose stacks.
 MODAL = EnvironmentConfig(
@@ -50,6 +57,12 @@ MODAL = EnvironmentConfig(
         "sandbox_timeout_secs": 3600,
         "sandbox_idle_timeout_secs": 1800,
     },
+)
+# The local Docker daemon, for Tasks that run without Docker-in-Docker.
+LOCAL = EnvironmentConfig(
+    type=EnvironmentType.DOCKER,
+    delete=True,
+    extra_docker_compose=[SHARED_COMPOSE],
 )
 
 
@@ -75,8 +88,9 @@ def package_task(task_dir: Path, destination: Path) -> None:
     (tests / "test.sh").chmod(0o755)
 
 
-def run(task_dir: Path, agent_name: str, attempts: int = 1) -> Path:
-    """Run ``attempts`` Trials of one Task by one Agent; return the run directory.
+def run(task_dir: Path, agent_name: str, attempts: int = 1, local: bool = False) -> Path:
+    """Run ``attempts`` Trials of one Task by one Agent on Modal, or on the local
+    Docker daemon when ``local``; return the run directory.
 
     Harbor failures inside a Trial are recorded as Non-results in ``weval.json``,
     not raised. Retained files are scrubbed of credential values afterwards,
@@ -101,7 +115,7 @@ def run(task_dir: Path, agent_name: str, attempts: int = 1) -> Path:
         agents=[harness.agent_config(agent)],
         n_attempts=attempts,
         n_concurrent_trials=attempts,
-        environment=MODAL,
+        environment=LOCAL if local else MODAL,
     )
     try:
         asyncio.run(_run_job(config))
@@ -149,9 +163,42 @@ def finalize(trial_dir: Path, task_path: Path, agent: dict) -> dict:
         "exception": (result.get("exception_info") or {}).get("exception_type"),
         "missing_logs": missing,
         "checks": json.loads(checks_file.read_text()) if checks_file.exists() else None,
+        # A harness that counts requests Harbor misses replaces Harbor's figures.
+        "usage": usage(trial_dir, result) | (
+            harness.token_usage(trial_dir) if hasattr(harness, "token_usage") else {}
+        ),
     }
     (trial_dir / "weval.json").write_text(json.dumps(record, indent=1))
     return record
+
+
+def usage(trial_dir: Path, result: dict) -> dict:
+    """Return the Agent's token use and web lookups for ``weval.json``.
+
+    Tokens and cost come from Harbor's ``result.json`` and are ``None`` when
+    the harness reports none, as for the Oracle. ``finalize()`` replaces them
+    with a harness module's ``token_usage(trial_dir)`` when it defines one. ``tool_calls`` counts calls
+    by tool name. ``urls`` lists, in first-use order, every external URL in
+    any tool call's arguments, including ``curl`` commands; a page read from
+    search results without its own fetch is not listed. ``search_queries``
+    lists every ``query`` or ``queries`` argument. All three are empty
+    without Harbor's ``agent/trajectory.json``.
+    """
+    agent_result = result.get("agent_result") or {}
+    record: dict = {field: agent_result.get(field) for field in USAGE_FIELDS}
+    tool_calls: dict[str, int] = {}
+    urls: dict[str, None] = {}
+    queries: list[str] = []
+    trajectory = trial_dir / "agent/trajectory.json"
+    steps = json.loads(trajectory.read_text())["steps"] if trajectory.exists() else []
+    for step in steps:
+        for call in step.get("tool_calls") or []:
+            name, arguments = call["function_name"], call.get("arguments") or {}
+            tool_calls[name] = tool_calls.get(name, 0) + 1
+            urls.update(dict.fromkeys(URL.findall(json.dumps(arguments))))
+            query = arguments.get("queries") or arguments.get("query") or []
+            queries.extend([query] if isinstance(query, str) else query)
+    return {**record, "tool_calls": tool_calls, "urls": list(urls), "search_queries": queries}
 
 
 def redact(run_dir: Path) -> None:

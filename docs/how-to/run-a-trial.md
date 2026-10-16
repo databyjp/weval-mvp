@@ -1,12 +1,14 @@
 # How to run a Trial
 
-Every Trial runs on Modal. Pi Agents use OpenRouter for inference; the Oracle uses no model.
+Trials run on Modal unless you pass `--local`. Pi Agents use OpenRouter for inference; the Oracle uses no model.
 
 Run a trial by specifying an env file, task, agent definition, and the number of trials to run (e.g. for higher sample size). The env file must define the credentials listed in the [README](../../README.md#setup). The `-n` Trials run concurrently, each in its own Modal sandbox.
 
 ```sh
-uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3]
+uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local]
 ```
+
+`--local` runs the Trials on the local Docker daemon instead, at no Modal cost. Use it for Tasks that don't need Docker-in-Docker, such as `investigate/current-practices`.
 
 Each `weval run` is one Experiment run. It writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/` and prints each Trial's status.
 

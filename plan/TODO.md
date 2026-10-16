@@ -38,7 +38,9 @@ Remaining work, roughly in order. Delete items when done.
 
 ## investigate/current-practices
 
-In progress. The spec is `docs/tasks/investigate/current-practices.md`.
+Built, and the Oracle passes on local Docker. Next: run Pi Trials (`--local`
+works for this Task) and read their `usage` in `weval.json`. The spec is
+`docs/tasks/investigate/current-practices.md`.
 
 Deferred until the observation layer has been seen working in real Trials:
 
@@ -49,11 +51,39 @@ Deferred until the observation layer has been seen working in real Trials:
 - Checks over the logs, such as "the agent fetched the page it cited". These
   need host-side scoring in `finalize()`, which makes `weval.json` the
   authoritative result and can disagree with Harbor's in-environment reward.
-- Pages read through `get_search_content` appear in the transcript as a
-  search-result ID, not a URL, so fetched-URL extraction undercounts them.
-  Find a way to observe them, possibly from the tool results.
+- Possible gaps in `usage.urls`, to confirm from real Trial output:
+  - pages read through `get_search_content` appear as a search-result ID,
+    not a URL, so they may be missing; they may be recoverable from the
+    tool results;
+  - Claude Code's `WebSearch` results list URLs only in the tool results,
+    so `usage.urls` holds the pages fetched, not the results seen;
+  - URLs built in shell keep unexpanded variables, such as
+    `...releases?per_page=100&page=$page`.
+
+Observed in the first three local Pi Trials
+(`experiment-outputs/20261016-100754__investigate__current-practices__pi-glm-5.3-flash`):
+
+- All three read `weaviate.io/llms.txt`. Many fetched legacy
+  `weaviate.io/developers/weaviate/...` paths; one fetched `.md` versions of
+  `docs.weaviate.io` pages. Both matter for the docs-site comparison.
+- One Trial made 36 `get_search_content` calls, so the gap below is real.
+- Regex text in bash commands is extracted as URLs, such as
+  `https://docs.weaviate.io/[a-z0-9/._-`.
+- The agents' answers disagree with the Oracle's in places: all three say
+  HNSW ships with RQ8 quantization by default, and that Weaviate Cloud is the
+  first deployment recommendation. The Oracle's answers came from summaries
+  of individual docs pages. Before writing criteria, re-check each expected
+  answer against the docs, including `llms.txt`; where pages disagree, that
+  is a possible Weaviate gap.
 
 Later: vague questions here can measure uplift from skills as a Treatment.
+
+## Claude Code usage figures
+
+- Token counts now come from Claude Code's `modelUsage`. `cost_usd` is
+  `null`: Claude Code's estimate for Trial `20261016-105100` was $2.24, and
+  OpenRouter billed $0.04. Compute cost from the token breakdown and
+  OpenRouter's prices, or fetch it from OpenRouter.
 
 ## Compare docs-site versions
 

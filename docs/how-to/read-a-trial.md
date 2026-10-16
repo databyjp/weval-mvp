@@ -7,6 +7,9 @@ Then follow your question:
 - Why did a check fail? See `verifier/checks.json` for the failure message, and
   `verifier/snapshot.json` for the output facts.
 - What did the agent do? See `agent/` for the transcript and stdout.
+- How many tokens did it use, and what did it look up? See `usage` in
+  `weval.json`. A page read from search results without its own fetch is
+  not in `usage.urls`.
 - What did it submit? See `artifacts/submission/` as the agent's final `/app`.
 - Did the infrastructure fail? A `non-result` status records the cause
   in `weval.json`; `result.json`, `trial.log`, and the `verifier/` logs have

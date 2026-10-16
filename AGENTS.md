@@ -137,7 +137,7 @@ Before running agents on a new Task:
 ## Running and reading Trials
 
 ```sh
-uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3]
+uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 ```
 
@@ -145,7 +145,8 @@ Real runs cost money (Modal, OpenRouter). Each Trial directory is Harbor's own
 output plus `weval.json`. Start there:
 
 - `weval.json`: status (`passed`, `failed`, `incomplete`, `non-result`), the
-  Agent, missing logs, and per-check results.
+  Agent, missing logs, per-check results, and `usage` (tokens, cost, tool
+  calls, URLs, and search queries).
 - `verifier/snapshot.json`, `checks.json`, `test-stdout.txt`,
   `application.log`, `docker-compose.log`.
 - `agent/`: the harness transcript and stdout. Pi writes
