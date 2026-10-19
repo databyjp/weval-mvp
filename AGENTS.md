@@ -5,6 +5,10 @@ needed to analyse each Trial. Most work here should be writing Tasks and
 reading results, not growing the framework. Use [`GLOSSARY.md`](GLOSSARY.md)
 as the domain language.
 
+## General
+
+If subagents are available, use them to run tests or searches unless there is a specific reason not to.
+
 ## Layout
 
 - `tasks/<stage>/<scenario>/`: one Task each (see below).
@@ -19,17 +23,35 @@ as the domain language.
   any harness-specific setup (for example, Pi's pinned `pi-web-access`).
 - `experiment-outputs/`: retained Experiment runs (git-ignored).
 
-Keep the framework small enough to read in one sitting. Prefer plain functions
-and dicts. Add a shared abstraction only when three Tasks need it. Handle
-cases that Trials have shown, not anticipated ones, but design for direction
-the maintainer has stated will happen
-([ADR 0001](architecture/adr/0001-handle-observed-cases.md)). If a change
+## Coding style & abstractions
+
+Code quality and long-term maintainability is very important.
+
+While code "quality" is a nebulous concept, think principles laid out
+in classic software engineering practices; especially those in
+"Philosophy of Software Design" and "How to Effectively Maintain Legacy Code".
+
+The easier a human maintainer finds it to read and understand the code,
+the more likely they will be to provide helpful inputs.
+
+Additional guidelines:
+
+- Prefer to keep the framework small where there is a choice.
+- The framework is very likely to end up with dozens of Tasks. Add a shared abstraction where proven to be needed (e.g. three+ Tasks) or if it is anticipated to be useful.
+- If a change
 makes the framework noticeably larger, ask first.
 
-## Failed checks are findings
+## Failed checks are extremely useful findings
 
-weval exists to find where agents fall short, so a failed check on an agent
-Trial is a good result that identifies an opportunity, not a defect to remove.
+weval exists to find where agents fall short, and then to help improve them.
+
+So a failed check on an agent Trial is a very useful result that identifies an opportunity.
+You must not treat a failed check as a defect to remove.
+
+Do not be afraid to allow tasks to include vagueness or under-specification simulating a user.
+Similarly, such a task is useful to sample likely agent responses,
+and design helpful resources and treatments.
+
 Classify each failure before acting on it:
 
 - agent gap: the agent missed something it could have discovered;
@@ -43,7 +65,7 @@ check, reword a prompt, or demote a check to make agent Trials pass. Do not
 add checks to manufacture failures either: every check must test something
 the Task's question needs, and the Oracle must pass it.
 
-## Writing a Task
+## Task Definition
 
 A Task lives at `tasks/<stage>/<scenario>/`. The stage is the kind of job:
 
@@ -85,7 +107,7 @@ process ID to `/tmp/application.pid`, as the shared instructions tell the agent.
 objects (read over REST, with vector presence flags), responses to fixed HTTP
 probes, and relevant submitted files. Outcome facts must come from the live
 stack because nothing can reconstruct them after teardown. `check.py` reads
-only the snapshot, so `weval check` can re-score retained Trials offline.
+only the snapshot, so `weval check` can re-score retained compatible Trials offline.
 
 A check function passes by returning (optionally a note string) and fails by
 raising `AssertionError`. Its name, with underscores replaced by dashes, is
@@ -142,8 +164,9 @@ uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] 
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 ```
 
-Real runs cost money (Modal, OpenRouter). Each Trial directory is Harbor's own
-output plus `weval.json`. Start there:
+Real runs cost money (Modal, OpenRouter). This is not a problem, but confirm with the user.
+
+Each Trial directory is Harbor's own output plus `weval.json`. Start there:
 
 - `weval.json`: status (`passed`, `failed`, `incomplete`, `non-result`), the
   Agent, the prompt variant, missing logs, per-check results, and `usage` (tokens, cost, tool
@@ -161,22 +184,11 @@ Never edit or summarise retained logs in place. Write analysis to separate
 files. `incomplete` means an expected log is missing; do not treat it as a
 scored result.
 
-## Code style
-
-- Type hints. Docstrings state guarantees and failure behavior; they do not
-  narrate steps.
-- Keep each check's ID, description, and logic together in one function.
-- A leading underscore means a private helper, nothing more. All code is
-  human-reviewed.
-- Generated files, such as `harnesses/pi_web_access/package-lock.json`, are
-  not hand-edited.
-
-Test check logic and transcript parsing against real retained runs.
-
 ## Pre-0.1 formats
 
-While the project version in `pyproject.toml` is below `0.1.0`:
+While the project version in `pyproject.toml` is below `0.1.0`, treat almost all parts of this project as mutable.
 
+For example:
 - revise formats (snapshots, `weval.json`, `agents.toml`) in place;
 - use schema version `"1"` when a schema becomes necessary;
 - treat schema migrations and version increments as approval-required changes.
