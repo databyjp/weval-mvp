@@ -134,7 +134,7 @@ def harbor_result(reward: int | None = None, exception: bool = False) -> dict:
         # The agent's submitted stack or app failed to start: the agent's result.
         (harbor_result(reward=0), [], {"error": "tb", "error_stage": "stack"}, "failed"),
         (harbor_result(reward=0), [], {"error": "tb", "error_stage": "app"}, "failed"),
-        # Retained snapshots from before error_stage was recorded stay failed.
+        # A snapshot error without error_stage scores failed.
         (harbor_result(reward=0), [], {"error": "tb"}, "failed"),
         (harbor_result(reward=1), ["agent/pi.txt"], None, "incomplete"),
         (harbor_result(reward=1), [], {"collections": []}, "passed"),

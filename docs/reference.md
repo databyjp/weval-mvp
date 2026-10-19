@@ -61,8 +61,8 @@ snapshot failed. `check.py` then defines `PROMPT_VARIANT_REQUIRED` and
 `PROMPT_VARIANT_PREFERRED`, mapping `default` and every prompt variant name to
 check functions scored after the shared `REQUIRED` and `PREFERRED` lists.
 `tests/test_verify.py` fails unless both dicts name exactly `default` and the
-files in `prompts/`. A snapshot without `prompt_variant`, retained from before
-it was recorded, is scored as `default`.
+files in `prompts/`. A snapshot without `prompt_variant` is scored as
+`default`.
 
 ## Trial environment
 

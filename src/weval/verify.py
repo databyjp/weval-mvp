@@ -45,8 +45,7 @@ def score(check: ModuleType, snapshot: dict) -> list[dict]:
     A Task with prompt variants also defines ``PROMPT_VARIANT_REQUIRED`` and
     ``PROMPT_VARIANT_PREFERRED``, mapping each prompt variant name to more
     check functions; the snapshot's ``prompt_variant`` picks them. A snapshot
-    without ``prompt_variant``, retained from before it was recorded, is the
-    ``default`` prompt variant.
+    without ``prompt_variant`` is the ``default`` prompt variant.
     """
     prompt_variant = snapshot.get("prompt_variant", "default")
     required_checks = check.REQUIRED + getattr(check, "PROMPT_VARIANT_REQUIRED", {}).get(prompt_variant, [])

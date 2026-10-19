@@ -78,5 +78,5 @@ def test_score_adds_the_snapshot_prompt_variants_checks():
         ("shared", True), ("legal-only", True), ("legal-preferred", False),
     ]
     assert scored({"prompt_variant": "default"}) == [("shared", True)]
-    # Snapshots retained from before the prompt variant was recorded.
+    # A snapshot without prompt_variant scores as default.
     assert scored({}) == [("shared", True)]

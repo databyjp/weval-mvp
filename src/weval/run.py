@@ -171,16 +171,11 @@ def finalize_run(
 
 
 def derive_status(result: dict, missing: list[str], snapshot: dict | None) -> str:
-    """Classify one Trial by whose outcome it records.
+    """Classify one Trial by whose outcome it records (statuses: docs/reference.md).
 
-    ``non-result``: infrastructure prevented a valid outcome — the verifier
-    produced no reward, or its own snapshot stage failed (``error_stage``
-    ``"snapshot"``). ``timed-out``: Harbor recorded an agent limit but the
-    verifier still graded the submission; the reward is recorded and does not
-    count as a pass. ``incomplete``: an expected log is missing. Otherwise
-    ``passed`` or ``failed`` by reward — a failed start of the agent's own
-    stack or app (``error_stage`` ``"stack"``/``"app"``) is the agent's
-    result, so it stays ``failed``.
+    Only ``error_stage`` ``"snapshot"`` is an infrastructure failure; a failed
+    start of the agent's own stack or app (``"stack"``/``"app"``) is the
+    agent's result and scores ``failed``.
     """
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
     if "reward" not in rewards:
