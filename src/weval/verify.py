@@ -11,7 +11,8 @@ start the submitted app on ``APP_PORT`` when the Task sets
 ``WEVAL_START_APP=1``, call ``snapshot.snapshot(app_url)`` (``None`` without an
 app), add the prompt variant named in ``prompt_variant`` beside this file, then
 score it with ``check.py``. Everything is written to ``/logs/verifier``.
-A stack or snapshot failure is recorded in the snapshot and scored as failing
+A stack, app, or snapshot failure is recorded in the snapshot (``error`` plus
+``error_stage``: ``stack``, ``app``, or ``snapshot``) and scored as failing
 checks; it is not a verifier crash.
 """
 
@@ -116,18 +117,24 @@ def main() -> None:
     has_stack = (APP_DIR / "docker-compose.yaml").exists()
     start_app = os.environ.get("WEVAL_START_APP") == "1"
     app = None
+    # The stage tells the host whose failure this is: "stack" and "app" are
+    # the agent's own submission failing to start; "snapshot" is this
+    # verifier's work, an infrastructure failure, not the agent's result.
+    stage = "stack"
     try:
         if has_stack and not keep_stack:
             up = _compose("up", "--detach", "--wait", "--wait-timeout", "180")
             if up.returncode != 0:
                 raise RuntimeError(f"docker compose up failed:\n{up.stdout}{up.stderr}")
         app_url = None
+        stage = "app"
         if start_app:
             app = _start_app()
             app_url = f"http://127.0.0.1:{APP_PORT}"
+        stage = "snapshot"
         snapshot = importlib.import_module("snapshot").snapshot(app_url)
     except Exception:  # noqa: BLE001
-        snapshot = {"error": traceback.format_exc()}
+        snapshot = {"error": traceback.format_exc(), "error_stage": stage}
     finally:
         if app is not None:
             app.terminate()

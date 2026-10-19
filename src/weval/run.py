@@ -131,9 +131,7 @@ def run(
     try:
         asyncio.run(_run_job(config))
     finally:
-        for result_file in sorted((run_dir / "job").glob("*/result.json")):
-            record = finalize(result_file.parent, task_path, agent, prompt_variant)
-            print(f"{result_file.parent}: {record['status']}")
+        finalize_run(run_dir, task_path, agent, attempts, prompt_variant)
         redact(run_dir)
     return run_dir
 
@@ -143,36 +141,85 @@ async def _run_job(config: JobConfig) -> None:
     await job.run()
 
 
+def finalize_run(
+    run_dir: Path, task_path: Path, agent: dict, attempts: int, prompt_variant: str = "default"
+) -> None:
+    """Record every Trial directory under ``run_dir/job`` and print its status.
+
+    A Trial without ``result.json`` (Harbor stops the environment before
+    writing it, so a stop failure or kill can leave none) gets a
+    ``non-result`` stub naming the cause, so no Trial vanishes from the
+    record. Warns when fewer Trial directories exist than ``attempts``.
+    """
+    trial_dirs = sorted(path for path in (run_dir / "job").glob("*") if path.is_dir())
+    for trial_dir in trial_dirs:
+        if (trial_dir / "result.json").exists():
+            record = finalize(trial_dir, task_path, agent, prompt_variant)
+        else:
+            record = {
+                "status": "non-result",
+                "task": str(task_path),
+                "prompt_variant": prompt_variant,
+                "agent": HARNESSES[agent["harness"]].agent_record(agent),
+                "reward": None,
+                "exception": "result.json never written",
+            }
+            (trial_dir / "weval.json").write_text(json.dumps(record, indent=1))
+        print(f"{trial_dir}: {record['status']}")
+    if len(trial_dirs) < attempts:
+        print(f"WARNING: {attempts} Trials requested, {len(trial_dirs)} found under {run_dir / 'job'}")
+
+
+def derive_status(result: dict, missing: list[str], snapshot: dict | None) -> str:
+    """Classify one Trial by whose outcome it records.
+
+    ``non-result``: infrastructure prevented a valid outcome — the verifier
+    produced no reward, or its own snapshot stage failed (``error_stage``
+    ``"snapshot"``). ``timed-out``: Harbor recorded an agent limit but the
+    verifier still graded the submission; the reward is recorded and does not
+    count as a pass. ``incomplete``: an expected log is missing. Otherwise
+    ``passed`` or ``failed`` by reward — a failed start of the agent's own
+    stack or app (``error_stage`` ``"stack"``/``"app"``) is the agent's
+    result, so it stays ``failed``.
+    """
+    rewards = (result.get("verifier_result") or {}).get("rewards") or {}
+    if "reward" not in rewards:
+        return "non-result"
+    if result.get("exception_info"):
+        return "timed-out"
+    if (snapshot or {}).get("error_stage") == "snapshot":
+        return "non-result"
+    if missing:
+        return "incomplete"
+    return "passed" if rewards["reward"] == 1 else "failed"
+
+
 def finalize(trial_dir: Path, task_path: Path, agent: dict, prompt_variant: str = "default") -> dict:
     """Write and return ``weval.json`` for one Harbor Trial directory.
 
     ``task_path`` is recorded as given; ``run()`` passes it relative to the
     repository root.
 
-    Status is ``non-result`` when Harbor raised or the verifier produced no
-    reward, ``incomplete`` when an expected log is missing, otherwise
-    ``passed`` or ``failed`` by reward.
+    Status comes from ``derive_status`` over Harbor's ``result.json``, the
+    missing-log list, and the retained snapshot.
     """
     harness = HARNESSES[agent["harness"]]
     result = json.loads((trial_dir / "result.json").read_text())
     expected = COMMON_LOGS + harness.EXPECTED_LOGS
     missing = [pattern for pattern in expected if not any(trial_dir.glob(pattern))]
     checks_file = trial_dir / "verifier/checks.json"
+    snapshot_file = trial_dir / "verifier/snapshot.json"
+    snapshot = json.loads(snapshot_file.read_text()) if snapshot_file.exists() else None
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
-    if result.get("exception_info") or "reward" not in rewards:
-        status = "non-result"
-    elif missing:
-        status = "incomplete"
-    else:
-        status = "passed" if rewards["reward"] == 1 else "failed"
     record = {
-        "status": status,
+        "status": derive_status(result, missing, snapshot),
         "task": str(task_path),
         "prompt_variant": prompt_variant,
         "agent": harness.agent_record(agent),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),
         "exception": (result.get("exception_info") or {}).get("exception_type"),
+        "error_stage": (snapshot or {}).get("error_stage"),
         "missing_logs": missing,
         "checks": json.loads(checks_file.read_text()) if checks_file.exists() else None,
         # A harness that counts requests Harbor misses replaces Harbor's figures.

@@ -91,12 +91,17 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `non-result`), the Agent, the prompt variant, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is `null` because it has no price for OpenRouter model names. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is `null` because it has no price for OpenRouter model names. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
 | `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |
 | `result.json`, `config.json`, `trial.log` | Harbor's record, including the harness version and timings. |
 
 `incomplete` means an expected log is missing; it is not a scored result.
+`timed-out` means Harbor recorded an agent limit but the verifier still graded
+the submission; the reward is recorded and does not count as `passed`.
+`non-result` names its cause in `exception` or `error_stage`: stage `snapshot`
+is a failure of the verifier's own snapshot work, while a failed `stack` or
+`app` start is the agent's result and scores `failed`.
 Retained logs are evidence: write analysis to separate files rather than
 editing or summarising a log in place.

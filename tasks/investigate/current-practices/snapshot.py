@@ -16,14 +16,17 @@ SERVER_RELEASES = "https://api.github.com/repos/weaviate/weaviate/releases?per_p
 CLIENT_RELEASES = "https://pypi.org/pypi/weaviate-client/json"
 
 
-def request(url: str) -> tuple[int, object]:
+def request(url: str) -> tuple[int | None, object]:
     """GET a URL; return the status and JSON body (or raw text if not JSON).
-    Connection failures and timeouts raise."""
+    A connection failure or timeout returns ``(None, <error text>)`` rather
+    than raising, so one unreachable host cannot cost the whole snapshot."""
     try:
         with urllib.request.urlopen(url, timeout=60) as response:
             status, raw = response.status, response.read()
     except urllib.error.HTTPError as error:
         status, raw = error.code, error.read()
+    except OSError as error:
+        return None, str(error)
     try:
         return status, json.loads(raw)
     except json.JSONDecodeError:

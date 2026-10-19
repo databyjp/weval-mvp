@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from weval.run import ROOT, finalize, package_task, rescore
+from weval.run import ROOT, derive_status, finalize, finalize_run, package_task, rescore
 
 TASK_PATH = Path("tasks/resolve/sku-search")
 PROMPT_VARIANT_TASK = ROOT / "tasks/investigate/current-practices"
@@ -108,3 +108,71 @@ def test_package_task_rejects_an_unknown_prompt_variant(tmp_path):
     with pytest.raises(FileNotFoundError, match="no-such-prompt-variant"):
         package_task(PROMPT_VARIANT_TASK, tmp_path / "package", "no-such-prompt-variant")
     assert not (tmp_path / "package").exists()
+
+
+def harbor_result(reward: int | None = None, exception: bool = False) -> dict:
+    result: dict = {}
+    if reward is not None:
+        result["verifier_result"] = {"rewards": {"reward": reward}}
+    if exception:
+        result["exception_info"] = {"exception_type": "AgentTimeoutError"}
+    return result
+
+
+@pytest.mark.parametrize(
+    "result, missing, snapshot, expected",
+    [
+        # Harbor raised, nothing graded: infrastructure, not the agent.
+        (harbor_result(exception=True), [], None, "non-result"),
+        # Harbor recorded a limit but the verifier still graded the submission.
+        (harbor_result(reward=1, exception=True), [], None, "timed-out"),
+        (harbor_result(reward=0, exception=True), [], None, "timed-out"),
+        # No reward at all: infrastructure.
+        (harbor_result(), [], None, "non-result"),
+        # The verifier's own snapshot stage failed: infrastructure.
+        (harbor_result(reward=0), [], {"error": "tb", "error_stage": "snapshot"}, "non-result"),
+        # The agent's submitted stack or app failed to start: the agent's result.
+        (harbor_result(reward=0), [], {"error": "tb", "error_stage": "stack"}, "failed"),
+        (harbor_result(reward=0), [], {"error": "tb", "error_stage": "app"}, "failed"),
+        # Retained snapshots from before error_stage was recorded stay failed.
+        (harbor_result(reward=0), [], {"error": "tb"}, "failed"),
+        (harbor_result(reward=1), ["agent/pi.txt"], None, "incomplete"),
+        (harbor_result(reward=1), [], {"collections": []}, "passed"),
+        (harbor_result(reward=0), [], None, "failed"),
+    ],
+)
+def test_derive_status_truth_table(result, missing, snapshot, expected):
+    assert derive_status(result, missing, snapshot) == expected
+
+
+def test_finalize_records_a_snapshot_stage_failure_as_non_result(tmp_path):
+    trial = tmp_path / "trial"
+    (trial / "verifier").mkdir(parents=True)
+    (trial / "result.json").write_text(json.dumps(harbor_result(reward=0)))
+    (trial / "verifier/snapshot.json").write_text(
+        json.dumps({"error": "Traceback: GitHub unreachable", "error_stage": "snapshot"})
+    )
+
+    record = finalize(trial, TASK_PATH, {"name": "oracle", "harness": "oracle"})
+
+    assert record["status"] == "non-result"
+    assert record["error_stage"] == "snapshot"
+
+
+def test_finalize_run_records_a_trial_without_result_json(tmp_path, capsys):
+    job = tmp_path / "job"
+    graded = job / "trial-0"
+    (graded / "verifier").mkdir(parents=True)
+    (graded / "result.json").write_text(json.dumps(harbor_result(reward=1)))
+    shutil.copy(ORACLE_SNAPSHOT, graded / "verifier/snapshot.json")
+    (job / "trial-1").mkdir()
+
+    finalize_run(tmp_path, TASK_PATH, {"name": "oracle", "harness": "oracle"}, attempts=3)
+
+    assert (graded / "weval.json").exists()
+    stub = json.loads((job / "trial-1/weval.json").read_text())
+    assert stub["status"] == "non-result"
+    assert stub["exception"] == "result.json never written"
+    out = capsys.readouterr().out
+    assert "trial-0" in out and "trial-1" in out
+    assert "3 Trials requested, 2 found" in out

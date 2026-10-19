@@ -58,7 +58,9 @@ Classify each failure before acting on it:
 - Weaviate gap: the product or its docs led the agent astray;
 - scorer bug: `snapshot.py` or `check.py` misjudged a correct solution;
 - Task defect: the prompt or workspace hid or contradicted a scored
-  constraint.
+  constraint;
+- infrastructure failure: the environment or the verifier's own snapshot
+  stage prevented a valid outcome. Recorded as a `non-result`, not a finding.
 
 Only scorer bugs and Task defects call for a weval change. Do not loosen a
 check, reword a prompt, or demote a check to make agent Trials pass. Do not
@@ -114,7 +116,8 @@ raising `AssertionError`. Its name, with underscores replaced by dashes, is
 the check ID. Its docstring is the description. Its failure message names the
 constraint checked and what was observed instead. Reward is 1 only when every
 `REQUIRED` check passes; `PREFERRED` checks are reported but do not affect it.
-When the snapshot fails, the verifier scores `{"error": <traceback>}`, so
+When the snapshot fails, the verifier scores `{"error": <traceback>,
+"error_stage": <stage>}` — both are reserved top-level snapshot keys — so
 every check must fail on it: read snapshot keys directly rather than with
 defaults that could pass. `tests/test_verify.py` enforces this for every Task.
 
@@ -168,7 +171,8 @@ Real runs cost money (Modal, OpenRouter). This is not a problem, but confirm wit
 
 Each Trial directory is Harbor's own output plus `weval.json`. Start there:
 
-- `weval.json`: status (`passed`, `failed`, `incomplete`, `non-result`), the
+- `weval.json`: status (`passed`, `failed`, `incomplete`, `timed-out`,
+  `non-result`), the
   Agent, the prompt variant, missing logs, per-check results, and `usage` (tokens, cost, tool
   calls, URLs, and search queries).
 - `verifier/snapshot.json`, `checks.json`, `test-stdout.txt`,
