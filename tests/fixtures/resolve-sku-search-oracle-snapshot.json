@@ -343,6 +343,16 @@
    }
   },
   {
+   "id": "802e27a6-001a-5f0c-9ab6-0f57c680a812",
+   "properties": {
+    "category": "accessories",
+    "description": "Foam insoles cut to fit low-top trainers for extra comfort.",
+    "name": "Cushioned Sneaker Insoles",
+    "price": 12,
+    "sku": "ZXQ 9917"
+   }
+  },
+  {
    "id": "8647683e-b11a-54af-8cb7-d4e7576fc11b",
    "properties": {
     "category": "electronics",
@@ -373,6 +383,16 @@
    }
   },
   {
+   "id": "c0a39bb4-5b40-5363-b8df-b20adb6bb4ff",
+   "properties": {
+    "category": "accessories",
+    "description": "Stackable clear box that keeps one pair of trainers dust-free.",
+    "name": "Sneaker Storage Box",
+    "price": 9,
+    "sku": "9917 ZXQ"
+   }
+  },
+  {
    "id": "cb5b8de0-d95d-589f-ba49-b503f626e618",
    "properties": {
     "category": "outdoors",
@@ -390,6 +410,16 @@
     "name": "Memory Foam Neck Pillow",
     "price": 31,
     "sku": "TRAVEL-288"
+   }
+  },
+  {
+   "id": "ef64a050-a597-5378-ba04-4bdfc5a41d96",
+   "properties": {
+    "category": "footwear",
+    "description": "Smaller sizes of the everyday canvas shoe with hook-and-loop straps.",
+    "name": "Metro Canvas Sneakers for Kids",
+    "price": 39,
+    "sku": "zxq-9917"
    }
   },
   {
@@ -510,6 +540,60 @@
       "description": "Slip-on leather shoes with a cushioned footbed for office wear.",
       "category": "footwear",
       "price": 88.0
+     }
+    ]
+   }
+  },
+  "exact-sku-zxq-9917": {
+   "params": {
+    "query": "zxq-9917",
+    "limit": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "zxq-9917",
+      "name": "Metro Canvas Sneakers for Kids",
+      "description": "Smaller sizes of the everyday canvas shoe with hook-and-loop straps.",
+      "category": "footwear",
+      "price": 39.0
+     }
+    ]
+   }
+  },
+  "exact-sku-ZXQ 9917": {
+   "params": {
+    "query": "ZXQ 9917",
+    "limit": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "ZXQ 9917",
+      "name": "Cushioned Sneaker Insoles",
+      "description": "Foam insoles cut to fit low-top trainers for extra comfort.",
+      "category": "accessories",
+      "price": 12.0
+     }
+    ]
+   }
+  },
+  "exact-sku-9917 ZXQ": {
+   "params": {
+    "query": "9917 ZXQ",
+    "limit": 5
+   },
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "sku": "9917 ZXQ",
+      "name": "Sneaker Storage Box",
+      "description": "Stackable clear box that keeps one pair of trainers dust-free.",
+      "category": "accessories",
+      "price": 9.0
      }
     ]
    }
@@ -743,6 +827,28 @@
    "description": "Replacement flat laces in six colours for low-top trainers.",
    "category": "accessories",
    "price": 7.0
+  },
+  {
+   "sku": "zxq-9917",
+   "name": "Metro Canvas Sneakers for Kids",
+   "description": "Smaller sizes of the everyday canvas shoe with hook-and-loop straps.",
+   "category": "footwear",
+   "price": 39.0
+  },
+  {
+   "sku": "ZXQ 9917",
+   "name": "Cushioned Sneaker Insoles",
+   "description": "Foam insoles cut to fit low-top trainers for extra comfort.",
+   "category": "accessories",
+   "price": 12.0
+  },
+  {
+   "sku": "9917 ZXQ",
+   "name": "Sneaker Storage Box",
+   "description": "Stackable clear box that keeps one pair of trainers dust-free.",
+   "category": "accessories",
+   "price": 9.0
   }
- ]
+ ],
+ "prompt_variant": "default"
 }

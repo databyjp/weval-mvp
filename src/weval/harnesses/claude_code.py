@@ -1,9 +1,13 @@
-"""Harbor's built-in Claude Code, with inference routed through OpenRouter.
+"""Harbor's built-in Claude Code, with inference through OpenRouter or a Claude subscription.
 
-Claude Code authenticates to OpenRouter's Anthropic-compatible endpoint with
-the OpenRouter key as a bearer token; ``ANTHROPIC_API_KEY`` is set empty so it
-cannot fall back to Anthropic directly. Harbor sets every model alias, including
-the subagent model, to the Agent's ``model``.
+By default, Claude Code authenticates to OpenRouter's Anthropic-compatible
+endpoint with the OpenRouter key as a bearer token; ``ANTHROPIC_API_KEY`` is set
+empty so it cannot fall back to Anthropic directly. An Agent with
+``auth = "subscription"`` instead calls Anthropic with the long-lived OAuth
+token from ``claude setup-token`` in ``CLAUDE_CODE_OAUTH_TOKEN``, and its
+``model`` is an Anthropic model ID such as ``anthropic/claude-opus-5-5``.
+Harbor sets every model alias, including the subagent model, to the Agent's
+``model``.
 """
 
 import json
@@ -19,17 +23,25 @@ EXPECTED_LOGS = (
 
 
 def agent_config(agent: dict) -> AgentConfig:
-    """Build Harbor's agent config for a Claude Code Agent (``version``, ``model``)."""
+    """Build Harbor's agent config for a Claude Code Agent (``version``, ``model``, optional ``auth``)."""
+    # Harbor resolves the templates from the host environment.
+    if agent.get("auth") == "subscription":
+        # The empty key overrides any host ANTHROPIC_API_KEY, which Claude Code
+        # would prefer to the token. Harbor's CLAUDE_FORCE_OAUTH flag does the
+        # same, but Harbor treats its value "1" as a secret and scrubs every "1"
+        # from the Trial output.
+        env = {"CLAUDE_CODE_OAUTH_TOKEN": "${CLAUDE_CODE_OAUTH_TOKEN}", "ANTHROPIC_API_KEY": ""}
+    else:
+        env = {
+            "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+            "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}",
+            "ANTHROPIC_API_KEY": "",
+        }
     return AgentConfig(
         name="claude-code",
         model_name=agent["model"],
         kwargs={"version": agent["version"]},
-        env={
-            "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-            # Harbor resolves the template from the host environment.
-            "ANTHROPIC_AUTH_TOKEN": "${OPENROUTER_API_KEY}",
-            "ANTHROPIC_API_KEY": "",
-        },
+        env=env,
     )
 
 

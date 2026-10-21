@@ -1,8 +1,10 @@
 # Product search workspace
 
 The deployment is defined in `docker-compose.yaml`. Its Weaviate service has a
-persistent volume and a `Product` collection holding the indexed catalog of 28
-products. The application runs from `main.py` on port 8000;
+persistent volume and a `Product` collection holding the indexed catalog of 31
+products. SKUs are case-sensitive and may contain spaces. Other services query
+the `Product` collection by name. The
+application runs from `main.py` on port 8000;
 `requirements.txt` records its Python dependencies.
 
 `GET /search?query=...&limit=...` accepts a nonempty query and a limit from 1

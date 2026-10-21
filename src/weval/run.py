@@ -36,7 +36,7 @@ SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
 SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
-SECRET_VARS = ("OPENROUTER_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
+SECRET_VARS = ("OPENROUTER_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
 # Harbor's per-Trial token and cost fields in result.json's agent_result.
 USAGE_FIELDS = ("n_input_tokens", "n_cache_tokens", "n_output_tokens", "cost_usd")
 # A URL's host must contain a dot, which excludes Compose service names such as
