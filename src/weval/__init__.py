@@ -1,4 +1,4 @@
-"""weval command line: ``weval run`` and ``weval check``."""
+"""weval command line: ``weval run``, ``weval check``, and ``weval report``."""
 
 import argparse
 from pathlib import Path
@@ -18,7 +18,17 @@ def main() -> None:
     check_parser = commands.add_parser("check", help="re-score a retained Trial's snapshot")
     check_parser.add_argument("trial", type=Path, help="Harbor Trial directory")
     check_parser.add_argument("--task", type=Path, help="Task directory (default: from weval.json)")
+    report_parser = commands.add_parser("report", help="write the Task catalog and retained runs as HTML pages")
+    report_parser.add_argument(
+        "outputs", type=Path, nargs="?", default=Path("experiment-outputs"), help="directory of run directories"
+    )
     args = parser.parse_args()
+
+    if args.command == "report":
+        from weval.report import write_report
+
+        print(write_report(args.outputs))
+        return
 
     # Imported here so `weval --help` does not pay Harbor's import time.
     from weval.run import rescore, run

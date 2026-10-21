@@ -11,7 +11,8 @@ uv sync
 ```
 
 Create `.env` with `OPENROUTER_API_KEY`, `MODAL_TOKEN_ID`, and
-`MODAL_TOKEN_SECRET`. Git ignores it, and after each run weval replaces any
+`MODAL_TOKEN_SECRET`. Claude Code Agents with `auth = "subscription"` also
+need `CLAUDE_CODE_OAUTH_TOKEN`, printed by `claude setup-token`. Git ignores it, and after each run weval replaces any
 of these values found in retained output with `<redacted:NAME>`.
 
 ## Use
@@ -25,6 +26,9 @@ uv run --env-file .env weval run tasks/build/ecommerce-search --agent pi-glm-5.3
 
 # Re-score a retained Trial with the Task's current check.py
 uv run weval check experiment-outputs/<run>/job/<trial>
+
+# Write the Task catalog and every retained run to experiment-outputs/index.html
+uv run weval report
 ```
 
 Each run writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/`. Each

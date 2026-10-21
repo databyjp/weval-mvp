@@ -1,6 +1,36 @@
 # How to read a Trial
 
-Start at `weval.json` in the Trial directory ([layout reference](../reference.md#the-trial-directory)).
+To find a Trial, or compare runs, build the report offline:
+
+```sh
+uv run weval report
+```
+
+Open `experiment-outputs/index.html` in a browser. It reads the Tasks,
+`agents.toml`, and retained runs, and does not modify any run directory.
+Run the command again after a run or a Task change.
+
+The Tasks tab has one row per Task and prompt variant. Each Agent column
+shows that Agent's latest run: how many scored Trials (`passed`, `failed`,
+or `timed-out`) passed every required check, and which required checks
+failed. Click a result to see its runs. Click *definition* for the Task's
+summary, settings, checks (read from `check.py`), and prompts. The Agents
+in `agents.toml` are listed below.
+
+The Results tab has one row per run: the Task, prompt variant, Treatment,
+Agent, date, environment, and output directory. Required and Preferred
+show how many scored Trials passed every check of that kind. Cost, tokens
+(input plus output), turns (agent messages in `agent/trajectory.json`),
+and agent execution time are means per Trial. Filter by Task, prompt
+variant, or Agent; click a header to sort, or the Task or Trial count
+to list each Trial. A Trial without `weval.json` shows as `unrecorded`.
+
+Each Trial links to its page under `experiment-outputs/_report/`: the
+status, the agent's final message, each check with its notes, usage, the
+transcript from `agent/trajectory.json`, and the snapshot as a collapsible
+tree. The page links to the retained files it reads.
+
+For one Trial, start at `weval.json` in the Trial directory ([layout reference](../reference.md#the-trial-directory)).
 
 Then follow your question:
 

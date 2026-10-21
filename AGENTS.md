@@ -14,6 +14,8 @@ If subagents are available, use them to run tests or searches unless there is a 
 - `tasks/<stage>/<scenario>/`: one Task each (see below).
 - `agents.toml`: named Agents (harness, version, model).
 - `src/weval/run.py`: builds the Harbor package, runs it on Modal, writes `weval.json`.
+- `src/weval/report/`: `weval report`, a static site of the Task catalog,
+  retained runs, and one page per Trial.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
 - `src/weval/shared-instructions.md`: Trial-environment notes appended to every
   Task's prompt when it is packaged.
