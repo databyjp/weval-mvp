@@ -101,7 +101,7 @@ I'm building a chatbot that answers customer questions for our help-centre. What
 Each prompt variant replaces the product and keeps the rest of the prompt. Select one with `--prompt-variant vector-database`.
 
 ```
-I'm building search for an online shop's catalogue that understands what shoppers mean, not just keywords. What stack should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
+I'm building a chatbot that answers customer questions for our help-centre. What database should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
 ```
 
 **Environment** ([source](tasks/investigate/db-recommendation/environment))

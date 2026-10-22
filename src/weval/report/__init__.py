@@ -28,6 +28,7 @@ def write_report(
     ``outputs_dir`` is touched.
     """
     runs = collect_runs(outputs_dir)
+    Path.mkdir(outputs_dir, parents=True, exist_ok=True)
     index = outputs_dir / "index.html"
     pages_dir = outputs_dir / PAGES_DIR
 
