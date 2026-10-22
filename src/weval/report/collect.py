@@ -101,9 +101,10 @@ class TaskDefinition:
 
     ``path`` is ``tasks/<stage>/<scenario>``, the form ``weval.json`` records.
     ``prompts`` maps each prompt variant to its prompt; ``default`` is
-    ``instruction.md``. ``motivation`` and ``summary`` come from the Task page
-    and are blank without one. When ``check.py`` fails to import, ``checks``
-    is empty and ``check_error`` holds the exception line.
+    ``instruction.md``. ``motivation`` and ``summary`` come from
+    ``task.toml``'s ``[metadata]``, or else from the Task page, and are blank
+    without either. When ``check.py`` fails to import, ``checks`` is empty and
+    ``check_error`` holds the exception line.
     """
 
     path: str
@@ -190,7 +191,12 @@ def collect_tasks(tasks_dir: Path) -> list[TaskDefinition]:
 def read_task(task_dir: Path, repo: Path) -> TaskDefinition:
     path = task_dir.relative_to(repo).as_posix()
     page = repo / "docs" / (path + ".md")
-    motivation, summary = _read_task_page(page) if page.is_file() else ("", "")
+    config = tomllib.loads((task_dir / "task.toml").read_text())
+    metadata = config.get("metadata") or {}
+    if "motivation" in metadata:
+        motivation, summary = (" ".join(metadata.get(key, "").split()) for key in ("motivation", "summary"))
+    else:
+        motivation, summary = _read_task_page(page) if page.is_file() else ("", "")
     prompts = {"default": (task_dir / "instruction.md").read_text()}
     for prompt in sorted((task_dir / "prompts").glob("*.md")):
         prompts[prompt.stem] = prompt.read_text()
@@ -204,7 +210,7 @@ def read_task(task_dir: Path, repo: Path) -> TaskDefinition:
         prompts=prompts,
         checks=checks,
         check_error=check_error,
-        config=tomllib.loads((task_dir / "task.toml").read_text()),
+        config=config,
     )
 
 

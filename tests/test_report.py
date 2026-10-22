@@ -111,6 +111,16 @@ def test_task_definition_reads_prompts_checks_and_page(tmp_path):
     assert task.config["agent"]["timeout_sec"] == 1200.0
 
 
+def test_task_toml_metadata_takes_the_place_of_the_page(tmp_path):
+    tasks_dir = write_task(tmp_path, CHECKS)
+    task_toml = tasks_dir / "build/ecommerce-search/task.toml"
+    task_toml.write_text('[metadata]\nmotivation = """\nCan an agent\nsearch?"""\n' + task_toml.read_text())
+
+    [task] = collect_tasks(tasks_dir)
+
+    assert (task.motivation, task.summary) == ("Can an agent search?", "")
+
+
 def test_broken_check_module_is_reported_on_its_task(tmp_path):
     [task] = collect_tasks(write_task(tmp_path, "import missing_module\n"))
 

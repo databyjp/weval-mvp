@@ -31,4 +31,4 @@ These docs follow the diataxis framework.
 - [How to run a Trial](how-to/run-a-trial.md)
 - [How to read a Trial](how-to/read-a-trial.md)
 - [Reference](reference.md): `task.toml`, verifier flags, and the Trial directory
-- Tasks: [build/ecommerce-search](tasks/build/ecommerce-search.md), [deploy/local-instance](tasks/deploy/local-instance.md), [deploy/document-search-upgrade](tasks/deploy/document-search-upgrade.md), [resolve/sku-search](tasks/resolve/sku-search.md)
+- Tasks: one directory each under [`tasks/`](../tasks/), named `<stage>/<scenario>`. `uv run weval report experiment-outputs` writes the catalog, with each Task's motivation, prompts and checks, to `experiment-outputs/index.html`.

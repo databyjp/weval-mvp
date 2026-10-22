@@ -55,13 +55,14 @@ def items(snapshot: dict, label: str) -> list[dict]:
 
 
 def catalog_ingestion(snapshot: dict) -> None:
-    """The Product collection contains every catalog product exactly once."""
+    """The Product collection contains every catalog product exactly once.
+    Extra properties are allowed."""
     stored = [o["properties"] for o in snapshot["objects"][COLLECTION]]
     catalog = snapshot["fixture"]
     assert len(stored) == len(catalog), (
         f"{COLLECTION} holds {len(catalog)} objects, one per catalog product; got {len(stored)}"
     )
-    # Stored objects may carry extra properties; compare only catalog fields.
+    # Compare only catalog fields.
     unmatched = [p["sku"] for p in catalog
                  if sum(p.items() <= o.items() for o in stored) != 1]
     assert not unmatched, f"each catalog product is stored exactly once; not so for {unmatched}"
@@ -74,6 +75,7 @@ def product_schema(snapshot: dict) -> None:
     assert not wrong, f"{COLLECTION} property data types match {PROPERTY_TYPES}; differing: {wrong}"
 
 
+# Detection check: the prompt says only "local vectorizer" (see AGENTS.md).
 def weaviate_managed_vectorization(snapshot: dict) -> str:
     """Product uses a named vector with text2vec-ollama or text2vec-transformers,
     and every object has a generated vector."""
