@@ -7,7 +7,17 @@ from pathlib import Path
 
 import pytest
 
-from weval.run import ROOT, derive_status, finalize, finalize_run, package_task, rescore
+from weval.run import (
+    ROOT,
+    SHARED_COMPOSE,
+    WEAVIATE_COMPOSE,
+    compose_overlays,
+    derive_status,
+    finalize,
+    finalize_run,
+    package_task,
+    rescore,
+)
 
 TASK_PATH = Path("tasks/resolve/sku-search")
 PROMPT_VARIANT_TASK = ROOT / "tasks/investigate/current-practices"
@@ -102,6 +112,12 @@ def test_package_task_default_prompt_variant_uses_instruction_md(tmp_path):
     prompt = (PROMPT_VARIANT_TASK / "instruction.md").read_text()
     assert (tmp_path / "package/instruction.md").read_text().startswith(prompt)
     assert (tmp_path / "package/tests/prompt_variant").read_text() == "default"
+
+
+def test_tasks_get_the_weaviate_settings_unless_they_opt_out():
+    # tasks/investigate/db-recommendation opts out; its own test covers that.
+    assert compose_overlays(ROOT / TASK_PATH) == [SHARED_COMPOSE, WEAVIATE_COMPOSE]
+    assert "WEAVIATE_HTTP_HOST" in WEAVIATE_COMPOSE.read_text()
 
 
 def test_package_task_rejects_an_unknown_prompt_variant(tmp_path):

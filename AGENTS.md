@@ -20,7 +20,9 @@ If subagents are available, use them to run tests or searches unless there is a 
 - `src/weval/shared-instructions.md`: Trial-environment notes appended to every
   Task's prompt when it is packaged.
 - `src/weval/shared-compose.yaml`: Compose overlay applied to every Trial
-  environment: the Trial network, `WEAVIATE_*` settings, and Docker socket.
+  environment: the Trial network and Docker socket.
+- `src/weval/weaviate-compose.yaml`: the `WEAVIATE_*` settings, applied unless
+  the Task's `task.toml` sets `[metadata] weaviate_workspace = false`.
 - `src/weval/harnesses/<harness>.py`: Harbor agent config, expected logs, and
   any harness-specific setup (for example, Pi's pinned `pi-web-access`).
 - `experiment-outputs/`: retained Experiment runs (git-ignored).

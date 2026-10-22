@@ -34,6 +34,8 @@ HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi, "claude-code": c
 SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
 # Applied to every Trial environment: the workspace contract no single Task owns.
 SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
+# Applied after it unless the Task opts out (see compose_overlays).
+WEAVIATE_COMPOSE = Path(__file__).with_name("weaviate-compose.yaml")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
 SECRET_VARS = ("OPENROUTER_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
@@ -50,7 +52,6 @@ MODAL = EnvironmentConfig(
     delete=True,
     override_cpus=4,
     override_memory_mb=8192,
-    extra_docker_compose=[SHARED_COMPOSE],
     kwargs={
         "modal_vm_runtime": True,
         "region": "eu",
@@ -62,7 +63,6 @@ MODAL = EnvironmentConfig(
 LOCAL = EnvironmentConfig(
     type=EnvironmentType.DOCKER,
     delete=True,
-    extra_docker_compose=[SHARED_COMPOSE],
 )
 
 
@@ -126,7 +126,9 @@ def run(
         agents=[harness.agent_config(agent)],
         n_attempts=attempts,
         n_concurrent_trials=attempts,
-        environment=LOCAL if local else MODAL,
+        environment=(LOCAL if local else MODAL).model_copy(
+            update={"extra_docker_compose": compose_overlays(task_dir)}
+        ),
     )
     try:
         asyncio.run(_run_job(config))
@@ -134,6 +136,15 @@ def run(
         finalize_run(run_dir, task_path, agent, attempts, prompt_variant)
         redact(run_dir)
     return run_dir
+
+
+def compose_overlays(task_dir: Path) -> list[Path]:
+    """The Compose overlays weval adds to the Task's Trial environment, in
+    the order Harbor applies them. The Weaviate settings are left out when
+    ``task.toml`` sets ``[metadata] weaviate_workspace = false``, for a Task
+    whose workspace must not suggest a data store."""
+    metadata = tomllib.loads((task_dir / "task.toml").read_text()).get("metadata", {})
+    return [SHARED_COMPOSE] + ([WEAVIATE_COMPOSE] if metadata.get("weaviate_workspace", True) else [])
 
 
 async def _run_job(config: JobConfig) -> None:

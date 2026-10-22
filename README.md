@@ -90,26 +90,26 @@ This Task asks how often an agent recommends Weaviate.
 
 #### Task
 
-**Instruction** ([source](tasks/investigate/stack-recommendation/instruction.md))
+**Instruction** ([source](tasks/investigate/db-recommendation/instruction.md))
 
 ```
-I'm building a chatbot that answers customer questions from our help-centre articles. What stack should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
+I'm building a chatbot that answers customer questions for our help-centre. What database should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
 ```
 
-**Prompt variant** `product-search` ([source](tasks/investigate/stack-recommendation/prompts/product-search.md))
+**Prompt variant** `vector-database` ([source](tasks/investigate/db-recommendation/prompts/vector-database.md))
 
-Each prompt variant replaces the product and keeps the rest of the prompt. Select one with `--prompt-variant product-search`.
+Each prompt variant replaces the product and keeps the rest of the prompt. Select one with `--prompt-variant vector-database`.
 
 ```
 I'm building search for an online shop's catalogue that understands what shoppers mean, not just keywords. What stack should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
 ```
 
-**Environment** ([source](tasks/investigate/stack-recommendation/environment))
+**Environment** ([source](tasks/investigate/db-recommendation/environment))
 
 - Dockerfile with an empty `/app`
 - No `WEAVIATE_*` settings: `task.toml` sets `weaviate_workspace = false`
 
-**Snapshot** ([source](tasks/investigate/stack-recommendation/snapshot.py))
+**Snapshot** ([source](tasks/investigate/db-recommendation/snapshot.py))
 
 ```python
 def recommendation() -> dict:
@@ -119,11 +119,11 @@ def recommendation() -> dict:
     return {"text": RECOMMENDATION.read_text(errors="replace"), "error": None}
 ```
 
-**Checks** ([source](tasks/investigate/stack-recommendation/check.py))
+**Checks** ([source](tasks/investigate/db-recommendation/check.py))
 
 - `/app/RECOMMENDATION.md` exists and is not blank.
 
-A passing Trial shows only that the agent answered. Which stores the answer recommends is read later from the retained snapshots ([Task page](docs/tasks/investigate/stack-recommendation.md#observations)).
+A passing Trial shows only that the agent answered. Which stores the answer recommends is read later from the retained snapshots ([Task page](docs/tasks/investigate/db-recommendation.md#observations)).
 
 ## Setup
 

@@ -73,16 +73,29 @@ settings from `src/weval/shared-compose.yaml`:
 |---|---|
 | `COMPOSE_PROJECT_NAME` | `<Harbor project>_submission`, so the agent's stack is a separate Compose project. |
 | `TRIAL_NETWORK` | `<Harbor project>_default`, the network the agent's stack must join. |
-| `WEAVIATE_HTTP_HOST`, `WEAVIATE_HTTP_PORT` | `weaviate`, `8080` |
-| `WEAVIATE_GRPC_HOST`, `WEAVIATE_GRPC_PORT` | `weaviate`, `50051` |
 | `/var/run/docker.sock` | The Docker socket, mounted so the agent and verifier can run Compose. |
 
-`weval` passes this file to Harbor as an extra Compose overlay
-(`extra_docker_compose`); Harbor applies it after the Task's own overlay.
+It also gets these from `src/weval/weaviate-compose.yaml`, unless the Task's
+`task.toml` sets `[metadata] weaviate_workspace = false`. A Task opts out when
+its workspace must not suggest a data store, as in
+`investigate/db-recommendation`.
+
+| Setting | Value |
+|---|---|
+| `WEAVIATE_HTTP_HOST`, `WEAVIATE_HTTP_PORT` | `weaviate`, `8080` |
+| `WEAVIATE_GRPC_HOST`, `WEAVIATE_GRPC_PORT` | `weaviate`, `50051` |
+
+`weval` passes these files to Harbor as extra Compose overlays
+(`extra_docker_compose`); Harbor applies them after the Task's own overlay.
+
+Claude Code Agents are installed from a binary that the host downloads once per
+version and platform, checks against the release manifest's SHA-256, and keeps
+gzipped (about 110 MB each) in `~/.cache/weval/claude-code/`, or under
+`$XDG_CACHE_HOME`. Each Trial uploads it, so Trials do not download Claude Code
+themselves.
 
 A Task's `environment/` supplies the `Dockerfile` and anything specific to that
-Task. Its optional `docker-compose.yaml` overlay is applied before the shared
-one, for example to add a healthcheck on `main`.
+Task. Its optional `docker-compose.yaml` overlay is applied before weval's, for example to add a healthcheck on `main`.
 
 ## The Trial directory
 

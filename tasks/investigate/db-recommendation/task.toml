@@ -1,0 +1,18 @@
+# Harbor task config. weval adds tests/.
+artifacts = [{ source = "/app", destination = "submission" }]
+
+[metadata]
+# The workspace must not suggest a data store; see weval's compose_overlays.
+weaviate_workspace = false
+
+[agent]
+timeout_sec = 1200.0
+
+[verifier]
+timeout_sec = 300.0
+# The answer is the only output under test. Any Compose file the agent writes
+# as an example is not started.
+env = { WEVAL_KEEP_STACK = "1" }
+
+[environment]
+build_timeout_sec = 600.0
