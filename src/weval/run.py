@@ -34,9 +34,11 @@ HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi, "claude-code": c
 SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
 # Applied to every Trial environment: the workspace contract no single Task owns.
 SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
+# Applied after it unless the Task opts out (see compose_overlays).
+WEAVIATE_COMPOSE = Path(__file__).with_name("weaviate-compose.yaml")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
-SECRET_VARS = ("OPENROUTER_API_KEY", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
+SECRET_VARS = ("OPENROUTER_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
 # Harbor's per-Trial token and cost fields in result.json's agent_result.
 USAGE_FIELDS = ("n_input_tokens", "n_cache_tokens", "n_output_tokens", "cost_usd")
 # A URL's host must contain a dot, which excludes Compose service names such as
@@ -50,7 +52,6 @@ MODAL = EnvironmentConfig(
     delete=True,
     override_cpus=4,
     override_memory_mb=8192,
-    extra_docker_compose=[SHARED_COMPOSE],
     kwargs={
         "modal_vm_runtime": True,
         "region": "eu",
@@ -62,7 +63,6 @@ MODAL = EnvironmentConfig(
 LOCAL = EnvironmentConfig(
     type=EnvironmentType.DOCKER,
     delete=True,
-    extra_docker_compose=[SHARED_COMPOSE],
 )
 
 
@@ -118,6 +118,12 @@ def run(
     scenario = task_dir.name if prompt_variant == "default" else f"{task_dir.name}@{prompt_variant}"
     run_name = f"{stamp}__{task_dir.parent.name}__{scenario}__{agent_name}"
     run_dir = ROOT / "experiment-outputs" / run_name
+    environment = (LOCAL if local else MODAL).model_copy(
+        update={"extra_docker_compose": compose_overlays(task_dir)}
+    )
+    # Before the run directory exists, so a failed preparation leaves no empty run.
+    if not local and hasattr(harness, "modal_environment"):
+        environment = harness.modal_environment(agent, environment)
     package_task(task_dir, run_dir / "task", prompt_variant)
     config = JobConfig(
         job_name="job",
@@ -126,21 +132,75 @@ def run(
         agents=[harness.agent_config(agent)],
         n_attempts=attempts,
         n_concurrent_trials=attempts,
-        environment=LOCAL if local else MODAL,
+        environment=environment,
     )
     try:
         asyncio.run(_run_job(config))
     finally:
-        for result_file in sorted((run_dir / "job").glob("*/result.json")):
-            record = finalize(result_file.parent, task_path, agent, prompt_variant)
-            print(f"{result_file.parent}: {record['status']}")
+        finalize_run(run_dir, task_path, agent, attempts, prompt_variant)
         redact(run_dir)
     return run_dir
+
+
+def compose_overlays(task_dir: Path) -> list[Path]:
+    """The Compose overlays weval adds to the Task's Trial environment, in
+    the order Harbor applies them. The Weaviate settings are left out when
+    ``task.toml`` sets ``[metadata] weaviate_workspace = false``, for a Task
+    whose workspace must not suggest a data store."""
+    metadata = tomllib.loads((task_dir / "task.toml").read_text()).get("metadata", {})
+    return [SHARED_COMPOSE] + ([WEAVIATE_COMPOSE] if metadata.get("weaviate_workspace", True) else [])
 
 
 async def _run_job(config: JobConfig) -> None:
     job = await Job.create(config)
     await job.run()
+
+
+def finalize_run(
+    run_dir: Path, task_path: Path, agent: dict, attempts: int, prompt_variant: str = "default"
+) -> None:
+    """Record every Trial directory under ``run_dir/job`` and print its status.
+
+    A Trial without ``result.json`` (Harbor stops the environment before
+    writing it, so a stop failure or kill can leave none) gets a
+    ``non-result`` stub naming the cause, so no Trial vanishes from the
+    record. Warns when fewer Trial directories exist than ``attempts``.
+    """
+    trial_dirs = sorted(path for path in (run_dir / "job").glob("*") if path.is_dir())
+    for trial_dir in trial_dirs:
+        if (trial_dir / "result.json").exists():
+            record = finalize(trial_dir, task_path, agent, prompt_variant)
+        else:
+            record = {
+                "status": "non-result",
+                "task": str(task_path),
+                "prompt_variant": prompt_variant,
+                "agent": HARNESSES[agent["harness"]].agent_record(agent),
+                "reward": None,
+                "exception": "result.json never written",
+            }
+            (trial_dir / "weval.json").write_text(json.dumps(record, indent=1))
+        print(f"{trial_dir}: {record['status']}")
+    if len(trial_dirs) < attempts:
+        print(f"WARNING: {attempts} Trials requested, {len(trial_dirs)} found under {run_dir / 'job'}")
+
+
+def derive_status(result: dict, missing: list[str]) -> str:
+    """Classify one Trial by whose outcome it records (statuses: docs/reference.md).
+
+    The snapshot plays no part: a snapshot error at any ``error_stage`` was
+    graded, so it scores ``failed``. A ``snapshot``-stage error usually means
+    the agent left its stack broken; a scorer bug is told apart when the
+    failure is classified.
+    """
+    rewards = (result.get("verifier_result") or {}).get("rewards") or {}
+    if "reward" not in rewards:
+        return "non-result"
+    if result.get("exception_info"):
+        return "timed-out"
+    if missing:
+        return "incomplete"
+    return "passed" if rewards["reward"] == 1 else "failed"
 
 
 def finalize(trial_dir: Path, task_path: Path, agent: dict, prompt_variant: str = "default") -> dict:
@@ -149,30 +209,26 @@ def finalize(trial_dir: Path, task_path: Path, agent: dict, prompt_variant: str 
     ``task_path`` is recorded as given; ``run()`` passes it relative to the
     repository root.
 
-    Status is ``non-result`` when Harbor raised or the verifier produced no
-    reward, ``incomplete`` when an expected log is missing, otherwise
-    ``passed`` or ``failed`` by reward.
+    Status comes from ``derive_status`` over Harbor's ``result.json`` and the
+    missing-log list.
     """
     harness = HARNESSES[agent["harness"]]
     result = json.loads((trial_dir / "result.json").read_text())
     expected = COMMON_LOGS + harness.EXPECTED_LOGS
     missing = [pattern for pattern in expected if not any(trial_dir.glob(pattern))]
     checks_file = trial_dir / "verifier/checks.json"
+    snapshot_file = trial_dir / "verifier/snapshot.json"
+    snapshot = json.loads(snapshot_file.read_text()) if snapshot_file.exists() else None
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
-    if result.get("exception_info") or "reward" not in rewards:
-        status = "non-result"
-    elif missing:
-        status = "incomplete"
-    else:
-        status = "passed" if rewards["reward"] == 1 else "failed"
     record = {
-        "status": status,
+        "status": derive_status(result, missing),
         "task": str(task_path),
         "prompt_variant": prompt_variant,
         "agent": harness.agent_record(agent),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),
         "exception": (result.get("exception_info") or {}).get("exception_type"),
+        "error_stage": (snapshot or {}).get("error_stage"),
         "missing_logs": missing,
         "checks": json.loads(checks_file.read_text()) if checks_file.exists() else None,
         # A harness that counts requests Harbor misses replaces Harbor's figures.

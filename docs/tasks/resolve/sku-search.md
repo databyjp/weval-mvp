@@ -15,12 +15,16 @@ so BM25 may rank other products that share those tokens ahead of the exact match
 
 > Customers report that searching for an exact SKU like `ZXQ-9917` shows other
 > products ahead of it. The search stack and app are running in this
-> workspace. Fix search without losing the indexed catalog.
+> workspace. Fix search without losing any products from the catalog, and
+> minimise downtime.
 
 ### Workspace
 
 - `WORKSPACE.md`: the `/search` contract (query, limit 1 to 25, default 5,
-  and the item fields) and the Weaviate connection variables.
+  and the item fields), the Weaviate connection variables, that SKUs are
+  case-sensitive and may contain spaces, and that other services query
+  `Product` by name, so the fix must be visible through `Product` rather than
+  only through this app.
 - `main.py`: a FastAPI app whose `/search` runs a BM25 query on `Product`.
 - `docker-compose.yaml`: Weaviate 1.39.5 with a persistent volume and no
   vectorizer.
@@ -30,15 +34,19 @@ so BM25 may rank other products that share those tokens ahead of the exact match
 `environment/start-existing-stack.sh`
 - Starts the stack and seeds `Product` with `sku` on word tokenization.
 - Starts the app and confirms that a query for `ZXQ-9917` ranks another product first.
-  - The catalog includes four SKUs that collide with `ZXQ-9917`. `9917-ZXQ` and
-  `9917@ZXQ` produce the same tokens under word tokenization. `AQ1-9917` and
-  `ZXQ-4831` share one token each.
+  - The catalog of 31 products includes seven SKUs that collide with
+  `ZXQ-9917` or each other. `9917-ZXQ` and `9917@ZXQ` produce the same
+  tokens under word tokenization. `AQ1-9917` and `ZXQ-4831` share one token
+  each. `zxq-9917` differs from `ZXQ-9917` only in case, so lowercase
+  tokenization ties them. `ZXQ 9917` and `9917 ZXQ` differ only in word
+  order, so whitespace tokenization ties them. Only field tokenization keeps
+  every SKU distinct.
 
 ## Checks
 
 | Check | Tier | Validation |
 |---|---|---|
-| `exact-sku-retrieval` | REQUIRED | The reported fault is fixed: `/search` for each of the five colliding SKUs ranks that SKU first. |
+| `exact-sku-retrieval` | REQUIRED | The reported fault is fixed: `/search` for each of the eight colliding SKUs ranks that SKU first. |
 | `search-contract` | REQUIRED | Non-SKU search still works: `/search` for "waterproof hiking boots" returns `TRAIL-001` with the documented fields. |
 | `document-preservation` | REQUIRED | The catalog survived the fix: `Product` holds each originally seeded product exactly once, with its property values. UUIDs may change. |
 | `collection-definition` | REQUIRED | The schema survived the fix: property names and data types are unchanged. `Product` may be an alias. |
@@ -55,6 +63,8 @@ tokenization, and replaces `Product` with an alias to it.
 |---|---|---|
 | `word_tokenized_ranking` | `exact-sku-retrieval` | The seeded baseline's ranking, unchanged. |
 | `hoisted_filter_matches` | `exact-sku-retrieval` | Trial `HrrRY7G`'s workaround: word-tokenized filter matches, in seed order, ahead of BM25 results. |
+| `lowercase_tokenized_ranking` | `exact-sku-retrieval` | `sku` on lowercase tokenization: `ZXQ-9917` and `zxq-9917` tie, so one ranks second for its own query. |
+| `whitespace_tokenized_ranking` | `exact-sku-retrieval` | `sku` on whitespace tokenization: `ZXQ 9917` and `9917 ZXQ` tie in the same way. |
 | `exact_match_only_search` | `search-contract` | A descriptive query returns nothing. |
 | `dropped_catalog` | `document-preservation` | The collection is empty. |
 | `price_as_text` | `collection-definition` | `price` re-created as text. |

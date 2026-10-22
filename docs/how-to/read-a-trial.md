@@ -1,6 +1,14 @@
 # How to read a Trial
 
-Start at `weval.json` in the Trial directory ([layout reference](../reference.md#the-trial-directory)).
+To find a Trial, or compare runs, build the report offline:
+
+```sh
+uv run weval report
+```
+
+Then view `experiment-outputs/index.html` in a browser.
+
+For one Trial, start at `weval.json` in the Trial directory ([layout reference](../reference.md#the-trial-directory)).
 
 Then follow your question:
 

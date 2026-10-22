@@ -6,10 +6,15 @@ the docstring is its description. Reward requires every ``REQUIRED`` check.
 """
 
 COLLECTION = "Product"
-CATALOG_SIZE = 28
-# ZXQ-9917 is the reported SKU. The others share its segments: the first two
-# tokenize identically under word tokenization, the last two share one token.
-EXACT_SKUS = ("ZXQ-9917", "9917-ZXQ", "9917@ZXQ", "AQ1-9917", "ZXQ-4831")
+CATALOG_SIZE = 31
+# ZXQ-9917 is the reported SKU. The others share its segments: 9917-ZXQ and
+# 9917@ZXQ tokenize identically under word tokenization, and AQ1-9917 and
+# ZXQ-4831 share one token. zxq-9917 differs only in case, so lowercase
+# tokenization ties it with ZXQ-9917; ZXQ 9917 and 9917 ZXQ differ only in
+# word order, so whitespace tokenization ties them. Only field tokenization
+# separates every pair.
+EXACT_SKUS = ("ZXQ-9917", "9917-ZXQ", "9917@ZXQ", "AQ1-9917", "ZXQ-4831",
+              "zxq-9917", "ZXQ 9917", "9917 ZXQ")
 KEYWORD_SKU = "TRAIL-001"
 PROPERTY_TYPES = {"sku": "text", "name": "text", "description": "text",
                   "category": "text", "price": "number"}

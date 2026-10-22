@@ -1,1 +1,1 @@
-Customers report that searching for an exact SKU like `ZXQ-9917` shows other products ahead of it. The search stack and app are running in this workspace. Fix search without losing the indexed catalog.
+Customers report that searching for an exact SKU like `ZXQ-9917` shows other products ahead of it. The search stack and app are running in this workspace. Fix search without losing any products from the catalog, and minimise downtime.

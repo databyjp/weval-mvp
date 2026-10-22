@@ -1,0 +1,7 @@
+{
+ "recommendation": {
+  "text": "# Recommended stack\n\n- Backend: Python with FastAPI.\n- Data store: a database with vector and keyword search, so retrieval can\n  combine meaning and exact terms.\n- Embeddings and generation: a hosted model API, chosen per budget and\n  latency.\n- Deployment: Docker Compose locally, then a managed container platform.\n",
+  "error": null
+ },
+ "prompt_variant": "default"
+}

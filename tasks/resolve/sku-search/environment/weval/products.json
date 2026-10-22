@@ -194,5 +194,26 @@
     "description": "Replacement flat laces in six colours for low-top trainers.",
     "category": "accessories",
     "price": 7.0
+  },
+  {
+    "sku": "zxq-9917",
+    "name": "Metro Canvas Sneakers for Kids",
+    "description": "Smaller sizes of the everyday canvas shoe with hook-and-loop straps.",
+    "category": "footwear",
+    "price": 39.0
+  },
+  {
+    "sku": "ZXQ 9917",
+    "name": "Cushioned Sneaker Insoles",
+    "description": "Foam insoles cut to fit low-top trainers for extra comfort.",
+    "category": "accessories",
+    "price": 12.0
+  },
+  {
+    "sku": "9917 ZXQ",
+    "name": "Sneaker Storage Box",
+    "description": "Stackable clear box that keeps one pair of trainers dust-free.",
+    "category": "accessories",
+    "price": 9.0
   }
 ]

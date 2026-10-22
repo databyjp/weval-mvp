@@ -1,20 +1,25 @@
 # Weval
 
-We are building `weval` to assess and improve Weaviate's "agent experience". It runs Weaviate coding Tasks against agent harnesses and scores each Trial against the Task's checks.
+`Weval` is an "agent experience" (AX) evaluation harness for Weaviate. It runs Weaviate-related Tasks against agent harnesses and scores each Trial against its predefined Checks.
 
 Domain terms (e.g. Task, Agent, Trial, Non-result) are defined in [`GLOSSARY.md`](../GLOSSARY.md).
 
 ## Tech stack
 
-`weval` is built on top of Harbor, a coding-agent testing framework. This allows us to focus on Weaviate-specific implementation details, and outsource important, but already-solved details such as container and agent orchestration.
+`weval` is built on top of Harbor, a coding-agent testing framework. This allows us to focus on Weaviate-specific implementation details, and outsource important, but already-implemented details such as container and agent orchestration.
 
-For convenient orchestration of Docker-in-Docker and Trial parallelisation, `weval` uses Modal for Docker-based runs.
+- Modal is used for runs requiring Docker-based Weaviate instances for convenience and parallelisation.
+- OpenRouter is generally used for providing API-based model access. Subscriptions (e.g. Claude Code or Codex) may be used where available.
 
-## Architecture
+## Key Concepts
 
-Think of `weval` as a set of Weaviate-related "Tasks" that agents are to perform, which will be then evaluated by `weval`.
+Each "Task" is defined in `tasks/<stage>/<scenario>`.
 
-A "Trial" is an attempt at a Task, and thus it requires an agent definition. An "Experiment" defines a plan comprising one or more Trials. An Experiment may also include "Treatments", such as additional agent skills, MCPs or other tools to be given to the agent.
+A Task comprises Harbor definition (`task.toml`) and an instruction (`instruction.md`), to be carried out by an agent in a provided environment `/environment`. Each run's outputs are captured through `snapshot.py`, and reviewed through criteria in `check.py`
+
+The outputs from a task are captured in `experiment-outputs`, under `<YYYYMMDD>-<HHMMSS>__<stage>__<scenario>@<variant>__<model>` (*note: `@variant` is optional).
+
+A "Trial" is an attempt at a Task. Thus it requires an agent definition. An "Experiment" defines a plan comprising one or more Trials. An Experiment may also include "Treatments", such as additional agent skills, MCPs or other tools to be given to the agent.
 
 [Task runs](concepts/task-runs.md) describes how a run moves between `weval`, Harbor, and the verifier.
 
@@ -26,4 +31,4 @@ These docs follow the diataxis framework.
 - [How to run a Trial](how-to/run-a-trial.md)
 - [How to read a Trial](how-to/read-a-trial.md)
 - [Reference](reference.md): `task.toml`, verifier flags, and the Trial directory
-- Tasks: [build/ecommerce-search](tasks/build/ecommerce-search.md), [deploy/local-instance](tasks/deploy/local-instance.md), [deploy/document-search-upgrade](tasks/deploy/document-search-upgrade.md), [resolve/sku-search](tasks/resolve/sku-search.md)
+- Tasks: one directory each under [`tasks/`](../tasks/), named `<stage>/<scenario>`. `uv run weval report experiment-outputs` writes the catalog, with each Task's motivation, prompts and checks, to `experiment-outputs/index.html`.

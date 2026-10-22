@@ -53,6 +53,19 @@ def hoisted_filter_matches(s: dict) -> None:
         set_ranking(s, query, ("ZXQ-9917", "9917@ZXQ", "9917-ZXQ", "ZXQ-4831", "AQ1-9917"))
 
 
+def lowercase_tokenized_ranking(s: dict) -> None:
+    # Lowercase tokenization stores ZXQ-9917 and zxq-9917 as the same token, so
+    # both queries return the same order.
+    for query in ("ZXQ-9917", "zxq-9917"):
+        set_ranking(s, query, ("ZXQ-9917", "zxq-9917"))
+
+
+def whitespace_tokenized_ranking(s: dict) -> None:
+    # Whitespace tokenization splits ZXQ 9917 and 9917 ZXQ into the same tokens.
+    for query in ("ZXQ 9917", "9917 ZXQ"):
+        set_ranking(s, query, ("ZXQ 9917", "9917 ZXQ"))
+
+
 def exact_match_only_search(s: dict) -> None:
     s["probes"]["keyword"]["body"]["items"] = []
 
@@ -82,8 +95,10 @@ def test_oracle_passes_every_check():
     [
         (word_tokenized_ranking, "exact-sku-retrieval", "'ZXQ-9917': ['9917-ZXQ'"),
         (hoisted_filter_matches, "exact-sku-retrieval", "'9917-ZXQ': ['ZXQ-9917'"),
+        (lowercase_tokenized_ranking, "exact-sku-retrieval", "'zxq-9917': ['ZXQ-9917'"),
+        (whitespace_tokenized_ranking, "exact-sku-retrieval", "'9917 ZXQ': ['ZXQ 9917'"),
         (exact_match_only_search, "search-contract", "returns TRAIL-001"),
-        (dropped_catalog, "document-preservation", "holds 28 objects"),
+        (dropped_catalog, "document-preservation", "holds 31 objects"),
         (price_as_text, "collection-definition", "'price': 'text'"),
         (name_field_tokenization, "other-properties-word-tokenization", "changed: {'name': 'field'}"),
         (app_side_workaround, "sku-field-tokenization", "got 'word'"),

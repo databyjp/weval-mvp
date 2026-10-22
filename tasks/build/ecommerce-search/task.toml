@@ -1,6 +1,15 @@
 # Harbor task config. weval adds tests/.
 artifacts = [{ source = "/app", destination = "submission" }]
 
+# The Task's spec. Its prompt is instruction.md, the agent's workspace contract
+# is environment/app/WORKSPACE.md, and each check's docstring says what it
+# scores. weval report shows all of these.
+[metadata]
+motivation = """
+Can an agent build a product search API on Weaviate that supports exact SKU
+lookup, semantic queries, and pagination, configured the current way?"""
+summary = "Nothing is running when the agent starts."
+
 [agent]
 timeout_sec = 1200.0
 

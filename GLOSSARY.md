@@ -26,6 +26,8 @@ These definitions are authoritative for `weval`. Add a term only when the projec
 
 **Non-result.** A Trial for which evaluation infrastructure prevented a valid Task outcome from being observed. A Non-result records the cause.
 
+**Timed-out.** A Trial in which the Agent hit a Harbor limit, such as the time budget, but the verifier still scored the submission. The reward is recorded; a Timed-out Trial does not count as passed.
+
 ## Weaviate
 
 **Schema.** A collection's property names and data types.

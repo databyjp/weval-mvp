@@ -7,7 +7,17 @@ from pathlib import Path
 
 import pytest
 
-from weval.run import ROOT, finalize, package_task, rescore
+from weval.run import (
+    ROOT,
+    SHARED_COMPOSE,
+    WEAVIATE_COMPOSE,
+    compose_overlays,
+    derive_status,
+    finalize,
+    finalize_run,
+    package_task,
+    rescore,
+)
 
 TASK_PATH = Path("tasks/resolve/sku-search")
 PROMPT_VARIANT_TASK = ROOT / "tasks/investigate/current-practices"
@@ -104,7 +114,81 @@ def test_package_task_default_prompt_variant_uses_instruction_md(tmp_path):
     assert (tmp_path / "package/tests/prompt_variant").read_text() == "default"
 
 
+def test_tasks_get_the_weaviate_settings_unless_they_opt_out():
+    # tasks/investigate/db-recommendation opts out; its own test covers that.
+    assert compose_overlays(ROOT / TASK_PATH) == [SHARED_COMPOSE, WEAVIATE_COMPOSE]
+    assert "WEAVIATE_HTTP_HOST" in WEAVIATE_COMPOSE.read_text()
+
+
 def test_package_task_rejects_an_unknown_prompt_variant(tmp_path):
     with pytest.raises(FileNotFoundError, match="no-such-prompt-variant"):
         package_task(PROMPT_VARIANT_TASK, tmp_path / "package", "no-such-prompt-variant")
     assert not (tmp_path / "package").exists()
+
+
+def harbor_result(reward: int | None = None, exception: bool = False) -> dict:
+    result: dict = {}
+    if reward is not None:
+        result["verifier_result"] = {"rewards": {"reward": reward}}
+    if exception:
+        result["exception_info"] = {"exception_type": "AgentTimeoutError"}
+    return result
+
+
+@pytest.mark.parametrize(
+    "result, missing, expected",
+    [
+        # Harbor raised, nothing graded: infrastructure, not the agent.
+        (harbor_result(exception=True), [], "non-result"),
+        # Harbor recorded a limit but the verifier still graded the submission.
+        (harbor_result(reward=1, exception=True), [], "timed-out"),
+        (harbor_result(reward=0, exception=True), [], "timed-out"),
+        # No reward at all: infrastructure.
+        (harbor_result(), [], "non-result"),
+        (harbor_result(reward=1), ["agent/pi.txt"], "incomplete"),
+        (harbor_result(reward=1), [], "passed"),
+        (harbor_result(reward=0), [], "failed"),
+    ],
+)
+def test_derive_status_truth_table(result, missing, expected):
+    assert derive_status(result, missing) == expected
+
+
+@pytest.mark.parametrize("stage", ["stack", "app", "snapshot"])
+def test_finalize_records_a_snapshot_error_at_any_stage_as_failed(tmp_path, stage):
+    # A "snapshot"-stage error is what a stopped Weaviate gives a Task with
+    # WEVAL_KEEP_STACK, such as deploy/local-instance.
+    trial = tmp_path / "trial"
+    (trial / "verifier").mkdir(parents=True)
+    (trial / "agent").mkdir()
+    (trial / "artifacts/submission").mkdir(parents=True)
+    (trial / "agent/oracle.txt").write_text("")
+    (trial / "result.json").write_text(json.dumps(harbor_result(reward=0)))
+    (trial / "verifier/snapshot.json").write_text(
+        json.dumps({"error": "Traceback: Connection refused", "error_stage": stage})
+    )
+    (trial / "verifier/checks.json").write_text("[]")
+
+    record = finalize(trial, TASK_PATH, {"name": "oracle", "harness": "oracle"})
+
+    assert record["status"] == "failed"
+    assert record["error_stage"] == stage
+
+
+def test_finalize_run_records_a_trial_without_result_json(tmp_path, capsys):
+    job = tmp_path / "job"
+    graded = job / "trial-0"
+    (graded / "verifier").mkdir(parents=True)
+    (graded / "result.json").write_text(json.dumps(harbor_result(reward=1)))
+    shutil.copy(ORACLE_SNAPSHOT, graded / "verifier/snapshot.json")
+    (job / "trial-1").mkdir()
+
+    finalize_run(tmp_path, TASK_PATH, {"name": "oracle", "harness": "oracle"}, attempts=3)
+
+    assert (graded / "weval.json").exists()
+    stub = json.loads((job / "trial-1/weval.json").read_text())
+    assert stub["status"] == "non-result"
+    assert stub["exception"] == "result.json never written"
+    out = capsys.readouterr().out
+    assert "trial-0" in out and "trial-1" in out
+    assert "3 Trials requested, 2 found" in out

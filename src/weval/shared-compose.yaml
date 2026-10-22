@@ -2,7 +2,8 @@
 # Compose overlay applied to every Trial environment after the Task's own
 # environment/docker-compose.yaml. It defines the workspace contract that each
 # Task's WORKSPACE.md describes to the agent and that verify.py and snapshot.py
-# rely on.
+# rely on. It names no data store, so a Task can opt out of the store-specific
+# settings in weaviate-compose.yaml.
 ---
 services:
   main:
@@ -11,9 +12,5 @@ services:
       # network that already contains this Harbor-managed application container.
       COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}_submission
       TRIAL_NETWORK: ${COMPOSE_PROJECT_NAME}_default
-      WEAVIATE_HTTP_HOST: weaviate
-      WEAVIATE_HTTP_PORT: "8080"
-      WEAVIATE_GRPC_HOST: weaviate
-      WEAVIATE_GRPC_PORT: "50051"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
