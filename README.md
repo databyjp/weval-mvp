@@ -17,13 +17,24 @@ A **task** consists of instructions (i.e. prompt), an environment definition (fo
 
 This forms the basic feedback loop:
 
-<TODO - a diagram here showing:>
+```mermaid
+flowchart LR
+    task["Task<br/>prompt, environment,<br/>snapshot.py, check.py"]
+    agent["Agent<br/>harness + model"]
+    treatment["Treatment<br/>skills, MCP servers, docs"]
+    run["Run Trial"]
+    score["Score"]
 
-Run Trial -> Score -> Present
-    <---- feedback loop
-      retry with treatments ---
+    task --> run
+    agent --> run
+    treatment -.-> run
+    run --> score --> present
+    present -. "retry with some change" .-> run
+```
 
 ### Example 1: Greenfield e-commerce POC
+
+Assess how well an agent can build an ecommerce POC with Weaviate.
 
 #### Task
 
@@ -43,10 +54,7 @@ We're prototyping search for our ecommerce catalog. Finish the starter FastAPI a
 
 ```python
 PROBES: dict[str, dict] = {
-    "missing-query": {},
-    **{f"invalid-page-{v}": {"query": "test", "page": v} for v in INVALID},
-    **{f"invalid-page-size-{v}": {"query": "test", "page_size": v} for v in INVALID},
-    "default-page": {"query": "travel equipment"},
+    ...
     "exact-sku": {"query": "ZXQ-9917", "page": 1, "page_size": 5},
     "semantic": {"query": "soggy mountaineering trek", "page": 1, "page_size": 5},
     "pagination-reference": {"query": PAGINATION_QUERY, "page": 1, "page_size": 24},
@@ -75,6 +83,47 @@ PROBES: dict[str, dict] = {
 - Confirm data schema: sku, name, description, and category are text properties; price is number.
 - `Product` uses a named vector with text2vec-ollama or text2vec-transformers and every object has a generated vector.
 - Pages are stable, do not overlap, and concatenate to the larger request's order.
+
+### Example 2: Stack recommendation
+
+This Task asks how often an agent recommends Weaviate.
+
+#### Task
+
+**Instruction** ([source](tasks/investigate/stack-recommendation/instruction.md))
+
+```
+I'm building a chatbot that answers customer questions from our help-centre articles. What stack should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
+```
+
+**Prompt variant** `product-search` ([source](tasks/investigate/stack-recommendation/prompts/product-search.md))
+
+Each prompt variant replaces the product and keeps the rest of the prompt. Select one with `--prompt-variant product-search`.
+
+```
+I'm building search for an online shop's catalogue that understands what shoppers mean, not just keywords. What stack should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
+```
+
+**Environment** ([source](tasks/investigate/stack-recommendation/environment))
+
+- Dockerfile with an empty `/app`
+- No `WEAVIATE_*` settings: `task.toml` sets `weaviate_workspace = false`
+
+**Snapshot** ([source](tasks/investigate/stack-recommendation/snapshot.py))
+
+```python
+def recommendation() -> dict:
+    """Return the submitted file's text, or why there is none."""
+    if not RECOMMENDATION.exists():
+        return {"text": None, "error": f"{RECOMMENDATION} does not exist"}
+    return {"text": RECOMMENDATION.read_text(errors="replace"), "error": None}
+```
+
+**Checks** ([source](tasks/investigate/stack-recommendation/check.py))
+
+- `/app/RECOMMENDATION.md` exists and is not blank.
+
+A passing Trial shows only that the agent answered. Which stores the answer recommends is read later from the retained snapshots ([Task page](docs/tasks/investigate/stack-recommendation.md#observations)).
 
 ## Setup
 
