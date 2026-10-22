@@ -136,43 +136,43 @@ def harbor_result(reward: int | None = None, exception: bool = False) -> dict:
 
 
 @pytest.mark.parametrize(
-    "result, missing, snapshot, expected",
+    "result, missing, expected",
     [
         # Harbor raised, nothing graded: infrastructure, not the agent.
-        (harbor_result(exception=True), [], None, "non-result"),
+        (harbor_result(exception=True), [], "non-result"),
         # Harbor recorded a limit but the verifier still graded the submission.
-        (harbor_result(reward=1, exception=True), [], None, "timed-out"),
-        (harbor_result(reward=0, exception=True), [], None, "timed-out"),
+        (harbor_result(reward=1, exception=True), [], "timed-out"),
+        (harbor_result(reward=0, exception=True), [], "timed-out"),
         # No reward at all: infrastructure.
-        (harbor_result(), [], None, "non-result"),
-        # The verifier's own snapshot stage failed: infrastructure.
-        (harbor_result(reward=0), [], {"error": "tb", "error_stage": "snapshot"}, "non-result"),
-        # The agent's submitted stack or app failed to start: the agent's result.
-        (harbor_result(reward=0), [], {"error": "tb", "error_stage": "stack"}, "failed"),
-        (harbor_result(reward=0), [], {"error": "tb", "error_stage": "app"}, "failed"),
-        # A snapshot error without error_stage scores failed.
-        (harbor_result(reward=0), [], {"error": "tb"}, "failed"),
-        (harbor_result(reward=1), ["agent/pi.txt"], None, "incomplete"),
-        (harbor_result(reward=1), [], {"collections": []}, "passed"),
-        (harbor_result(reward=0), [], None, "failed"),
+        (harbor_result(), [], "non-result"),
+        (harbor_result(reward=1), ["agent/pi.txt"], "incomplete"),
+        (harbor_result(reward=1), [], "passed"),
+        (harbor_result(reward=0), [], "failed"),
     ],
 )
-def test_derive_status_truth_table(result, missing, snapshot, expected):
-    assert derive_status(result, missing, snapshot) == expected
+def test_derive_status_truth_table(result, missing, expected):
+    assert derive_status(result, missing) == expected
 
 
-def test_finalize_records_a_snapshot_stage_failure_as_non_result(tmp_path):
+@pytest.mark.parametrize("stage", ["stack", "app", "snapshot"])
+def test_finalize_records_a_snapshot_error_at_any_stage_as_failed(tmp_path, stage):
+    # A "snapshot"-stage error is what a stopped Weaviate gives a Task with
+    # WEVAL_KEEP_STACK, such as deploy/local-instance.
     trial = tmp_path / "trial"
     (trial / "verifier").mkdir(parents=True)
+    (trial / "agent").mkdir()
+    (trial / "artifacts/submission").mkdir(parents=True)
+    (trial / "agent/oracle.txt").write_text("")
     (trial / "result.json").write_text(json.dumps(harbor_result(reward=0)))
     (trial / "verifier/snapshot.json").write_text(
-        json.dumps({"error": "Traceback: GitHub unreachable", "error_stage": "snapshot"})
+        json.dumps({"error": "Traceback: Connection refused", "error_stage": stage})
     )
+    (trial / "verifier/checks.json").write_text("[]")
 
     record = finalize(trial, TASK_PATH, {"name": "oracle", "harness": "oracle"})
 
-    assert record["status"] == "non-result"
-    assert record["error_stage"] == "snapshot"
+    assert record["status"] == "failed"
+    assert record["error_stage"] == stage
 
 
 def test_finalize_run_records_a_trial_without_result_json(tmp_path, capsys):

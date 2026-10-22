@@ -91,8 +91,13 @@ its workspace must not suggest a data store, as in
 Claude Code Agents are installed from a binary that the host downloads once per
 version and platform, checks against the release manifest's SHA-256, and keeps
 gzipped (about 110 MB each) in `~/.cache/weval/claude-code/`, or under
-`$XDG_CACHE_HOME`. Each Trial uploads it, so Trials do not download Claude Code
-themselves.
+`$XDG_CACHE_HOME`, so Trials do not download Claude Code themselves. Before
+Modal Trials start, `weval run` uploads the `linux-x64` binary to the Modal
+Volume `weval-claude-code` if it lacks that version, and each Trial reads it
+from the Volume, mounted read-only at `/opt/weval/claude-code`. A local Trial
+uploads the binary from the host cache instead. Concurrent `weval run`
+processes on one host wait on a lock file in the version's cache directory,
+so only one of them downloads or uploads each binary.
 
 A Task's `environment/` supplies the `Dockerfile` and anything specific to that
 Task. Its optional `docker-compose.yaml` overlay is applied before weval's, for example to add a healthcheck on `main`.
@@ -113,8 +118,9 @@ Each retained Trial directory is Harbor's own output plus weval's
 `incomplete` means an expected log is missing; it is not a scored result.
 `timed-out` means Harbor recorded an agent limit but the verifier still graded
 the submission; the reward is recorded and does not count as `passed`.
-`non-result` names its cause in `exception` or `error_stage`: stage `snapshot`
-is a failure of the verifier's own snapshot work, while a failed `stack` or
-`app` start is the agent's result and scores `failed`.
+`non-result` names its cause in `exception`. A snapshot error scores `failed`
+at any `error_stage`: `stack` and `app` are the agent's submission failing to
+start, and `snapshot` is `snapshot.py` raising, usually on a stack the agent
+left broken.
 Retained logs are evidence: write analysis to separate files rather than
 editing or summarising a log in place.

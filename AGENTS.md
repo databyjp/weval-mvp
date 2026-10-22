@@ -63,8 +63,10 @@ Classify each failure before acting on it:
 - scorer bug: `snapshot.py` or `check.py` misjudged a correct solution;
 - Task defect: the prompt or workspace hid or contradicted a scored
   constraint;
-- infrastructure failure: the environment or the verifier's own snapshot
-  stage prevented a valid outcome. Recorded as a `non-result`, not a finding.
+- infrastructure failure: the environment or Harbor prevented a valid
+  outcome. Recorded as a `non-result`, not a finding. A snapshot error
+  (`error_stage` `stack`, `app`, or `snapshot`) is graded and scores `failed`;
+  classify it like any other failure.
 
 Only scorer bugs and Task defects call for a weval change. Do not loosen a
 check, reword a prompt, or demote a check to make agent Trials pass. Do not

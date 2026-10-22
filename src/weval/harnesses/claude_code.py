@@ -10,10 +10,12 @@ Harbor sets every model alias, including the subagent model, to the Agent's
 ``model``.
 
 Claude Code is installed from a binary the host downloads once per version and
-platform (``CachedClaudeCode``), not by Harbor's per-Trial download.
+platform (``CachedClaudeCode``), not by Harbor's per-Trial download. Modal
+Trials read it from a Modal Volume (``modal_environment``).
 """
 
 import asyncio
+import fcntl
 import gzip
 import hashlib
 import json
@@ -22,12 +24,15 @@ import shlex
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import override
 
+import modal
 from harbor.agents.installed.claude_code import ClaudeCode
 from harbor.environments.base import BaseEnvironment
-from harbor.models.trial.config import AgentConfig
+from harbor.models.trial.config import AgentConfig, EnvironmentConfig
 
 # Relative to the Harbor Trial directory. A missing match marks the Trial incomplete.
 EXPECTED_LOGS = (
@@ -63,14 +68,17 @@ RELEASES = "https://downloads.claude.ai/claude-code-releases"
 # One gzipped binary per version and platform, kept across runs.
 CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "weval/claude-code"
 REMOTE_ARCHIVE = "/tmp/weval-claude.gz"
+# The Modal Volume holds the same layout as CACHE_DIR, mounted read-only at
+# VOLUME_MOUNT in the agent's container.
+VOLUME = "weval-claude-code"
+VOLUME_MOUNT = "/opt/weval/claude-code"
+MODAL_PLATFORM = "linux-x64"
 # The platform names of Claude Code's release manifest, detected as bootstrap.sh does.
 PLATFORM_COMMAND = (
     'case "$(uname -m)" in x86_64|amd64) arch=x64 ;; arm64|aarch64) arch=arm64 ;; *) arch="$(uname -m)" ;; esac; '
     "if [ -f /lib/libc.musl-x86_64.so.1 ] || [ -f /lib/libc.musl-aarch64.so.1 ] "
     "|| ldd /bin/ls 2>&1 | grep -q musl; then echo linux-$arch-musl; else echo linux-$arch; fi"
 )
-# Concurrent Trials in one run share a single download.
-_download_lock = asyncio.Lock()
 
 
 class CachedClaudeCode(ClaudeCode):
@@ -78,9 +86,10 @@ class CachedClaudeCode(ClaudeCode):
 
     Harbor's own install downloads Claude Code from downloads.claude.ai inside
     every Trial, and concurrent Trials on Modal get HTTP 429 from it. This
-    install uploads the binary from ``CACHE_DIR`` instead, downloading it on
-    the host first if needed, then lets Harbor's install confirm the version.
-    The Trial environment gets the same system packages as Harbor's install.
+    install reads the binary from the Modal Volume when it is mounted, and
+    otherwise uploads it from ``CACHE_DIR``, downloading it on the host first
+    if needed. Harbor's install then confirms the version. The Trial
+    environment gets the same system packages as Harbor's install.
     """
 
     @override
@@ -89,10 +98,12 @@ class CachedClaudeCode(ClaudeCode):
             raise ValueError("a Claude Code Agent needs a version to install from the cache")
         await self.ensure_system_dependencies(environment, ("curl", "bash", "nodejs", "npm", "procps"))
         platform = (await environment.exec(command=PLATFORM_COMMAND)).stdout.strip()
-        async with _download_lock:
-            archive = await asyncio.to_thread(cached_binary, self._version, platform)
+        archive = f"{VOLUME_MOUNT}/{shlex.quote(self._version)}/claude-{platform}.gz"
+        if (await environment.exec(command=f"test -f {archive}")).return_code != 0:
+            cached = await asyncio.to_thread(cached_binary, self._version, platform)
+            await self._upload_agent_owned_file(environment, cached, REMOTE_ARCHIVE)
+            archive = REMOTE_ARCHIVE
 
-        await self._upload_agent_owned_file(environment, archive, REMOTE_ARCHIVE)
         # As bootstrap.sh does, the binary's own `claude install` links
         # ~/.local/bin/claude and writes ~/.claude.json (native install, auto-updates
         # off). It finds the requested version already in place, so it downloads nothing.
@@ -101,7 +112,7 @@ class CachedClaudeCode(ClaudeCode):
             environment,
             command=(
                 "set -eu; mkdir -p ~/.local/share/claude/versions; "
-                f"gunzip -c {REMOTE_ARCHIVE} > {binary}; chmod +x {binary}; rm -f {REMOTE_ARCHIVE}; "
+                f"gunzip -c {archive} > {binary}; chmod +x {binary}; rm -f {REMOTE_ARCHIVE}; "
                 f"{binary} install {shlex.quote(self._version)}; "
                 "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc"
             ),
@@ -110,30 +121,76 @@ class CachedClaudeCode(ClaudeCode):
         await super().install(environment)
 
 
+def modal_environment(agent: dict, environment: EnvironmentConfig) -> EnvironmentConfig:
+    """Return ``environment`` with the ``VOLUME`` Modal Volume mounted
+    read-only at ``VOLUME_MOUNT`` in the agent's container, after uploading
+    the Agent's ``linux-x64`` binary to it if the Volume lacks it."""
+    publish_to_volume(agent["version"])
+    # Harbor binds a mount's target path on the sandbox VM, where Modal mounts the Volume.
+    mount = {"type": "bind", "source": VOLUME_MOUNT, "target": VOLUME_MOUNT, "read_only": True}
+    return environment.model_copy(update={
+        "kwargs": {**environment.kwargs, "volumes": {VOLUME_MOUNT: VOLUME}},
+        "mounts": [*(environment.mounts or []), mount],
+    })
+
+
+def publish_to_volume(version: str) -> None:
+    """Upload ``version``'s ``MODAL_PLATFORM`` binary from the host cache to
+    the ``VOLUME`` Modal Volume, creating the Volume if needed. Does nothing
+    when the Volume already holds it."""
+    # Before any sandbox starts: a running sandbox does not see later uploads.
+    volume = modal.Volume.from_name(VOLUME, create_if_missing=True)
+    remote = f"{version}/claude-{MODAL_PLATFORM}.gz"
+    with _host_lock(version, "volume"):
+        try:
+            if any(entry.path.strip("/") == remote for entry in volume.listdir(version)):
+                return
+        except modal.exception.NotFoundError:
+            pass
+        try:
+            with volume.batch_upload() as batch:
+                batch.put_file(cached_binary(version, MODAL_PLATFORM), f"/{remote}")
+        except FileExistsError:
+            pass  # A run on another host uploaded it first.
+
+
 def cached_binary(version: str, platform: str) -> Path:
     """Return the gzipped Claude Code binary for ``version`` and ``platform``
     (a release-manifest name such as ``linux-x64``), downloading it into
     ``CACHE_DIR`` and checking it against the manifest's SHA-256 first if
-    it is not cached."""
+    it is not cached. Concurrent callers on this host wait for one download."""
     archive = CACHE_DIR / version / f"claude-{platform}.gz"
-    if archive.exists():
+    with _host_lock(version, "download"):
+        if archive.exists():
+            return archive
+
+        manifest = json.loads(_fetch(f"{RELEASES}/{version}/manifest.json"))
+        if platform not in manifest["platforms"]:
+            raise ValueError(f"Claude Code {version} has no {platform!r} build")
+        binary = _fetch(f"{RELEASES}/{version}/{platform}/claude")
+        expected = manifest["platforms"][platform]["checksum"]
+        if hashlib.sha256(binary).hexdigest() != expected:
+            raise RuntimeError(f"Claude Code {version} {platform} does not match the manifest checksum")
+
+        # Written under another name first so an interrupted write is never taken as cached.
+        partial = archive.with_name(archive.name + ".partial")
+        with gzip.open(partial, "wb", compresslevel=6) as file:
+            file.write(binary)
+        partial.replace(archive)
         return archive
 
-    manifest = json.loads(_fetch(f"{RELEASES}/{version}/manifest.json"))
-    if platform not in manifest["platforms"]:
-        raise ValueError(f"Claude Code {version} has no {platform!r} build")
-    binary = _fetch(f"{RELEASES}/{version}/{platform}/claude")
-    expected = manifest["platforms"][platform]["checksum"]
-    if hashlib.sha256(binary).hexdigest() != expected:
-        raise RuntimeError(f"Claude Code {version} {platform} does not match the manifest checksum")
 
-    archive.parent.mkdir(parents=True, exist_ok=True)
-    # Written under another name first so an interrupted write is never taken as cached.
-    partial = archive.with_name(archive.name + ".partial")
-    with gzip.open(partial, "wb", compresslevel=6) as file:
-        file.write(binary)
-    partial.replace(archive)
-    return archive
+@contextmanager
+def _host_lock(version: str, name: str) -> Iterator[None]:
+    """Hold ``CACHE_DIR/<version>/<name>.lock`` exclusively against every
+    other process and thread on this host."""
+    # flock locks belong to the open file, so separate opens exclude each other
+    # within one process too, and the OS releases a dead holder's lock.
+    lock = CACHE_DIR / version / f"{name}.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock, "w") as file:
+        fcntl.flock(file, fcntl.LOCK_EX)
+        yield
 
 
 def _fetch(url: str, retries: int = 2) -> bytes:

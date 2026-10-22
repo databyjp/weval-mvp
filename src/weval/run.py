@@ -118,6 +118,12 @@ def run(
     scenario = task_dir.name if prompt_variant == "default" else f"{task_dir.name}@{prompt_variant}"
     run_name = f"{stamp}__{task_dir.parent.name}__{scenario}__{agent_name}"
     run_dir = ROOT / "experiment-outputs" / run_name
+    environment = (LOCAL if local else MODAL).model_copy(
+        update={"extra_docker_compose": compose_overlays(task_dir)}
+    )
+    # Before the run directory exists, so a failed preparation leaves no empty run.
+    if not local and hasattr(harness, "modal_environment"):
+        environment = harness.modal_environment(agent, environment)
     package_task(task_dir, run_dir / "task", prompt_variant)
     config = JobConfig(
         job_name="job",
@@ -126,9 +132,7 @@ def run(
         agents=[harness.agent_config(agent)],
         n_attempts=attempts,
         n_concurrent_trials=attempts,
-        environment=(LOCAL if local else MODAL).model_copy(
-            update={"extra_docker_compose": compose_overlays(task_dir)}
-        ),
+        environment=environment,
     )
     try:
         asyncio.run(_run_job(config))
@@ -181,20 +185,19 @@ def finalize_run(
         print(f"WARNING: {attempts} Trials requested, {len(trial_dirs)} found under {run_dir / 'job'}")
 
 
-def derive_status(result: dict, missing: list[str], snapshot: dict | None) -> str:
+def derive_status(result: dict, missing: list[str]) -> str:
     """Classify one Trial by whose outcome it records (statuses: docs/reference.md).
 
-    Only ``error_stage`` ``"snapshot"`` is an infrastructure failure; a failed
-    start of the agent's own stack or app (``"stack"``/``"app"``) is the
-    agent's result and scores ``failed``.
+    The snapshot plays no part: a snapshot error at any ``error_stage`` was
+    graded, so it scores ``failed``. A ``snapshot``-stage error usually means
+    the agent left its stack broken; a scorer bug is told apart when the
+    failure is classified.
     """
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
     if "reward" not in rewards:
         return "non-result"
     if result.get("exception_info"):
         return "timed-out"
-    if (snapshot or {}).get("error_stage") == "snapshot":
-        return "non-result"
     if missing:
         return "incomplete"
     return "passed" if rewards["reward"] == 1 else "failed"
@@ -206,8 +209,8 @@ def finalize(trial_dir: Path, task_path: Path, agent: dict, prompt_variant: str 
     ``task_path`` is recorded as given; ``run()`` passes it relative to the
     repository root.
 
-    Status comes from ``derive_status`` over Harbor's ``result.json``, the
-    missing-log list, and the retained snapshot.
+    Status comes from ``derive_status`` over Harbor's ``result.json`` and the
+    missing-log list.
     """
     harness = HARNESSES[agent["harness"]]
     result = json.loads((trial_dir / "result.json").read_text())
@@ -218,7 +221,7 @@ def finalize(trial_dir: Path, task_path: Path, agent: dict, prompt_variant: str 
     snapshot = json.loads(snapshot_file.read_text()) if snapshot_file.exists() else None
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
     record = {
-        "status": derive_status(result, missing, snapshot),
+        "status": derive_status(result, missing),
         "task": str(task_path),
         "prompt_variant": prompt_variant,
         "agent": harness.agent_record(agent),

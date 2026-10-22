@@ -116,9 +116,9 @@ def main() -> None:
     has_stack = (APP_DIR / "docker-compose.yaml").exists()
     start_app = os.environ.get("WEVAL_START_APP") == "1"
     app = None
-    # The stage tells the host whose failure this is: "stack" and "app" are
-    # the agent's own submission failing to start; "snapshot" is this
-    # verifier's work, an infrastructure failure, not the agent's result.
+    # The stage records where the failure happened: "stack" and "app" are the
+    # agent's submission failing to start; "snapshot" is snapshot.py raising,
+    # usually on the agent's broken stack, sometimes on a scorer bug.
     stage = "stack"
     try:
         if has_stack and not keep_stack:

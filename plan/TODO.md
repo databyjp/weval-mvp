@@ -85,6 +85,25 @@ Later: vague questions here can measure uplift from skills as a Treatment.
   OpenRouter billed $0.04. Compute cost from the token breakdown and
   OpenRouter's prices, or fetch it from OpenRouter.
 
+## Claude Code binary on GitHub Actions runners
+
+Modal Trials read Claude Code from the `weval-claude-code` Volume. If Trials
+run with `--local` on GitHub Actions runners, keep the host cache between
+workflow runs instead, so runners do not download from `downloads.claude.ai`:
+
+- add an `actions/cache` step for `~/.cache/weval/claude-code`, keyed on
+  `hashFiles('agents.toml')`;
+- check that the runner has the memory for Harbor's `apt-get install nodejs
+  npm procps`, which exited 137 in a local Trial on a laptop;
+- download once per workflow: the host lock in `cached_binary` does not reach
+  across matrix jobs, and `actions/cache` saves only when a job ends. Add a
+  `weval prepare` command (download every version in `agents.toml`, and
+  publish it to the Volume for Modal runs) and run it in a setup job that the
+  matrix jobs list under `needs:`.
+
+An Experiment runner, when one exists, should call the same preparation once
+before it starts its runs.
+
 ## Compare docs-site versions
 
 Run Tasks against different versions of the docs site to see whether changes
