@@ -20,6 +20,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import shlex
 import time
 import urllib.error
@@ -39,6 +40,20 @@ EXPECTED_LOGS = (
     "agent/claude-code.txt",
     "agent/sessions/projects/*/*.jsonl",
 )
+# USD per million tokens, by modelUsage field, from OpenRouter's model list on
+# 2026-10-22 (cache writes at the 5-minute rate). Claude Code's own costUSD uses
+# other prices, and has none for Haiku 5.5. WebFetch summarises pages with
+# Haiku 4.5 whatever the Agent's model.
+PRICES = {
+    "claude-haiku-5-5": {"inputTokens": 0.10, "outputTokens": 0.50,
+                         "cacheReadInputTokens": 0.01, "cacheCreationInputTokens": 0.125},
+    "claude-sonnet-5-5": {"inputTokens": 2.00, "outputTokens": 10.00,
+                          "cacheReadInputTokens": 0.10, "cacheCreationInputTokens": 2.50},
+    "claude-opus-5-5": {"inputTokens": 4.00, "outputTokens": 20.00,
+                        "cacheReadInputTokens": 0.20, "cacheCreationInputTokens": 5.00},
+    "claude-haiku-4-5": {"inputTokens": 1.00, "outputTokens": 5.00,
+                         "cacheReadInputTokens": 0.10, "cacheCreationInputTokens": 1.25},
+}
 
 
 def agent_config(agent: dict) -> AgentConfig:
@@ -220,9 +235,9 @@ def token_usage(trial_dir: Path) -> dict:
     separate requests in which ``WebFetch`` summarises each page. Field names
     match ``weval.json``'s: ``n_input_tokens`` includes cache reads and cache
     writes, which ``n_cache_tokens`` and ``n_cache_creation_tokens`` break out.
-    ``cost_usd`` is ``None`` when Claude Code has no price for a model, as for
-    OpenRouter model names. Returns ``{}``, keeping Harbor's figures, when
-    there is no ``result`` event.
+    ``cost_usd`` is an estimate from ``PRICES``, and ``None`` when a model
+    has no entry there. Returns ``{}``, keeping Harbor's figures, when there
+    is no ``result`` event.
     """
     log = trial_dir / "agent/claude-code.txt"
     lines = log.read_text().splitlines() if log.exists() else []
@@ -241,6 +256,21 @@ def token_usage(trial_dir: Path) -> dict:
         "n_cache_tokens": total("cacheReadInputTokens"),
         "n_cache_creation_tokens": total("cacheCreationInputTokens"),
         "n_output_tokens": total("outputTokens"),
-        "cost_usd": None if any(m.get("costBasis") == "unknown" for m in models)
-        else sum(m.get("costUSD", 0) for m in models),
+        "cost_usd": cost_usd(result["modelUsage"]),
     }
+
+
+def cost_usd(model_usage: dict) -> float | None:
+    """Estimate the OpenRouter cost of one Trial's ``modelUsage`` from
+    ``PRICES``; ``None`` when any model has no entry. Haiku 5.5's higher
+    rate for prompts over 100k tokens is not applied, so its estimate is a
+    lower bound."""
+    cost = 0.0
+    for name, usage in model_usage.items():
+        # Keys are OpenRouter names in older Trials, e.g.
+        # "anthropic/claude-haiku-5.5", and dated Anthropic IDs in newer ones.
+        model = re.sub(r"^anthropic/|-\d{8}$", "", usage.get("canonicalModel", name)).replace(".", "-")
+        if model not in PRICES:
+            return None
+        cost += sum(usage.get(field, 0) * price for field, price in PRICES[model].items()) / 1e6
+    return cost

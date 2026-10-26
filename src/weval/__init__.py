@@ -15,6 +15,7 @@ def main() -> None:
     run_parser.add_argument(
         "--prompt-variant", default="default", help="prompt variant: a file name in the Task's prompts/, without .md"
     )
+    run_parser.add_argument("--treatment", help="Treatment: a directory name in treatments/ (default: none, a baseline)")
     check_parser = commands.add_parser("check", help="re-score a retained Trial's snapshot")
     check_parser.add_argument("trial", type=Path, help="Harbor Trial directory")
     check_parser.add_argument("--task", type=Path, help="Task directory (default: from weval.json)")
@@ -34,7 +35,10 @@ def main() -> None:
     from weval.run import rescore, run
 
     if args.command == "run":
-        print(run(args.task, args.agent, args.n, local=args.local, prompt_variant=args.prompt_variant))
+        print(run(
+            args.task, args.agent, args.n,
+            local=args.local, prompt_variant=args.prompt_variant, treatment=args.treatment,
+        ))
     else:
         for r in rescore(args.trial, args.task):
             status = "PASS" if r["passed"] else "FAIL"

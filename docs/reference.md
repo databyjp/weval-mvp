@@ -64,6 +64,20 @@ check functions scored after the shared `REQUIRED` and `PREFERRED` lists.
 files in `prompts/`. A snapshot without `prompt_variant` is scored as
 `default`.
 
+## Treatments
+
+A Treatment is a directory `treatments/<treatment>/` whose `skills/` holds one
+subdirectory per skill, each with a `SKILL.md`. Its `README.md` states the
+experimental question and is not given to the Agent.
+`weval run --treatment <treatment>` copies the directory to the run
+directory's `treatment/`, passes the copy's `skills/` to Harbor as the Agent's
+skills, records the name in each Trial's `weval.json` as `treatment`, and adds
+`+<treatment>` to the run directory's Agent part. Harbor installs the skills
+where the harness looks for them: `$CLAUDE_CONFIG_DIR/skills/` for Claude Code
+and `~/.agents/skills/` for Pi. They are not in `/app`, so they are not in
+`artifacts/submission/`. An unknown Treatment fails before anything runs.
+Without `--treatment`, a Trial is a baseline and `treatment` is `null`.
+
 ## Trial environment
 
 Every Trial environment's `main` service, where the agent works, gets these
@@ -109,7 +123,7 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is `null` because it has no price for OpenRouter model names. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, the Treatment, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
 | `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |

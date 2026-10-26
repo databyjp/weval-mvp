@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from weval.harnesses import claude_code
 from weval.run import (
     ROOT,
     SHARED_COMPOSE,
@@ -17,6 +18,7 @@ from weval.run import (
     finalize_run,
     package_task,
     rescore,
+    treatment_skills,
 )
 
 TASK_PATH = Path("tasks/resolve/sku-search")
@@ -75,6 +77,7 @@ def test_finalize_records_usage_from_result_and_trajectory(tmp_path):
 def test_finalize_takes_claude_code_tokens_from_its_model_usage(tmp_path):
     # Figures from Trial 20261016-105100 (claude-code-haiku-5.5): Harbor's
     # counts miss the requests in which WebFetch summarises each page.
+    # OpenRouter billed $0.04 for it.
     trial = tmp_path / "trial"
     (trial / "agent").mkdir(parents=True)
     (trial / "result.json").write_text(json.dumps({"agent_result": {
@@ -93,8 +96,25 @@ def test_finalize_takes_claude_code_tokens_from_its_model_usage(tmp_path):
     assert {k: usage[k] for k in ("n_input_tokens", "n_cache_tokens", "n_cache_creation_tokens",
                                   "n_output_tokens", "cost_usd")} == {
         "n_input_tokens": 601577, "n_cache_tokens": 383347, "n_cache_creation_tokens": 54342,
-        "n_output_tokens": 35401, "cost_usd": None,
+        "n_output_tokens": 35401, "cost_usd": pytest.approx(0.0447155),
     }
+
+
+def test_claude_code_cost_covers_the_webfetch_model_and_rejects_unpriced_ones():
+    # Figures from Trial 20261021-010554 (claude-code-sonnet-5.5): WebFetch's
+    # summaries ran on Haiku 4.5, under a dated key.
+    model_usage = {
+        "claude-sonnet-5-5": {
+            "inputTokens": 12, "outputTokens": 3375, "cacheReadInputTokens": 104873,
+            "cacheCreationInputTokens": 11876, "canonicalModel": "claude-sonnet-5-5",
+        },
+        "claude-haiku-4-5-20251001": {
+            "inputTokens": 135580, "outputTokens": 2573, "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0, "canonicalModel": "claude-haiku-4-5",
+        },
+    }
+    assert claude_code.cost_usd(model_usage) == pytest.approx(0.2223963)
+    assert claude_code.cost_usd(model_usage | {"claude-unpriced": {"inputTokens": 1}}) is None
 
 
 def test_package_task_uses_the_prompt_variant_and_tells_the_verifier(tmp_path):
@@ -124,6 +144,21 @@ def test_package_task_rejects_an_unknown_prompt_variant(tmp_path):
     with pytest.raises(FileNotFoundError, match="no-such-prompt-variant"):
         package_task(PROMPT_VARIANT_TASK, tmp_path / "package", "no-such-prompt-variant")
     assert not (tmp_path / "package").exists()
+
+
+def test_treatment_skills_rejects_an_unknown_treatment():
+    with pytest.raises(FileNotFoundError, match="no-such-treatment"):
+        treatment_skills("no-such-treatment")
+
+
+def test_finalize_records_the_treatment(tmp_path):
+    trial = tmp_path / "trial"
+    trial.mkdir()
+    (trial / "result.json").write_text(json.dumps({"verifier_result": {"rewards": {"reward": 1}}}))
+    oracle = {"name": "oracle", "harness": "oracle"}
+
+    assert finalize(trial, TASK_PATH, oracle)["treatment"] is None
+    assert finalize(trial, TASK_PATH, oracle, treatment="weaviate-docs")["treatment"] == "weaviate-docs"
 
 
 def harbor_result(reward: int | None = None, exception: bool = False) -> dict:

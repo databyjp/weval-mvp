@@ -59,7 +59,7 @@ class RunSummary:
 
     ``task``, ``prompt_variant``, ``treatment``, and ``agent`` come from the
     first Trial's ``weval.json``, or from the run directory name when no Trial
-    has one. ``treatment`` is blank until runs record one.
+    has one. ``treatment`` is blank for a baseline run.
     """
 
     path: Path
@@ -138,8 +138,7 @@ def summarise_run(run_dir: Path) -> RunSummary:
         treatment = first.get("treatment") or ""
         agent = (first.get("agent") or {}).get("name", "")
     else:
-        task, prompt_variant, agent = _parse_run_name(run_dir.name)
-        treatment = ""
+        task, prompt_variant, agent, treatment = _parse_run_name(run_dir.name)
     config = _read_json(run_dir / "job/config.json") or {}
     environment_type = (config.get("environment") or {}).get("type", "")
     return RunSummary(
@@ -288,16 +287,17 @@ def _parse_stamp(run_name: str) -> datetime | None:
         return None
 
 
-def _parse_run_name(run_name: str) -> tuple[str, str, str]:
-    """Return ``(task, prompt_variant, agent)`` from ``run.py``'s run name,
-    ``<stamp>__<stage>__<scenario>[@<prompt-variant>]__<agent>``; blanks when
-    the name has another form."""
+def _parse_run_name(run_name: str) -> tuple[str, str, str, str]:
+    """Return ``(task, prompt_variant, agent, treatment)`` from ``run.py``'s
+    run name, ``<stamp>__<stage>__<scenario>[@<prompt-variant>]__<agent>[+<treatment>]``;
+    blanks when the name has another form."""
     parts = run_name.split("__")
     if len(parts) != 4:
-        return "", "", ""
+        return "", "", "", ""
     _, stage, scenario, agent = parts
     scenario, _, prompt_variant = scenario.partition("@")
-    return f"tasks/{stage}/{scenario}", prompt_variant or "default", agent
+    agent, _, treatment = agent.partition("+")
+    return f"tasks/{stage}/{scenario}", prompt_variant or "default", agent, treatment
 
 
 def _read_json(path: Path) -> dict | None:

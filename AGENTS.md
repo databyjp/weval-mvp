@@ -13,6 +13,8 @@ If subagents are available, use them to run tests or searches unless there is a 
 
 - `tasks/<stage>/<scenario>/`: one Task each (see below).
 - `agents.toml`: named Agents (harness, version, model).
+- `treatments/<treatment>/`: one Treatment each: `skills/` for the Agent and a
+  `README.md` stating its question ([reference](docs/reference.md#treatments)).
 - `src/weval/run.py`: builds the Harbor package, runs it on Modal, writes `weval.json`.
 - `src/weval/report/`: `weval report`, a static site of the Task catalog,
   retained runs, and one page per Trial.
@@ -169,7 +171,7 @@ Before running agents on a new Task:
 ## Running and reading Trials
 
 ```sh
-uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>]
+uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>] [--treatment <treatment>]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 ```
 
@@ -179,7 +181,7 @@ Each Trial directory is Harbor's own output plus `weval.json`. Start there:
 
 - `weval.json`: status (`passed`, `failed`, `incomplete`, `timed-out`,
   `non-result`), the
-  Agent, the prompt variant, missing logs, per-check results, and `usage` (tokens, cost, tool
+  Agent, the prompt variant, the Treatment, missing logs, per-check results, and `usage` (tokens, cost, tool
   calls, URLs, and search queries).
 - `verifier/snapshot.json`, `checks.json`, `test-stdout.txt`,
   `application.log`, `docker-compose.log`.

@@ -2,8 +2,9 @@
 
 Output layout, one directory per invocation::
 
-    experiment-outputs/<timestamp>__<stage>__<scenario>[@<prompt-variant>]__<agent>/
+    experiment-outputs/<timestamp>__<stage>__<scenario>[@<prompt-variant>]__<agent>[+<treatment>]/
         task/                 Harbor task package built from tasks/<stage>/<scenario>/
+        treatment/            copy of treatments/<treatment>/, when given
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
         job/<trial>/weval.json  Agent, status, missing logs, check results
 """
@@ -28,6 +29,7 @@ from weval import verify
 from weval.harnesses import claude_code, oracle, pi
 
 ROOT = Path(__file__).resolve().parents[2]
+TREATMENTS = ROOT / "treatments"
 HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi, "claude-code": claude_code}
 # Appended to every packaged prompt: facts about the Trial environment that no
 # single Task owns.
@@ -96,11 +98,17 @@ def package_task(task_dir: Path, destination: Path, prompt_variant: str = "defau
 
 
 def run(
-    task_dir: Path, agent_name: str, attempts: int = 1, local: bool = False, prompt_variant: str = "default"
+    task_dir: Path,
+    agent_name: str,
+    attempts: int = 1,
+    local: bool = False,
+    prompt_variant: str = "default",
+    treatment: str | None = None,
 ) -> Path:
     """Run ``attempts`` Trials of one Task's prompt variant by one Agent on
     Modal, or on the local Docker daemon when ``local``; return the run
-    directory.
+    directory. With ``treatment``, the Agent gets that Treatment's skills
+    (``treatment_skills``).
 
     Harbor failures inside a Trial are recorded as Non-results in ``weval.json``,
     not raised. Retained files are scrubbed of credential values afterwards,
@@ -113,10 +121,12 @@ def run(
     agents = tomllib.loads((ROOT / "agents.toml").read_text())
     agent = {"name": agent_name, **agents[agent_name]}
     harness = HARNESSES[agent["harness"]]
+    skills = treatment_skills(treatment) if treatment else None
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     # Task and Agent names contain dashes; Harbor's "__" keeps the parts separable.
     scenario = task_dir.name if prompt_variant == "default" else f"{task_dir.name}@{prompt_variant}"
-    run_name = f"{stamp}__{task_dir.parent.name}__{scenario}__{agent_name}"
+    agent_part = agent_name if treatment is None else f"{agent_name}+{treatment}"
+    run_name = f"{stamp}__{task_dir.parent.name}__{scenario}__{agent_part}"
     run_dir = ROOT / "experiment-outputs" / run_name
     environment = (LOCAL if local else MODAL).model_copy(
         update={"extra_docker_compose": compose_overlays(task_dir)}
@@ -125,11 +135,16 @@ def run(
     if not local and hasattr(harness, "modal_environment"):
         environment = harness.modal_environment(agent, environment)
     package_task(task_dir, run_dir / "task", prompt_variant)
+    agent_config = harness.agent_config(agent)
+    if skills:
+        # Harbor installs the retained copy, so the run keeps the skills its Trials had.
+        shutil.copytree(skills.parent, run_dir / "treatment", ignore=shutil.ignore_patterns(".*"))
+        agent_config.skills = [str(run_dir / "treatment/skills")]
     config = JobConfig(
         job_name="job",
         jobs_dir=run_dir,
         tasks=[TaskConfig(path=run_dir / "task")],
-        agents=[harness.agent_config(agent)],
+        agents=[agent_config],
         n_attempts=attempts,
         n_concurrent_trials=attempts,
         environment=environment,
@@ -137,9 +152,20 @@ def run(
     try:
         asyncio.run(_run_job(config))
     finally:
-        finalize_run(run_dir, task_path, agent, attempts, prompt_variant)
+        finalize_run(run_dir, task_path, agent, attempts, prompt_variant, treatment)
         redact(run_dir)
     return run_dir
+
+
+def treatment_skills(treatment: str) -> Path:
+    """Return ``treatments/<treatment>/skills/``, whose subdirectories each
+    hold one skill's ``SKILL.md``; Harbor installs them for the Agent's
+    harness. Raises ``FileNotFoundError`` when the directory is missing, and
+    Harbor fails each Trial when a subdirectory has no ``SKILL.md``."""
+    skills = TREATMENTS / treatment / "skills"
+    if not skills.is_dir():
+        raise FileNotFoundError(f"no skills for Treatment {treatment!r}: {skills}")
+    return skills
 
 
 def compose_overlays(task_dir: Path) -> list[Path]:
@@ -157,7 +183,12 @@ async def _run_job(config: JobConfig) -> None:
 
 
 def finalize_run(
-    run_dir: Path, task_path: Path, agent: dict, attempts: int, prompt_variant: str = "default"
+    run_dir: Path,
+    task_path: Path,
+    agent: dict,
+    attempts: int,
+    prompt_variant: str = "default",
+    treatment: str | None = None,
 ) -> None:
     """Record every Trial directory under ``run_dir/job`` and print its status.
 
@@ -169,12 +200,13 @@ def finalize_run(
     trial_dirs = sorted(path for path in (run_dir / "job").glob("*") if path.is_dir())
     for trial_dir in trial_dirs:
         if (trial_dir / "result.json").exists():
-            record = finalize(trial_dir, task_path, agent, prompt_variant)
+            record = finalize(trial_dir, task_path, agent, prompt_variant, treatment)
         else:
             record = {
                 "status": "non-result",
                 "task": str(task_path),
                 "prompt_variant": prompt_variant,
+                "treatment": treatment,
                 "agent": HARNESSES[agent["harness"]].agent_record(agent),
                 "reward": None,
                 "exception": "result.json never written",
@@ -203,11 +235,17 @@ def derive_status(result: dict, missing: list[str]) -> str:
     return "passed" if rewards["reward"] == 1 else "failed"
 
 
-def finalize(trial_dir: Path, task_path: Path, agent: dict, prompt_variant: str = "default") -> dict:
+def finalize(
+    trial_dir: Path,
+    task_path: Path,
+    agent: dict,
+    prompt_variant: str = "default",
+    treatment: str | None = None,
+) -> dict:
     """Write and return ``weval.json`` for one Harbor Trial directory.
 
     ``task_path`` is recorded as given; ``run()`` passes it relative to the
-    repository root.
+    repository root. ``treatment`` is ``None`` for a baseline Trial.
 
     Status comes from ``derive_status`` over Harbor's ``result.json`` and the
     missing-log list.
@@ -224,6 +262,7 @@ def finalize(trial_dir: Path, task_path: Path, agent: dict, prompt_variant: str 
         "status": derive_status(result, missing),
         "task": str(task_path),
         "prompt_variant": prompt_variant,
+        "treatment": treatment,
         "agent": harness.agent_record(agent),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),

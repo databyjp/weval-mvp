@@ -99,6 +99,15 @@ def test_run_without_records_is_listed_from_its_name(tmp_path):
     assert run.scored == []
 
 
+def test_treatment_run_without_records_is_listed_from_its_name(tmp_path):
+    run_dir = tmp_path / f"{RUN}+weaviate-docs"
+    write_trial(run_dir, "t1", None)
+
+    [run] = collect_runs(tmp_path)
+
+    assert (run.agent, run.treatment) == ("pi-glm-5.3-flash", "weaviate-docs")
+
+
 def test_task_definition_reads_prompts_checks_and_page(tmp_path):
     [task] = collect_tasks(write_task(tmp_path, CHECKS))
 

@@ -76,14 +76,8 @@ Observed in the first three local Pi Trials
   answer against the docs, including `llms.txt`; where pages disagree, that
   is a possible Weaviate gap.
 
-Later: vague questions here can measure uplift from skills as a Treatment.
-
-## Claude Code usage figures
-
-- Token counts now come from Claude Code's `modelUsage`. `cost_usd` is
-  `null`: Claude Code's estimate for Trial `20261016-105100` was $2.24, and
-  OpenRouter billed $0.04. Compute cost from the token breakdown and
-  OpenRouter's prices, or fetch it from OpenRouter.
+The `weaviate-docs` Treatment measures token use here. Answer criteria are
+still needed so a cheaper Trial with wrong answers does not count as uplift.
 
 ## Claude Code binary on GitHub Actions runners
 
