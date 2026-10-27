@@ -28,12 +28,12 @@ sources below before writing configuration.
 ## Collections and vectors
 
 - Define collections and the data schema explicitly rather than relying on auto-schema.
-- If a use case involves many identical sub-collections with the same data schema,
-  such as a SaaS product with many end users.
 - Consider what might be the optimal index type, and configuration.
-  For example, Weaviate now offers "HFresh" index type, which is a disk-based index with a much smaller footprint.
-  And there is a new filtering algorithm called PathSeer (https://weaviate.io/blog/pathseer-filtered-vector-search)
-  which proves to be very performant in a variety of situations.
+  For example, the "HFresh" index type
+  (https://docs.weaviate.io/weaviate/config-refs/indexing/vector-index) is a disk-based index with a much smaller footprint.
+  From Weaviate 1.40 and Python client 4.24, the HNSW index also offers the PathSeer filter strategy
+  (`filter_strategy=VectorFilterStrategy.PATHSEER`; the default remains ACORN), which was the fastest
+  on almost every workload in Weaviate's benchmark (https://weaviate.io/blog/pathseer-filtered-vector-search).
   This is in addition to various quantization options, and other index settings.
   Look to research various options, and formulate a set of options that would suit the user's stated goals.
   If insufficient information is available, look to establish a balanced set of options that don't lead to
@@ -85,16 +85,17 @@ client.collections.create(
 
 ## Import
 
-- Where the server supports it, use server-side batching
+- From Weaviate 1.36, use server-side batching
   (see https://docs.weaviate.io/weaviate/manage-objects/import#server-side-batching):
-   ```python
-   with collection.batch.stream() as batch:
-    for data_row in data_rows:
-        batch.add_object(
-            properties=data_row,
-        )
-    ```
-- Import with a batch context: `collection.batch.dynamic()` or
+
+  ```python
+  with collection.batch.stream() as batch:
+      for data_row in data_rows:
+          batch.add_object(
+              properties=data_row,
+          )
+  ```
+- Otherwise, import with a batch context: `collection.batch.dynamic()` or
   `collection.batch.fixed_size(batch_size=...)`. After the context exits,
   read `collection.batch.failed_objects`; batch errors do not raise.
 - Give objects deterministic UUIDs (`weaviate.util.generate_uuid5(key)`) so
@@ -115,8 +116,10 @@ client.collections.create(
 
 ## Operations
 
-- Multi-tenancy (`Configure.multi_tenancy(enabled=True)`) isolates tenants'
-  data in one collection; enable it at creation.
+- When a use case needs many identical sub-collections with the same data
+  schema, such as one per end user of a SaaS product, use multi-tenancy
+  (`Configure.multi_tenancy(enabled=True)`). It isolates tenants' data in
+  one collection; enable it at creation.
 - Vector compression (`quantizer=Configure.VectorIndex.Quantizer.rq()` on a
   `Configure.Vectors` entry, or `pq`, `bq`, `sq`) reduces memory use for
   large collections.
