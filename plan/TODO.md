@@ -42,6 +42,11 @@ works for this Task) and read their `usage` in `weval.json`. The spec is
 Answer criteria cover the versions and the vector configuration API; see the
 Task page. Still open:
 
+- Maintainer: write a canonical solution, the answers a Weaviate expert
+  would give for each item, to replace the Oracle's for scoring.
+- Add an LLM-as-a-judge helper that compares an agent's answers with the
+  canonical solution, for items a regex can't score, such as
+  `current-vector-config` and the unscored `deployment` and `search`.
 - Criteria for `deployment` and `search`. Candidate expected answers are in
   the Task page's Calibration table, and need re-checking against the docs
   first.
