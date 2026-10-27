@@ -2,18 +2,15 @@
 
 Remaining work, roughly in order. Delete items when done.
 
-## Re-score retained Trials
+## Re-score tooling
 
-- Run `uv run weval check` on every retained Trial in `experiment-outputs/`
-  against the current checks. Retained Pi Trials of `resolve/sku-search` will
-  mostly fail now that `sku-field-tokenization` is REQUIRED.
-- Classify each failure as an agent gap, Weaviate gap, scorer bug, or Task
-  defect (`AGENTS.md`, "Failed checks are findings").
-- Write the results to a separate analysis file, never into the retained
-  Trial. `weval check` only prints, so the file records the date and the
-  commit whose `check.py` scored each Trial.
-- If re-scoring becomes routine, consider having `weval check` print the
-  commit and date itself.
+- `weval check` only prints, so re-score results live in analysis files that
+  record the date and commit (`analysis/2026-10-27-rescore.md`). If
+  re-scoring becomes routine, consider having `weval check` print the commit
+  and date itself, or write a file the report can read.
+- The four `investigate/stack-recommendation` Trials record a Task path that
+  no longer exists; re-score them with
+  `--task tasks/investigate/db-recommendation`.
 
 ## Generate the Task catalog
 
@@ -42,12 +39,12 @@ Built, and the Oracle passes on local Docker. Next: run Pi Trials (`--local`
 works for this Task) and read their `usage` in `weval.json`. The spec is
 `docs/tasks/investigate/current-practices.md`.
 
-Deferred until the observation layer has been seen working in real Trials:
+Answer criteria cover the versions and the vector configuration API; see the
+Task page. Still open:
 
-- Criteria for each answer. Candidate expected answers are in the Task
-  page's Calibration table.
-- Whether each answer must cite a canonical domain (`docs.weaviate.io`,
-  `weaviate.io`, `github.com/weaviate`, `pypi.org`).
+- Criteria for `deployment` and `search`. Candidate expected answers are in
+  the Task page's Calibration table, and need re-checking against the docs
+  first.
 - Checks over the logs, such as "the agent fetched the page it cited". These
   need host-side scoring in `finalize()`, which makes `weval.json` the
   authoritative result and can disagree with Harbor's in-environment reward.
@@ -76,8 +73,8 @@ Observed in the first three local Pi Trials
   answer against the docs, including `llms.txt`; where pages disagree, that
   is a possible Weaviate gap.
 
-The `weaviate-docs` Treatment measures token use here. Answer criteria are
-still needed so a cheaper Trial with wrong answers does not count as uplift.
+The `weaviate-docs` Treatment measures token use here, with the REQUIRED
+answer checks as a correctness guard.
 
 ## Claude Code binary on GitHub Actions runners
 
