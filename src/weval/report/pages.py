@@ -418,8 +418,10 @@ def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
                          if arm_runs else '<span class="muted">none</span>')
             # The Treatment row notes each usage mean's change from the baseline.
             reference = baseline_trials if i else None
-            identity = "" if i else "".join(f'<td rowspan="2">{escape(value)}</td>' for value in (
-                comparison.treatment, _task_name(comparison.task), comparison.prompt_variant, comparison.agent))
+            identity = "" if i else "".join(f'<td rowspan="2">{value}</td>' for value in (
+                escape(comparison.treatment) + _version_note(comparison.treatment_version),
+                escape(_task_name(comparison.task)) + _version_note(comparison.task_version, comparison.check_version),
+                escape(comparison.prompt_variant), escape(comparison.agent)))
             cells = [
                 (escape(arm), ""), (runs_cell, len(arm_runs)),
                 _fraction(passed, len(scored), "--bar-required"),
@@ -433,14 +435,21 @@ def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
                 _cell(*cell, css=css) for cell, (_, css) in zip(cells, columns[4:])) + "</tr>")
         bodies.append(f"<tbody>{''.join(rows)}</tbody>")
     return f"""
-<p class="intro">Each Treatment's runs beside the baseline runs of the same Task, prompt variant, and Agent.
-Each arm pools its runs' scored Trials with the check results recorded when they ran, so after a change to a
-Task's checks, compare only runs scored by the same checks. Usage is the mean per Trial; the Treatment row notes
-its change from the baseline.</p>
+<p class="intro">Each Treatment version's runs beside the baseline runs of the same Task, prompt variant, and Agent
+that ran the same Task and check versions (fingerprints in <code>weval.json</code>). Runs recorded without
+fingerprints are compared only with each other. Usage is the mean per Trial; the Treatment row notes its change
+from the baseline.</p>
 <div class="wrap"><table id="treatments-table" class="rows">
 <thead><tr>{header}</tr></thead>
 {"".join(bodies)}
 </table></div>"""
+
+
+def _version_note(*versions: str | None) -> str:
+    """Short fingerprints as a note under a Treatments-tab cell, or "unversioned"."""
+    if not any(versions):
+        return ' <span class="note">unversioned</span>'
+    return f' <span class="note mono">{" · ".join(escape(v[:8]) for v in versions if v)}</span>'
 
 
 def _usage_mean(

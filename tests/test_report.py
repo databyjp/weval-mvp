@@ -133,6 +133,33 @@ def test_treatment_without_a_baseline_run_has_an_empty_baseline(tmp_path):
     assert comparison.baseline == []
 
 
+def test_treatment_runs_are_paired_only_with_baselines_of_the_same_task_and_check_versions(tmp_path):
+    def versioned(treatment: str | None, task: str, check: str, treatment_version: str | None = None) -> dict:
+        return {**record("passed", preferred_passed=True, cost=0.1), "treatment": treatment,
+                "fingerprints": {"task": task, "check": check, "treatment": treatment_version}}
+
+    runs = {
+        RUN: versioned(None, "task-v1", "check-v1"),
+        RUN.replace("20261020", "20261021"): versioned(None, "task-v1", "check-v2"),
+        RUN.replace("20261020", "20261022"): versioned(None, "task-v2", "check-v1"),
+        RUN.replace("20261020", "20261019"): None,  # unversioned: recorded before fingerprints
+        f"{RUN.replace('20261020', '20261023')}+weaviate-docs": versioned("weaviate-docs", "task-v1", "check-v1", "docs-v1"),
+        f"{RUN.replace('20261020', '20261024')}+weaviate-docs": versioned("weaviate-docs", "task-v1", "check-v1", "docs-v2"),
+        f"{RUN.replace('20261020', '20261018')}+weaviate-docs": None,
+    }
+    for name, weval_record in runs.items():
+        write_trial(tmp_path / name, "t1", weval_record)
+
+    comparisons = compare_treatments(collect_runs(tmp_path))
+
+    assert [(c.treatment_version, c.task_version, c.check_version,
+             [r.path.name[:8] for r in c.baseline], [r.path.name[:8] for r in c.treated]) for c in comparisons] == [
+        (None, None, None, ["20261019"], ["20261018"]),
+        ("docs-v1", "task-v1", "check-v1", ["20261020"], ["20261023"]),
+        ("docs-v2", "task-v1", "check-v1", ["20261020"], ["20261024"]),
+    ]
+
+
 def test_task_definition_reads_prompts_checks_and_page(tmp_path):
     [task] = collect_tasks(write_task(tmp_path, CHECKS))
 
@@ -205,3 +232,4 @@ def test_treatment_runs_are_compared_not_shown_as_the_latest_result(tmp_path):
     treatments = page[page.index('<section class="tab" id="treatments"'):]
     assert '<td data-sort="1.0"' in treatments and '<td data-sort="0.0"' in treatments
     assert '0.300 <span class="note">-25%</span>' in treatments
+    assert '<span class="note">unversioned</span>' in treatments
