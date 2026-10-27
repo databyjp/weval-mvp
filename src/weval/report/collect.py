@@ -77,8 +77,25 @@ class RunSummary:
 
     def mean(self, attribute: str) -> float | None:
         """Mean of a usage field over the Trials that report it."""
-        values = [getattr(t, attribute) for t in self.trials if getattr(t, attribute) is not None]
-        return mean(values) if values else None
+        return mean_usage(self.trials, attribute)
+
+
+@dataclass
+class Comparison:
+    """One Treatment against its baseline for one Task, prompt variant, and Agent.
+
+    ``baseline`` holds that combination's runs without a Treatment and
+    ``treated`` its runs with ``treatment``, each newest first; ``baseline``
+    is empty when no baseline run is retained. The runs are pooled as
+    recorded, so runs scored by different versions of ``check.py`` mix.
+    """
+
+    task: str
+    prompt_variant: str
+    agent: str
+    treatment: str
+    baseline: list[RunSummary]
+    treated: list[RunSummary]
 
 
 @dataclass
@@ -126,6 +143,27 @@ def collect_runs(outputs_dir: Path) -> list[RunSummary]:
     """Summarise every run directory under ``outputs_dir``, newest first."""
     run_dirs = [path for path in outputs_dir.iterdir() if (path / "job").is_dir()]
     return [summarise_run(run_dir) for run_dir in sorted(run_dirs, reverse=True)]
+
+
+def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
+    """One ``Comparison`` per Treatment, Task, prompt variant, and Agent with
+    a Treatment run, sorted by those fields."""
+    groups: dict[tuple[str, str, str, str], list[RunSummary]] = {}
+    for run in runs:
+        groups.setdefault((run.task, run.prompt_variant, run.agent, run.treatment), []).append(run)
+    return [
+        Comparison(task, prompt_variant, agent, treatment,
+                   baseline=groups.get((task, prompt_variant, agent, ""), []), treated=treated)
+        for (task, prompt_variant, agent, treatment), treated in sorted(
+            groups.items(), key=lambda item: (item[0][3], *item[0][:3]))
+        if treatment
+    ]
+
+
+def mean_usage(trials: list[TrialSummary], attribute: str) -> float | None:
+    """Mean of a usage field over the ``trials`` that report it."""
+    values = [getattr(t, attribute) for t in trials if getattr(t, attribute) is not None]
+    return mean(values) if values else None
 
 
 def summarise_run(run_dir: Path) -> RunSummary:

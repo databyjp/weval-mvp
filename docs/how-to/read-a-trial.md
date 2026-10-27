@@ -8,6 +8,14 @@ uv run weval report
 
 Then view `experiment-outputs/index.html` in a browser.
 
+To compare a [Treatment](../reference.md#treatments) with its baseline, open
+the Treatments tab. Each row pair holds one Task, prompt variant, and Agent:
+the baseline runs, then the Treatment runs, with required pass rate, failed
+checks, and mean usage per Trial. The Tasks tab shows baseline runs only.
+Each run shows the check results recorded when it ran. After a `check.py`
+change, compare only runs scored by the same checks, or re-score both arms
+with `weval check` (below).
+
 For one Trial, start at `weval.json` in the Trial directory ([layout reference](../reference.md#the-trial-directory)).
 
 Then follow your question:

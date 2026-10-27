@@ -1,8 +1,10 @@
 """Render the report's HTML pages from collected report data.
 
-The index has a Tasks tab (the catalog, with each Agent's latest result per
-prompt variant, and the Agents) and a Results tab (one row per run). Each
-Trial also gets its own page with its checks, usage, prompt, and snapshot.
+The index has a Tasks tab (the catalog, with each Agent's latest baseline
+result per prompt variant, and the Agents), a Results tab (one row per run),
+and a Treatments tab (each Treatment's runs beside the baseline runs of the
+same Task, prompt variant, and Agent). Each Trial also gets its own page with
+its checks, usage, prompt, and snapshot.
 All links are relative, so the pages work from ``file://``.
 """
 
@@ -16,8 +18,10 @@ from pathlib import Path
 from urllib.parse import quote
 
 from weval.report.assets import INDEX_SCRIPT, STYLE
-from weval.report.collect import RunSummary, TaskDefinition, TrialSummary
+from weval.report.collect import Comparison, RunSummary, TaskDefinition, TrialSummary, compare_treatments, mean_usage
 
+# Filter value and label for runs without a Treatment.
+BASELINE = "baseline"
 # A JSON array longer than this shows its first items and points to the raw file.
 LIST_LIMIT = 50
 # Transcript tool output beyond this many characters is left to trajectory.json.
@@ -39,21 +43,25 @@ def render_index(
     agent_names = _agents_with_runs(runs, agents)
     trial_count = sum(len(run.trials) for run in runs)
     variant_count = sum(len(task.prompts) for task in tasks)
+    comparisons = compare_treatments(runs)
     return _page(
         "Weaviate AX Evaluation",
         f"""
 <header class="site"><h1>Weaviate Agent Experience (AX) Evaluation</h1>
 <p class="lede">Each Task gives a coding agent a Weaviate job in a live environment, and a verifier scores
 the result against required and preferred checks. Tasks shows what each Task asks and how each Agent did on
-its latest run; Results lists every run and its Trials.</p>
+its latest baseline run; Results lists every run and its Trials; Treatments sets each Treatment's runs beside
+the baseline runs of the same Task, prompt variant, and Agent.</p>
 <span class="meta">{len(tasks)} Tasks, {variant_count} prompt variants, {len(agents)} Agents, {len(runs)} runs,
 {trial_count} Trials. Generated {generated:%Y-%m-%d %H:%M}.</span></header>
 <nav class="tabs">
 <a href="#tab=tasks" data-tab="tasks">Tasks<span class="count">{len(tasks)}</span></a>
 <a href="#tab=results" data-tab="results">Results<span class="count">{len(runs)}</span></a>
+<a href="#tab=treatments" data-tab="treatments">Treatments<span class="count">{len(comparisons)}</span></a>
 </nav>
 <section class="tab" id="tasks">{_tasks_tab(tasks, runs, agents, agent_names, links)}</section>
 <section class="tab" id="results" hidden>{_results_tab(runs, agents, links, trial_pages)}</section>
+<section class="tab" id="treatments" hidden>{_treatments_tab(comparisons, links)}</section>
 <script>{INDEX_SCRIPT}</script>""",
     )
 
@@ -136,10 +144,13 @@ def _tasks_tab(
     tasks: list[TaskDefinition], runs: list[RunSummary], agents: dict[str, dict],
     agent_names: list[str], links: "_Links",
 ) -> str:
-    # Runs are newest first, so the first run per key is the latest.
+    # Runs are newest first, so the first run per key is the latest. Treatment
+    # runs are left to the Treatments tab, so a cell is always a baseline result.
     latest: dict[tuple[str, str, str], RunSummary] = {}
     run_counts: Counter = Counter()
     for run in runs:
+        if run.treatment:
+            continue
         key = (run.task, run.prompt_variant, run.agent)
         latest.setdefault(key, run)
         run_counts[key] += 1
@@ -202,7 +213,7 @@ def _tasks_tab(
 <div class="wrap"><table id="catalog">
 <thead><tr><th>Task</th><th>Prompt variant</th><th>Checks</th>{agent_headers}</tr></thead>
 {"".join(bodies)}
-<tfoot><tr><th colspan="3">Prompt variants whose latest run passed every scored Trial</th>{"".join(totals)}</tr></tfoot>
+<tfoot><tr><th colspan="3">Prompt variants whose latest baseline run passed every scored Trial</th>{"".join(totals)}</tr></tfoot>
 </table></div>
 <h2>Agents</h2>
 <p class="intro">Named Agents in <code>agents.toml</code>.</p>
@@ -223,10 +234,11 @@ def _latest_cell(run: RunSummary | None, run_count: int, links: "_Links") -> str
         label = f"{passed}/{len(scored)}"
         css = "pass" if passed == len(scored) else "fail" if passed == 0 else "partial"
     failed = Counter(check for t in scored for check in t.failed_required)
-    title = (f"Latest run {run.date:%Y-%m-%d %H:%M}, " if run.date else "Latest run, ") + (
+    title = (f"Latest baseline run {run.date:%Y-%m-%d %H:%M}, " if run.date else "Latest baseline run, ") + (
         f"{passed} of {len(scored)} scored Trials passed" if scored else "no scored Trials"
     )
-    href = links.index(None, tab="results", task=run.task, variant=run.prompt_variant, agent=run.agent)
+    href = links.index(None, tab="results", task=run.task, variant=run.prompt_variant, agent=run.agent,
+                       treatment=BASELINE)
     # Earlier runs may have used an older Task version, so they are counted, not scored.
     earlier = f'<span class="note">+{run_count - 1} earlier</span>' if run_count > 1 else ""
     return (
@@ -288,11 +300,6 @@ def _definition(task: TaskDefinition, links: "_Links") -> str:
 def _results_tab(
     runs: list[RunSummary], agents: dict[str, dict], links: "_Links", trial_pages: dict[Path, Path],
 ) -> str:
-    def fraction(passed: int, total: int, bar: str) -> tuple[str, object, str]:
-        if not total:
-            return "", "", ""
-        return f"{passed}/{total}", passed / total, f"--fraction: {100 * passed / total:.0f}%; --bar: var({bar})"
-
     # Classes: "num" right-aligns with tabular figures, "secondary" mutes, and
     # "group" opens a column group (identity, outcome, effort, links) with extra space.
     columns = [
@@ -323,12 +330,12 @@ def _results_tab(
         cells = [
             (f'<button class="row-toggle" aria-expanded="false">{escape(_task_name(run.task))}</button>', run.task),
             (escape(run.prompt_variant), run.prompt_variant),
-            (escape(run.treatment), run.treatment),
+            (escape(run.treatment) if run.treatment else f'<span class="muted">{BASELINE}</span>', run.treatment),
             (f'<span title="{escape(_agent_spec(agents.get(run.agent, {})))}">{escape(run.agent)}</span>', run.agent),
             (run.date.strftime("%Y-%m-%d %H:%M") if run.date else "", run.date.isoformat() if run.date else ""),
             (escape(run.environment), run.environment),
-            fraction(passed, len(scored), "--bar-required"),
-            fraction(preferred_passed, len(with_preferred), "--bar-preferred"),
+            _fraction(passed, len(scored), "--bar-required"),
+            _fraction(preferred_passed, len(with_preferred), "--bar-preferred"),
             (_check_ids(failed, "failed-required"), " ".join(sorted(failed))),
             (_format_cost(cost), cost),
             (_format_tokens(tokens), tokens),
@@ -353,7 +360,8 @@ def _results_tab(
             "</tr>"
             for t in run.trials
         )
-        data = f'data-task="{escape(run.task)}" data-variant="{escape(run.prompt_variant)}" data-agent="{escape(run.agent)}"'
+        data = (f'data-task="{escape(run.task)}" data-variant="{escape(run.prompt_variant)}" '
+                f'data-agent="{escape(run.agent)}" data-treatment="{escape(run.treatment or BASELINE)}"')
         bodies.append(
             f'<tbody {data}><tr class="row">{row}</tr>'
             f'<tr class="detail" hidden><td colspan="{len(columns)}"><table>'
@@ -371,6 +379,7 @@ def _results_tab(
         select("task", "Task", sorted({r.task for r in runs if r.task}), _task_name)
         + select("variant", "Prompt variant", sorted({r.prompt_variant for r in runs if r.prompt_variant}))
         + select("agent", "Agent", sorted({r.agent for r in runs if r.agent}))
+        + select("treatment", "Treatment", [BASELINE] + sorted({r.treatment for r in runs if r.treatment}))
         + '<a href="#tab=results" id="clear-filters">Clear</a><span class="shown" id="shown"></span>'
     )
     return f"""
@@ -379,6 +388,70 @@ def _results_tab(
 <thead><tr>{header}</tr></thead>
 {"".join(bodies)}
 </table></div>"""
+
+
+# --- Treatments tab ----------------------------------------------------------
+
+
+def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
+    if not comparisons:
+        return '<p class="muted">No Treatment runs are retained.</p>'
+    columns = [
+        ("Treatment", ""), ("Task", ""), ("Prompt variant", ""), ("Agent", ""), ("Arm", "group"),
+        ("Runs", "num"), ("Required", "num group bar"), ("Failed required checks", "check-ids"),
+        ("Cost (USD)", "num group"), ("Tokens (k)", "num"), ("Turns", "num"), ("Duration", "num"),
+    ]
+    header = "".join(f'<th class="{css}">{name}</th>' for name, css in columns)
+    bodies = []
+    for comparison in comparisons:
+        arms = [(BASELINE, comparison.baseline), (comparison.treatment, comparison.treated)]
+        baseline_trials = [t for run in comparison.baseline for t in run.trials]
+        rows = []
+        for i, (arm, arm_runs) in enumerate(arms):
+            trials = [t for run in arm_runs for t in run.trials]
+            scored = [t for run in arm_runs for t in run.scored]
+            passed = sum(t.status == "passed" for t in scored)
+            failed = Counter(check for t in scored for check in t.failed_required)
+            href = links.index(None, tab="results", task=comparison.task, variant=comparison.prompt_variant,
+                               agent=comparison.agent, treatment=arm)
+            runs_cell = (f'<a href="{href}">{len(arm_runs)}</a> <span class="note">{len(trials)} Trial{"" if len(trials) == 1 else "s"}</span>'
+                         if arm_runs else '<span class="muted">none</span>')
+            # The Treatment row notes each usage mean's change from the baseline.
+            reference = baseline_trials if i else None
+            identity = "" if i else "".join(f'<td rowspan="2">{escape(value)}</td>' for value in (
+                comparison.treatment, _task_name(comparison.task), comparison.prompt_variant, comparison.agent))
+            cells = [
+                (escape(arm), ""), (runs_cell, len(arm_runs)),
+                _fraction(passed, len(scored), "--bar-required"),
+                (_check_ids(failed, "failed-required"), ""),
+                _usage_mean(trials, reference, "cost_usd", _format_cost),
+                _usage_mean(trials, reference, "tokens", _format_tokens),
+                _usage_mean(trials, reference, "turns", lambda v: "" if v is None else f"{v:.0f}"),
+                _usage_mean(trials, reference, "duration_s", _format_duration),
+            ]
+            rows.append('<tr class="row">' + identity + "".join(
+                _cell(*cell, css=css) for cell, (_, css) in zip(cells, columns[4:])) + "</tr>")
+        bodies.append(f"<tbody>{''.join(rows)}</tbody>")
+    return f"""
+<p class="intro">Each Treatment's runs beside the baseline runs of the same Task, prompt variant, and Agent.
+Each arm pools its runs' scored Trials with the check results recorded when they ran, so after a change to a
+Task's checks, compare only runs scored by the same checks. Usage is the mean per Trial; the Treatment row notes
+its change from the baseline.</p>
+<div class="wrap"><table id="treatments-table" class="rows">
+<thead><tr>{header}</tr></thead>
+{"".join(bodies)}
+</table></div>"""
+
+
+def _usage_mean(
+    trials: list[TrialSummary], reference: list[TrialSummary] | None, attribute: str, formatted,
+) -> tuple[str, object]:
+    """A usage mean's cell content and sort key, noting its relative change
+    from the ``reference`` Trials' mean when both are known and nonzero."""
+    value = mean_usage(trials, attribute)
+    base = mean_usage(reference, attribute) if reference else None
+    change = f' <span class="note">{100 * (value - base) / base:+.0f}%</span>' if value and base else ""
+    return formatted(value) + change, value
 
 
 # --- Trial page parts --------------------------------------------------------
@@ -592,6 +665,13 @@ def _check_ids(counts: Counter, css: str) -> str:
 def _inline_markdown(text: str) -> str:
     """Escape ``text`` and render its inline code spans; other Markdown stays as written."""
     return re.sub(r"`([^`]+)`", r"<code>\1</code>", escape(text))
+
+
+def _fraction(passed: int, total: int, bar: str) -> tuple[str, object, str]:
+    """A ``passed/total`` cell's content, sort key, and bar style; blank without a total."""
+    if not total:
+        return "", "", ""
+    return f"{passed}/{total}", passed / total, f"--fraction: {100 * passed / total:.0f}%; --bar: var({bar})"
 
 
 def _cell(content: str, sort_key: object, style: str = "", *, css: str = "") -> str:

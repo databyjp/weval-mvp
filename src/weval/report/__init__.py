@@ -1,8 +1,9 @@
 """``weval report``: a static site over the Task catalog and retained runs.
 
 ``write_report`` writes ``index.html`` into the outputs directory, with a
-Tasks tab (each Task's definition and every Agent's latest result) and a
-Results tab (one row per run), plus one page per Trial under
+Tasks tab (each Task's definition and every Agent's latest baseline result),
+a Results tab (one row per run), and a Treatments tab (Treatment runs beside
+their baseline runs), plus one page per Trial under
 ``_report/<run>/<trial>.html``. It reads Tasks, ``agents.toml``, and retained
 runs, and never modifies a run directory. Pages link to each other and to
 retained files relatively, so the site opens from ``file://``.

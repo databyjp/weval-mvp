@@ -175,7 +175,7 @@ li.step details > pre { margin: 2px 0 6px; padding: 6px 10px; background: var(--
 
 INDEX_SCRIPT = """
 // State lives in the URL hash, e.g. #tab=results&task=tasks/x/y&agent=z, so views can be linked.
-const FILTERS = ["task", "variant", "agent"];
+const FILTERS = ["task", "variant", "agent", "treatment"];
 const runs = document.getElementById("runs");
 
 function readHash() {
@@ -226,7 +226,7 @@ FILTERS.forEach(k => document.getElementById("filter-" + k).addEventListener("ch
 }));
 document.getElementById("clear-filters").addEventListener("click", event => {
   event.preventDefault();
-  const state = { tab: "results", task: "", variant: "", agent: "" };
+  const state = { tab: "results", ...Object.fromEntries(FILTERS.map(k => [k, ""])) };
   writeHash(state);
   show(state);
 });

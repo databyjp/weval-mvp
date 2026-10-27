@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from weval.report import write_report
-from weval.report.collect import collect_runs, collect_tasks
+from weval.report.collect import collect_runs, collect_tasks, compare_treatments
 
 RUN = "20261020-120000__build__ecommerce-search@terse__pi-glm-5.3-flash"
 
@@ -108,6 +108,31 @@ def test_treatment_run_without_records_is_listed_from_its_name(tmp_path):
     assert (run.agent, run.treatment) == ("pi-glm-5.3-flash", "weaviate-docs")
 
 
+def test_treatment_runs_are_paired_with_baseline_runs_of_the_same_agent(tmp_path):
+    other_agent = RUN.replace("pi-glm-5.3-flash", "claude-code-opus-5.5")
+    for name in (RUN, RUN.replace("20261020-120000", "20261021-120000"), other_agent,
+                 f"{RUN}+weaviate-docs", f"{other_agent}+weaviate-docs", f"{RUN}+other"):
+        write_trial(tmp_path / name, "t1", None)
+
+    comparisons = compare_treatments(collect_runs(tmp_path))
+
+    assert [(c.treatment, c.agent, [r.path.name for r in c.baseline], [r.path.name for r in c.treated])
+            for c in comparisons] == [
+        ("other", "pi-glm-5.3-flash", [RUN.replace("20261020-120000", "20261021-120000"), RUN], [f"{RUN}+other"]),
+        ("weaviate-docs", "claude-code-opus-5.5", [other_agent], [f"{other_agent}+weaviate-docs"]),
+        ("weaviate-docs", "pi-glm-5.3-flash",
+         [RUN.replace("20261020-120000", "20261021-120000"), RUN], [f"{RUN}+weaviate-docs"]),
+    ]
+
+
+def test_treatment_without_a_baseline_run_has_an_empty_baseline(tmp_path):
+    write_trial(tmp_path / f"{RUN}+weaviate-docs", "t1", None)
+
+    [comparison] = compare_treatments(collect_runs(tmp_path))
+
+    assert comparison.baseline == []
+
+
 def test_task_definition_reads_prompts_checks_and_page(tmp_path):
     [task] = collect_tasks(write_task(tmp_path, CHECKS))
 
@@ -149,7 +174,8 @@ def test_site_links_catalog_results_and_trial_pages(tmp_path):
     index = write_report(outputs, tasks_dir, tmp_path / "repo/agents.toml")
 
     page = index.read_text()
-    results_link = "#tab=results&amp;task=tasks/build/ecommerce-search&amp;variant=terse&amp;agent=pi-glm-5.3-flash"
+    results_link = ("#tab=results&amp;task=tasks/build/ecommerce-search&amp;variant=terse"
+                    "&amp;agent=pi-glm-5.3-flash&amp;treatment=baseline")
     # The terse row's latest-run cell: 1 of 2 scored Trials passed, and check a failed once.
     assert f'<a class="chip partial" href="{results_link}"' in page
     assert '<span class="failed-required">a</span>' in page
@@ -161,3 +187,21 @@ def test_site_links_catalog_results_and_trial_pages(tmp_path):
     assert '<span class="chip fail">failed</span></td><td class="mono">a</td>' in trial_page
     assert "Done." in trial_page
     assert not stale.parent.exists()
+
+
+def test_treatment_runs_are_compared_not_shown_as_the_latest_result(tmp_path):
+    tasks_dir = write_task(tmp_path / "repo", CHECKS)
+    outputs = tmp_path / "outputs"
+    write_trial(outputs / RUN, "t1", record("passed", preferred_passed=True, cost=0.4))
+    # Newer than the baseline, so it would be the catalog's latest run if Treatments counted.
+    treated = RUN.replace("20261020-120000", "20261021-120000") + "+weaviate-docs"
+    write_trial(outputs / treated, "t1", {**record("failed", preferred_passed=True, cost=0.3),
+                                          "treatment": "weaviate-docs"})
+
+    page = write_report(outputs, tasks_dir, tmp_path / "repo/agents.toml").read_text()
+
+    assert '<a class="chip pass" href="#tab=results&amp;task=tasks/build/ecommerce-search' in page
+    assert 'data-treatment="weaviate-docs"' in page and 'data-treatment="baseline"' in page
+    treatments = page[page.index('<section class="tab" id="treatments"'):]
+    assert '<td data-sort="1.0"' in treatments and '<td data-sort="0.0"' in treatments
+    assert '0.300 <span class="note">-25%</span>' in treatments
