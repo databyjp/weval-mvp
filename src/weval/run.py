@@ -299,11 +299,9 @@ def finalize_run(
         else:
             record = {
                 "status": "non-result",
-                "task": str(task_path),
-                "prompt_variant": prompt_variant,
-                "treatment": treatment,
-                "fingerprints": versions,
-                "agent": HARNESSES[agent["harness"]].agent_record(agent),
+                **_trial_identity(
+                    task_path, agent, prompt_variant, treatment, versions
+                ),
                 "reward": None,
                 "exception": "result.json never written",
             }
@@ -383,6 +381,26 @@ def derive_status(result: dict, missing: list[str]) -> str:
     return "passed" if rewards["reward"] == 1 else "failed"
 
 
+def _trial_identity(
+    task_path: Path,
+    agent: dict,
+    prompt_variant: str,
+    treatment: str | None,
+    versions: dict[str, str | None] | None,
+) -> dict:
+    """The fields every ``weval.json`` carries whatever the outcome: which
+    Task, prompt variant, Treatment, fingerprints, and Agent the Trial ran.
+    One construction path, so ``finalize`` and ``finalize_run``'s non-result
+    stub cannot drift apart."""
+    return {
+        "task": str(task_path),
+        "prompt_variant": prompt_variant,
+        "treatment": treatment,
+        "fingerprints": versions,
+        "agent": HARNESSES[agent["harness"]].agent_record(agent),
+    }
+
+
 def finalize(
     trial_dir: Path,
     task_path: Path,
@@ -411,11 +429,7 @@ def finalize(
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
     record = {
         "status": derive_status(result, missing),
-        "task": str(task_path),
-        "prompt_variant": prompt_variant,
-        "treatment": treatment,
-        "fingerprints": versions,
-        "agent": harness.agent_record(agent),
+        **_trial_identity(task_path, agent, prompt_variant, treatment, versions),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),
         "exception": (result.get("exception_info") or {}).get("exception_type"),
