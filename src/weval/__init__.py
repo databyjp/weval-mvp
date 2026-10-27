@@ -4,6 +4,19 @@ import argparse
 from pathlib import Path
 
 
+def print_diagnostics(found: dict) -> None:
+    """Print the Trial-level facts from ``weval.diagnostics.diagnose``."""
+    used = found["treatment_used"]
+    if used is not None:
+        print(f"Treatment: skill {'loaded' if used['skill_loaded'] else 'not loaded'}; "
+              f"files named: {', '.join(used['files_named']) or 'none'}")
+    if found["deprecations_seen"] is None:
+        print("Deprecations seen by the agent: unknown (no agent/trajectory.json)")
+    else:
+        print(f"Deprecations seen by the agent: {'; '.join(found['deprecations_seen']) or 'none'}")
+    print(f"Deprecations in application.log: {'; '.join(found['deprecations_logged']) or 'none'}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="weval")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -32,7 +45,7 @@ def main() -> None:
         return
 
     # Imported here so `weval --help` does not pay Harbor's import time.
-    from weval.run import check_versions, rescore, run
+    from weval.run import check_versions, diagnose, rescore, run
 
     if args.command == "run":
         print(run(
@@ -43,7 +56,14 @@ def main() -> None:
         current, recorded = check_versions(args.trial, args.task)
         print(f"check.py {current}, recorded {recorded or 'unversioned'}"
               + ("" if current == recorded else "; scores may differ from weval.json"))
-        for r in rescore(args.trial, args.task):
+        results = rescore(args.trial, args.task)
+        found = diagnose(args.trial, results, args.task)
+        seen = {item["check"]: item for item in found["expected_value_seen"] or []}
+        for r in results:
             status = "PASS" if r["passed"] else "FAIL"
             kind = "" if r["required"] else " (preferred)"
             print(f"{status} {r['name']}{kind}: {r['notes']}")
+            if r["name"] in seen:
+                item = seen[r["name"]]
+                print(f"     expected {item['expected']}, {'seen' if item['seen'] else 'not seen'} in what the agent was shown")
+        print_diagnostics(found)

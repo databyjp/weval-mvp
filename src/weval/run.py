@@ -26,7 +26,7 @@ from harbor.models.environment_type import EnvironmentType
 from harbor.models.job.config import JobConfig
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig
 
-from weval import verify
+from weval import diagnostics, verify
 from weval.harnesses import claude_code, oracle, pi
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -388,13 +388,26 @@ def rescore(trial_dir: Path, task_dir: Path | None = None) -> list[dict]:
     ``task_dir`` defaults to the Task recorded in the Trial's ``weval.json``,
     resolved against the repository root. Retained files are not modified.
     """
-    task_dir = task_dir or _recorded_task(trial_dir)
+    check = _load_check(task_dir or _recorded_task(trial_dir))
+    snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
+    return verify.score(check, snapshot)
+
+
+def diagnose(trial_dir: Path, results: list[dict], task_dir: Path | None = None) -> dict:
+    """``diagnostics.diagnose`` for a retained Trial and its ``rescore``
+    ``results``, with the same ``check.py``. ``task_dir`` defaults as in
+    ``rescore``."""
+    check = _load_check(task_dir or _recorded_task(trial_dir))
+    snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
+    return diagnostics.diagnose(trial_dir, check, snapshot, results)
+
+
+def _load_check(task_dir: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location("check", task_dir / "check.py")
     assert spec and spec.loader
     check = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(check)
-    snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
-    return verify.score(check, snapshot)
+    return check
 
 
 def check_versions(trial_dir: Path, task_dir: Path | None = None) -> tuple[str, str | None]:
