@@ -5,10 +5,8 @@ description: Markdown copies of Weaviate documentation pages on releases and ver
 
 # Weaviate documentation
 
-PLACEHOLDER: the maintainer adds the pages. Do not run the Treatment until
-this line is gone.
-
-Each file in `pages/` is one docs page; its first line is the page's URL.
+Each file in `pages/` is one docs page; its first line, `Source: <url>`, is
+the page's URL.
 Cite that URL, not the file.
 
 | File | Page |
