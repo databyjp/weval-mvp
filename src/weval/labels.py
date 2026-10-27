@@ -24,8 +24,11 @@ from weval.diagnostics import URL
 API = "https://api.typesafe.ai/v1/systemone"
 MODEL = "jev-latest"
 KEY_VAR = "TYPESAFEAI_API_KEY"
-# Per source and per agent message, so a request stays a few thousand tokens.
-EXCERPT_CHARS = 3000
+# Source excerpts share one budget, split evenly, so the answer_source
+# question stays inside Jev's default 32k-token per-question context (about
+# 16k tokens here) without the long-context header. Agent messages are capped
+# one by one.
+SOURCES_CHARS = 60_000
 MESSAGE_CHARS = 600
 # Jev's Choice supports up to 255 options; one is the agent's own knowledge.
 MAX_SOURCES = 254
@@ -112,9 +115,10 @@ def _sources(steps: list[dict], skills: Path) -> dict[str, str]:
                 names = [f"search: {(call.get('arguments') or {}).get('query', arguments)}"]
             names += [f for f in treatment_files if Path(f).name in arguments]
             for name in names:
-                excerpt = sources.get(name, "") + shown.get(call.get("tool_call_id"), "")
-                sources[name] = excerpt[:EXCERPT_CHARS]
-    return dict(list(sources.items())[:MAX_SOURCES])
+                sources[name] = sources.get(name, "") + shown.get(call.get("tool_call_id"), "")
+    sources = dict(list(sources.items())[:MAX_SOURCES])
+    share = SOURCES_CHARS // max(len(sources), 1)
+    return {name: excerpt[:share] for name, excerpt in sources.items()}
 
 
 def _request(result: dict, sources: dict[str, str], messages: list[str]) -> dict:
