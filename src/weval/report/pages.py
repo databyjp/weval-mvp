@@ -17,6 +17,7 @@ from html import escape
 from pathlib import Path
 from urllib.parse import quote
 
+from weval.diagnostics import diagnose
 from weval.report.assets import INDEX_SCRIPT, STYLE
 from weval.report.collect import Comparison, RunSummary, TaskDefinition, TrialSummary, compare_treatments, mean_usage
 
@@ -66,8 +67,11 @@ the baseline runs of the same Task, prompt variant, and Agent.</p>
     )
 
 
-def render_trial(run: RunSummary, trial: TrialSummary, *, page_dir: Path, index: Path) -> str:
-    """Return one Trial's page; links are relative to ``page_dir``."""
+def render_trial(
+    run: RunSummary, trial: TrialSummary, *, page_dir: Path, index: Path, expected: dict | None = None,
+) -> str:
+    """Return one Trial's page; links are relative to ``page_dir``.
+    ``expected`` is the Task's ``EXPECTED``, for the checks' diagnostics."""
     links = _Links(page_dir)
     record = trial.record or {}
     agent = record.get("agent") or {}
@@ -97,6 +101,7 @@ def render_trial(run: RunSummary, trial: TrialSummary, *, page_dir: Path, index:
     snapshot_file = trial.path / "verifier/snapshot.json"
     snapshot = _read_json(snapshot_file)
     prompt_file = run.path / "task/instruction.md"
+    found = diagnose(trial.path, expected or {}, snapshot or {}, checks)
 
     sections = [
         (f'<div class="breadcrumb"><a href="{results_link}">&larr; Results</a>'
@@ -104,7 +109,8 @@ def render_trial(run: RunSummary, trial: TrialSummary, *, page_dir: Path, index:
         f"<h1>{escape(_task_name(run.task))} <span class=\"muted\">with</span> {escape(run.agent)}</h1>",
         "<dl class=\"facts\">" + "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts) + "</dl>",
         _final_message(trial.path / "agent/trajectory.json"),
-        "<h2>Checks</h2>" + (_checks_table(checks) if checks else '<p class="muted">No checks recorded.</p>'),
+        "<h2>Checks</h2>" + (_checks_table(checks, found) if checks else '<p class="muted">No checks recorded.</p>')
+        + _diagnostics(found),
         "<h2>Usage</h2>" + _usage(trial, usage),
         "<h2>Files</h2>" + '<p class="links">'
         + "".join(links.link(path, label) for label, path in trial.files.items()) + "</p>",
@@ -466,17 +472,42 @@ def _usage_mean(
 # --- Trial page parts --------------------------------------------------------
 
 
-def _checks_table(checks: list[dict]) -> str:
+def _checks_table(checks: list[dict], found: dict) -> str:
+    seen = {item["check"]: item for item in found["expected_value_seen"] or []}
     rows = "".join(
         f'<tr><td><span class="chip {"pass" if c["passed"] else "fail"}">{"passed" if c["passed"] else "failed"}</span></td>'
         f'<td class="mono">{escape(c["name"])}</td>'
         f'<td class="secondary">{"required" if c["required"] else "preferred"}</td>'
-        f'<td class="wrapping"><pre>{escape(str(c.get("notes") or ""))}</pre></td>'
+        f'<td class="wrapping"><pre>{escape(str(c.get("notes") or ""))}</pre>{_seen_note(seen.get(c["name"]))}</td>'
         f'<td class="wrapping secondary">{_inline_markdown(c.get("description") or "")}</td></tr>'
         for c in sorted(checks, key=lambda c: (c["passed"], not c["required"]))
     )
     return ("<table><thead><tr><th>Result</th><th>Check</th><th>Tier</th><th>Notes</th><th>Description</th>"
             f"</tr></thead><tbody>{rows}</tbody></table>")
+
+
+def _seen_note(item: dict | None) -> str:
+    if item is None:
+        return ""
+    return (f'<p class="note">expected <code>{escape(item["expected"])}</code>, '
+            f'{"seen" if item["seen"] else "not seen"} in what the agent was shown</p>')
+
+
+def _diagnostics(found: dict) -> str:
+    """The Trial-level diagnostics, as facts under the checks table."""
+    def listed(values: list[str] | None) -> str:
+        if values is None:
+            return '<span class="muted">unknown (no trajectory)</span>'
+        return "<br>".join(f"<code>{escape(v)}</code>" for v in values) or '<span class="muted">none</span>'
+
+    facts = []
+    used = found["treatment_used"]
+    if used is not None:
+        facts.append(("Treatment skill", "loaded" if used["skill_loaded"] else "not loaded"))
+        facts.append(("Treatment files named", listed(used["files_named"])))
+    facts.append(("Deprecations shown to the agent", listed(found["deprecations_seen"])))
+    facts.append(("Deprecations in application.log", listed(found["deprecations_logged"])))
+    return '<dl class="facts">' + "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts) + "</dl>"
 
 
 def _usage(trial: TrialSummary, usage: dict) -> str:

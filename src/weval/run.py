@@ -399,7 +399,7 @@ def diagnose(trial_dir: Path, results: list[dict], task_dir: Path | None = None)
     ``rescore``."""
     check = _load_check(task_dir or _recorded_task(trial_dir))
     snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
-    return diagnostics.diagnose(trial_dir, check, snapshot, results)
+    return diagnostics.diagnose(trial_dir, getattr(check, "EXPECTED", {}), snapshot, results)
 
 
 def _load_check(task_dir: Path) -> ModuleType:

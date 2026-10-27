@@ -9,22 +9,24 @@ them too. Nothing is written.
 
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
-from types import ModuleType
 
 # The Weaviate Python client numbers its deprecation warnings ("Dep024: ...").
 # Other libraries' warnings (authlib's, in every Trial) are left out.
 DEPRECATION = re.compile(r"\bDep\d{3}:[^\n]*")
 
 
-def diagnose(trial_dir: Path, check: ModuleType, snapshot: dict, results: list[dict]) -> dict:
-    """Diagnostics for one Trial scored by ``check`` (a loaded ``check.py``).
+def diagnose(trial_dir: Path, expected: dict[str, Callable[[dict], str | None]],
+             snapshot: dict, results: list[dict]) -> dict:
+    """Diagnostics for one Trial's check ``results``, given its Task's
+    ``check.py`` ``EXPECTED`` (empty when the Task defines none).
 
     - ``treatment_used``: ``None`` for a baseline, else whether a Treatment
       skill loaded and which of its files a tool call named (``files_named``;
       a glob such as ``*.md`` reads files without naming them).
     - ``expected_value_seen``: for each failed check in ``results`` that
-      ``check.EXPECTED`` gives a value for, whether that value appeared in
+      ``expected`` gives a value for, whether that value appeared in
       what the agent was shown: tool results and injected messages, not its
       own output.
     - ``deprecations_seen``: Weaviate deprecation warnings the agent was
@@ -37,7 +39,7 @@ def diagnose(trial_dir: Path, check: ModuleType, snapshot: dict, results: list[d
     log = trial_dir / "verifier/application.log"
     return {
         "treatment_used": _treatment_used(trial_dir.parents[1] / "treatment/skills", called),
-        "expected_value_seen": None if shown is None else _expected_value_seen(check, snapshot, results, shown),
+        "expected_value_seen": None if shown is None else _expected_value_seen(expected, snapshot, results, shown),
         "deprecations_seen": None if shown is None else _deprecations(shown),
         "deprecations_logged": _deprecations([log.read_text(errors="replace")]) if log.exists() else [],
     }
@@ -76,8 +78,7 @@ def _treatment_used(skills: Path, called: list[str] | None) -> dict | None:
     return {"skill_loaded": loaded, "files_named": files}
 
 
-def _expected_value_seen(check: ModuleType, snapshot: dict, results: list[dict], shown: list[str]) -> list[dict]:
-    expected = getattr(check, "EXPECTED", {})
+def _expected_value_seen(expected: dict, snapshot: dict, results: list[dict], shown: list[str]) -> list[dict]:
     seen = []
     for result in results:
         if result["passed"] or result["name"] not in expected:

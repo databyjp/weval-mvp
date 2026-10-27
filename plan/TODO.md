@@ -10,14 +10,10 @@ Produce the facts the 2026-10-27 analyses gathered by hand
 1. Done: `weval.json` records `fingerprints`, the report compares arms
    only within one Task and check version, and `weval check` prints both
    check versions.
-2. Computed diagnostics for each Trial, from its logs:
-   - `expected-value-seen`: for a failed check whose expected value the
-     snapshot holds (such as a latest release), whether that value appeared
-     in any tool result. It doesn't change the score.
-   - `treatment-used`: whether the skill loaded, and which Treatment files
-     the agent read.
-   - `deprecation-seen`: deprecation warnings (`Dep0\d\d`) in the
-     transcript and `application.log`.
+2. Done: `weval check` and the report's Trial page show diagnostics
+   (`src/weval/diagnostics.py`): whether each failed check's `EXPECTED`
+   value was shown to the agent, Treatment use, and Weaviate deprecation
+   warnings. Only current-practices defines `EXPECTED` so far.
 3. Report: uncached input tokens on the Treatments tab, and an interval or
    Fisher's exact test beside each pass-rate pair.
 4. Typed labels from Jev (`typesafe/jev-router` on OpenRouter) for each

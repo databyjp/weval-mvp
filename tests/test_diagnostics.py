@@ -2,8 +2,6 @@
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
-
 from weval.diagnostics import diagnose
 
 
@@ -30,7 +28,7 @@ def tool_step(name: str, arguments: dict, result: str) -> dict:
             "observation": {"results": [{"content": result}]}}
 
 
-NO_CHECKS = SimpleNamespace()
+NO_CHECKS: dict = {}
 
 
 def test_treatment_used_records_the_skill_load_and_the_files_named(tmp_path):
@@ -90,15 +88,15 @@ def test_expected_value_seen_reports_each_failed_check_with_an_expected_value(tm
         # The agent's own output is not what it was shown.
         tool_step("Write", {"content": "Weaviate 1.40.2"}, "File written"),
     ])
-    check = SimpleNamespace(EXPECTED={
+    expected = {
         "client": lambda snapshot: snapshot["client"],
         "server": lambda snapshot: snapshot["server"],
         "unknown": lambda snapshot: snapshot["missing"],
-    })
+    }
     results = [{"name": name, "passed": False} for name in ("client", "server", "unknown", "no-expected-value")]
     results.append({"name": "passed-check", "passed": True})
 
-    found = diagnose(trial, check, {"client": "4.24.1", "server": "1.40.2"}, results)
+    found = diagnose(trial, expected, {"client": "4.24.1", "server": "1.40.2"}, results)
 
     assert found["expected_value_seen"] == [
         {"check": "client", "expected": "4.24.1", "seen": True},
@@ -108,8 +106,8 @@ def test_expected_value_seen_reports_each_failed_check_with_an_expected_value(tm
 
 def test_an_expected_value_must_match_exactly(tmp_path):
     trial = write_trial(tmp_path, [tool_step("Bash", {"command": "pip index"}, "weaviate-client 4.24.10, 14.24.1")])
-    check = SimpleNamespace(EXPECTED={"client": lambda snapshot: "4.24.1"})
+    expected = {"client": lambda snapshot: "4.24.1"}
 
-    [item] = diagnose(trial, check, {}, [{"name": "client", "passed": False}])["expected_value_seen"]
+    [item] = diagnose(trial, expected, {}, [{"name": "client", "passed": False}])["expected_value_seen"]
 
     assert item["seen"] is False

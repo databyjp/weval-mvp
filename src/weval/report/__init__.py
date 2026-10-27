@@ -29,6 +29,8 @@ def write_report(
     ``outputs_dir`` is touched.
     """
     runs = collect_runs(outputs_dir)
+    tasks = collect_tasks(tasks_dir)
+    expected = {task.path: task.expected for task in tasks}
     Path.mkdir(outputs_dir, parents=True, exist_ok=True)
     index = outputs_dir / "index.html"
     pages_dir = outputs_dir / PAGES_DIR
@@ -41,11 +43,12 @@ def write_report(
         for trial in run.trials:
             page = trial_pages[trial.path]
             page.parent.mkdir(parents=True, exist_ok=True)
-            page.write_text(render_trial(run, trial, page_dir=page.parent, index=index))
+            page.write_text(render_trial(run, trial, page_dir=page.parent, index=index,
+                                         expected=expected.get(run.task, {})))
     _remove_stale_pages(pages_dir, set(trial_pages.values()))
 
     index.write_text(render_index(
-        runs, collect_tasks(tasks_dir), load_agents(agents_file),
+        runs, tasks, load_agents(agents_file),
         index_dir=outputs_dir, trial_pages=trial_pages, generated=datetime.now(),
     ))
     return index

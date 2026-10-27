@@ -233,3 +233,18 @@ def test_treatment_runs_are_compared_not_shown_as_the_latest_result(tmp_path):
     assert '<td data-sort="1.0"' in treatments and '<td data-sort="0.0"' in treatments
     assert '0.300 <span class="note">-25%</span>' in treatments
     assert '<span class="note">unversioned</span>' in treatments
+
+
+def test_trial_page_shows_whether_the_agent_was_shown_a_failed_checks_expected_value(tmp_path):
+    tasks_dir = write_task(tmp_path / "repo", CHECKS + 'EXPECTED = {"a": lambda snapshot: snapshot["latest"]}\n')
+    outputs = tmp_path / "outputs"
+    write_trial(outputs / RUN, "t1", record("failed", preferred_passed=True, cost=0.1), agent_steps=1)
+    (outputs / RUN / "job/t1/verifier").mkdir()
+    (outputs / RUN / "job/t1/verifier/snapshot.json").write_text(json.dumps({"latest": "1.40.2"}))
+
+    write_report(outputs, tasks_dir, tmp_path / "repo/agents.toml")
+
+    trial_page = (outputs / f"_report/{RUN}/t1.html").read_text()
+    assert "expected <code>1.40.2</code>, not seen in what the agent was shown" in trial_page
+    assert "<dt>Deprecations shown to the agent</dt><dd><span class=\"muted\">none</span></dd>" in trial_page
+    assert "Treatment skill" not in trial_page

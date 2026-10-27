@@ -129,7 +129,8 @@ class TaskDefinition:
     ``instruction.md``. ``motivation`` and ``summary`` come from
     ``task.toml``'s ``[metadata]``, or else from the Task page, and are blank
     without either. When ``check.py`` fails to import, ``checks`` is empty and
-    ``check_error`` holds the exception line.
+    ``check_error`` holds the exception line. ``expected`` is ``check.py``'s
+    ``EXPECTED`` (docs/how-to/define-a-task.md), empty when it has none.
     """
 
     path: str
@@ -141,6 +142,7 @@ class TaskDefinition:
     checks: list[CheckDefinition]
     check_error: str | None
     config: dict
+    expected: dict = field(default_factory=dict)
 
     def checks_for(self, prompt_variant: str) -> list[CheckDefinition]:
         """The checks a Trial of ``prompt_variant`` is scored on."""
@@ -257,7 +259,7 @@ def read_task(task_dir: Path, repo: Path) -> TaskDefinition:
     prompts = {"default": (task_dir / "instruction.md").read_text()}
     for prompt in sorted((task_dir / "prompts").glob("*.md")):
         prompts[prompt.stem] = prompt.read_text()
-    checks, check_error = _read_checks(task_dir / "check.py")
+    checks, check_error, expected = _read_checks(task_dir / "check.py")
     return TaskDefinition(
         path=path,
         directory=task_dir,
@@ -268,6 +270,7 @@ def read_task(task_dir: Path, repo: Path) -> TaskDefinition:
         checks=checks,
         check_error=check_error,
         config=config,
+        expected=expected,
     )
 
 
@@ -276,7 +279,7 @@ def load_agents(agents_file: Path) -> dict[str, dict]:
     return tomllib.loads(agents_file.read_text()) if agents_file.is_file() else {}
 
 
-def _read_checks(check_file: Path) -> tuple[list[CheckDefinition], str | None]:
+def _read_checks(check_file: Path) -> tuple[list[CheckDefinition], str | None, dict]:
     # A per-Task module name keeps Tasks' check modules apart; none is added to
     # sys.modules, so `weval check` and tests import their own copies.
     name = "weval_report_check_" + "_".join(check_file.parent.parts[-2:]).replace("-", "_")
@@ -301,8 +304,8 @@ def _read_checks(check_file: Path) -> tuple[list[CheckDefinition], str | None]:
             for prompt_variant, functions in getattr(module, attribute, {}).items():
                 checks += definitions(functions, required, prompt_variant)
     except Exception as error:  # noqa: BLE001  A broken Task must not break the report.
-        return [], "".join(traceback.format_exception_only(error)).strip()
-    return checks, None
+        return [], "".join(traceback.format_exception_only(error)).strip(), {}
+    return checks, None, getattr(module, "EXPECTED", {})
 
 
 def _read_task_page(page: Path) -> tuple[str, str]:
