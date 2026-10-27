@@ -20,6 +20,9 @@ If subagents are available, use them to run tests or searches unless there is a 
   comparisons for `weval analyse`.
 - `src/weval/rescore.py`: re-scores retained Trials offline against a Task's
   current `check.py` (`weval check`).
+- `src/weval/report/`: writes the static report over retained runs
+  (`weval report`): findings, Treatment comparisons, Task reliability, and
+  one page per Trial.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
 - `src/weval/shared-instructions.md`: Trial-environment notes appended to every
   Task's prompt when it is packaged.
@@ -176,6 +179,7 @@ Before running agents on a new Task:
 uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>] [--treatment <treatment>]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 uv run --env-file .env weval analyse experiment-outputs/<run>   # LLM analysis of its Treatment comparisons
+uv run weval report   # rebuild experiment-outputs/index.html and the Trial pages
 ```
 
 Real runs cost money (Modal, OpenRouter). This is not a problem, but confirm with the user.

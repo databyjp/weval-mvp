@@ -1,4 +1,5 @@
-"""weval command line: ``weval run``, ``weval check``, and ``weval analyse``."""
+"""weval command line: ``weval run``, ``weval check``, ``weval analyse``, and
+``weval report``."""
 
 import argparse
 from pathlib import Path
@@ -75,6 +76,16 @@ def main() -> None:
     analyse_parser.add_argument(
         "run", type=Path, help="run directory under experiment-outputs/"
     )
+    report_parser = commands.add_parser(
+        "report", help="write the static report over the retained runs"
+    )
+    report_parser.add_argument(
+        "outputs",
+        type=Path,
+        nargs="?",
+        default=Path("experiment-outputs"),
+        help="outputs directory (default: experiment-outputs)",
+    )
     args = parser.parse_args()
 
     # Imported here so `weval --help` does not pay Harbor's import time.
@@ -82,7 +93,11 @@ def main() -> None:
     from weval.rescore import check_versions, diagnose, rescore
     from weval.run import analyse_run, run
 
-    if args.command == "analyse":
+    if args.command == "report":
+        from weval.report import write_report
+
+        print(write_report(args.outputs))
+    elif args.command == "analyse":
         analyse_run(args.run)
     elif args.command == "run":
         print(
