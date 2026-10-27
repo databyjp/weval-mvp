@@ -84,6 +84,10 @@ def blog_source(s: dict) -> None:
     s["findings"]["parsed"]["search"]["sources"].append("https://medium.com/some-weaviate-post")
 
 
+def other_github_owner(s: dict) -> None:
+    s["findings"]["parsed"]["search"]["sources"].append("https://api.github.com/repos/someone/weaviate-notes")
+
+
 def test_oracle_passes_every_check():
     assert failures(ORACLE) == {}
 
@@ -91,6 +95,18 @@ def test_oracle_passes_every_check():
 def test_versions_match_with_a_v_prefix_and_trailing_punctuation():
     snapshot = copy.deepcopy(ORACLE)
     snapshot["findings"]["parsed"]["weaviate_version"]["answer"] = "Use v1.40.2."
+    assert failures(snapshot) == {}
+
+
+def test_registry_and_github_api_sources_are_canonical():
+    # Endpoints retained baseline Trials cited for versions.
+    snapshot = copy.deepcopy(ORACLE)
+    snapshot["findings"]["parsed"]["client_library_versions"]["sources"] += [
+        "https://api.github.com/repos/weaviate/typescript-client/releases/latest",
+        "https://registry.npmjs.org/weaviate-client/latest",
+        "https://repo1.maven.org/maven2/io/weaviate/client6/maven-metadata.xml",
+        "https://proxy.golang.org/github.com/weaviate/weaviate-go-client/v5/@latest",
+    ]
     assert failures(snapshot) == {}
 
 
@@ -115,6 +131,7 @@ def test_missing_file_fails_every_check():
         (prose_without_api, ["current-vector-config"], "names vector_config"),
         (uncited_answer, ["canonical-sources"], "uncited ['search']"),
         (blog_source, ["canonical-sources"], "non-canonical ['https://medium.com/some-weaviate-post']"),
+        (other_github_owner, ["canonical-sources"], "non-canonical ['https://api.github.com/repos/someone/weaviate-notes']"),
     ],
 )
 def test_broken_variant_fails_only_its_checks(break_snapshot, failing_checks, reason):

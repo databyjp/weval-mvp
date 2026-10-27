@@ -18,9 +18,11 @@ ITEMS = ("weaviate_version", "client_library_versions", "deployment",
 # Current Python client API for vectorizer configuration (client 4.16 and
 # later); the legacy one is vectorizer_config=Configure.Vectorizer.
 CURRENT_VECTOR_CONFIG = re.compile(r"Configure\.Vectors\b|\bvector_config\b|named vectors?", re.IGNORECASE)
-# Weaviate-owned sites, and the package registries of the official clients.
-CANONICAL_HOSTS = ("weaviate.io", "pypi.org", "npmjs.com", "pkg.go.dev", "nuget.org",
-                   "central.sonatype.com", "search.maven.org")
+# Weaviate-owned sites, and the package registries of the official clients,
+# including the API hosts agents query for versions (registry.npmjs.org,
+# repo1.maven.org, proxy.golang.org).
+CANONICAL_HOSTS = ("weaviate.io", "pypi.org", "npmjs.com", "npmjs.org", "pkg.go.dev",
+                   "proxy.golang.org", "nuget.org", "central.sonatype.com", "maven.org")
 
 
 def answer(snapshot: dict, item: str) -> str:
@@ -45,6 +47,8 @@ def is_canonical(url: str) -> bool:
     host = (parsed.hostname or "").removeprefix("www.")
     if host == "github.com":
         return parsed.path.lower().startswith("/weaviate/")
+    if host == "api.github.com":
+        return parsed.path.lower().startswith("/repos/weaviate/")
     return any(host == h or host.endswith("." + h) for h in CANONICAL_HOSTS)
 
 

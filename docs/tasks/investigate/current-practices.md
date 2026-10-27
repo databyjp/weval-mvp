@@ -71,7 +71,7 @@ disagree with.
 | `weaviate-version-latest` | REQUIRED | `weaviate_version` names the latest stable Weaviate release at verify time, including its patch. |
 | `python-client-version-latest` | REQUIRED | `client_library_versions` names the latest `weaviate-client` release on PyPI at verify time, including its patch. |
 | `current-vector-config` | REQUIRED | `config_ingestion` names `vector_config`, `Configure.Vectors`, or named vectors. Detection: the prompt asks for the recommended way to configure, not for an API, and the legacy path is `vectorizer_config=Configure.Vectorizer`. |
-| `canonical-sources` | PREFERRED | Every answer cites a source, and every source is on a Weaviate site (`weaviate.io` and its subdomains, `github.com/weaviate`) or an official client's package registry. |
+| `canonical-sources` | PREFERRED | Every answer cites a source, and every source is on a Weaviate site (`weaviate.io` and its subdomains, `github.com/weaviate`, `api.github.com/repos/weaviate`) or an official client's package registry, including its API host such as `registry.npmjs.org`. |
 
 A version check fails when its release could not be looked up at verify time;
 classify that as an infrastructure failure.
@@ -103,3 +103,4 @@ each citing the page it came from, the same for every prompt variant.
 | `prose_without_api` | `current-vector-config` | Describes configuration without naming the vector API. |
 | `uncited_answer` | `canonical-sources` | `search` has no sources. |
 | `blog_source` | `canonical-sources` | `search` cites a blog post. |
+| `other_github_owner` | `canonical-sources` | `search` cites another owner's repository through the GitHub API. |
