@@ -22,7 +22,8 @@ If subagents are available, use them to run tests or searches unless there is a 
   current `check.py` (`weval check`).
 - `src/weval/report/`: writes the static report over retained runs
   (`weval report`): findings, Treatment comparisons, Task reliability, one
-  page per Task, and one page per Trial.
+  page per Task with a syntax-highlighted page per packaged file, and one
+  page per Trial.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
 - `src/weval/shared-instructions.md`: Trial-environment notes appended to every
   Task's prompt when it is packaged.

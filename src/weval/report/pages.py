@@ -69,9 +69,9 @@ def render_index(
     body = f"""
 <header class="site"><h1>{LOGO}Weaviate Agent Experience (AX) Evaluation</h1>
 <details class="how"><summary>How the evals work</summary><ul>
-<li>Each Task gives a coding agent a real Weaviate job in a live environment.</li>
-<li>A verifier then scores what the agent built against the Task's required and preferred checks.</li>
-<li>A Treatment gives the agent extra skill files; its Trials are compared with baseline Trials run without them.</li>
+<li>Each <strong>Task</strong> gives a coding <strong>agent</strong> a real Weaviate job in a live environment.</li>
+<li>A <strong>verifier</strong> then scores what the agent built against the Task's required and preferred <strong>checks</strong>.</li>
+<li>A <strong>Treatment</strong> gives the agent extra skill files; its <strong>Trials</strong> are compared with <strong>baseline</strong> Trials run without them.</li>
 <li><a href="#findings">Findings</a> lists every check that failed and why.</li>
 <li><a href="#comparisons">Treatment comparisons</a> shows whether each Treatment helped.</li>
 <li><a href="#reliability">Task reliability</a> says how much to trust each Task's numbers.</li>
@@ -519,12 +519,15 @@ def render_task(
     page_dir: Path,
     index: Path,
     trial_pages: dict[Path, Path],
+    file_pages: dict[Path, Path],
     docs: Path | None = None,
 ) -> str:
     """Return one Task and prompt variant's page: the definition its newest
     run packaged (prompt, checks, and files) and every retained run, each
-    with its Trials. ``docs`` is the Task's page under ``docs/tasks/``, when
-    one exists. Links are relative to ``page_dir``."""
+    with its Trials. ``file_pages`` maps packaged files to their rendered
+    pages; a file without one links to the raw file. ``docs`` is the Task's
+    page under ``docs/tasks/``, when one exists. Links are relative to
+    ``page_dir``."""
     links = _Links(page_dir)
     newest = row.runs[0]
     package = newest.path / "task"
@@ -565,19 +568,30 @@ def render_task(
             f"{links.link(prompt_file, 'instruction.md')}.</p>"
             f'<div class="card"><pre class="message">{escape(prompt_file.read_text())}</pre></div>'
         )
-    sections.append("<h2>Checks</h2>" + _task_checks(row, index, links))
+    sections.append(
+        "<h2>Checks</h2>"
+        + _task_checks(row, index, links, package / "tests/check.py", file_pages)
+    )
     sections.append(
         "<h2>Files</h2>"
         '<p class="intro">The Task package as the newest run built it.</p>'
-        + _package_files(package, links)
+        + _package_files(package, links, file_pages)
     )
     sections.append("<h2>Runs</h2>" + _task_runs(row, links, trial_pages))
     return _page(_task_name(row.task), "\n".join(sections))
 
 
-def _task_checks(row: TaskReliability, index: Path, links: "_Links") -> str:
+def _task_checks(
+    row: TaskReliability,
+    index: Path,
+    links: "_Links",
+    check_file: Path,
+    file_pages: dict[Path, Path],
+) -> str:
     """The newest run's checks, each with its failure rate over the retained
-    Trials that recorded it; a check that failed links to its finding."""
+    Trials that recorded it; a check that failed links to its finding, and
+    each check links to its definition in ``check_file`` when that file has
+    a rendered page."""
     newest = next(
         (t.record for t in row.runs[0].trials if t.record and t.record.get("checks")),
         None,
@@ -585,6 +599,8 @@ def _task_checks(row: TaskReliability, index: Path, links: "_Links") -> str:
     if not newest:
         return '<p class="muted">No checks recorded.</p>'
     scored = [t for run in row.runs for t in run.scored]
+    check_page = file_pages.get(check_file)
+    defined = _definition_lines(check_file) if check_page else {}
     rows = []
     for check in newest["checks"]:
         name = check["name"]
@@ -600,22 +616,45 @@ def _task_checks(row: TaskReliability, index: Path, links: "_Links") -> str:
         if failed:
             anchor = _finding_anchor(row.task, row.prompt_variant, name)
             title = f'<a href="{links.href(index)}#{anchor}">{title}</a>'
+        if name in defined:
+            title += (
+                f' <a class="note" href="{links.href(check_page)}#L-{defined[name]}">'
+                "source</a>"
+            )
         rows.append(
             f'<tr><td class="mono">{title}</td>'
             f"<td>{'required' if check.get('required') else 'preferred'}</td>"
             f'<td class="wrapping">{_inline_markdown(check.get("description") or "")}</td>'
             f"<td>{_rate(failed, len(recorded), 'failed')}</td></tr>"
         )
+    intro = (
+        f'<p class="intro">Defined in {links.link(check_page, "check.py")}; each '
+        "source link opens a check's function.</p>"
+        if check_page
+        else ""
+    )
     return (
-        '<div class="card"><table class="plain trials"><thead><tr><th>Check</th><th>Kind</th>'
+        intro
+        + '<div class="card"><table class="plain trials"><thead><tr><th>Check</th><th>Kind</th>'
         '<th>Requires</th><th>Failed <span class="note">with 95% interval</span></th></tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
-def _package_files(package: Path, links: "_Links") -> str:
+def _definition_lines(check_file: Path) -> dict[str, int]:
+    """Each top-level function in ``check_file`` by line number, keyed by
+    check ID (the function name with dashes for underscores)."""
+    lines = {}
+    for number, line in enumerate(check_file.read_text().splitlines(), start=1):
+        if match := re.match(r"def (\w+)\(", line):
+            lines[match[1].replace("_", "-")] = number
+    return lines
+
+
+def _package_files(package: Path, links: "_Links", file_pages: dict[Path, Path]) -> str:
     """Links to every file in the Task package, grouped by what each part
-    holds; files outside the named parts are listed as the package itself."""
+    holds; files outside the named parts are listed as the package itself.
+    Each links to its rendered page, else to the raw file."""
     if not package.is_dir():
         return '<p class="muted">The run kept no Task package.</p>'
     groups: dict[str, list[str]] = {label: [] for _, label in PACKAGE_PARTS}
@@ -628,7 +667,9 @@ def _package_files(package: Path, links: "_Links") -> str:
             if len(relative.parts) > 1
             else "Package"
         )
-        groups[label].append(links.link(path, str(relative), css="mono"))
+        groups[label].append(
+            links.link(file_pages.get(path, path), str(relative), css="mono")
+        )
     return _facts(
         [(label, "<br>".join(files)) for label, files in groups.items() if files]
     )

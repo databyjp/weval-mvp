@@ -317,12 +317,22 @@ def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
     (run_dir / "task" / "environment").mkdir(parents=True)
     (run_dir / "task" / "instruction.md").write_text("Build **semantic search**.")
     (run_dir / "task" / "environment" / "WORKSPACE.md").write_text("notes")
+    (run_dir / "task" / "tests").mkdir()
+    (run_dir / "task" / "tests" / "check.py").write_text(
+        "import json\n\n\ndef vector_config(snapshot):\n    pass\n"
+    )
+    (run_dir / "task" / "environment" / "data.bin").write_bytes(b"\xff\xfe\x00")
     stale = tmp_path / "_report" / "gone-run" / "gone-trial.html"
     stale.parent.mkdir(parents=True)
     stale.write_text("stale")
     stale_task = tmp_path / "_report" / "tasks" / "build-gone.html"
     stale_task.parent.mkdir(parents=True)
     stale_task.write_text("stale")
+    stale_file = (
+        tmp_path / "_report" / "tasks" / "build-gone" / "tests" / "check.py.html"
+    )
+    stale_file.parent.mkdir(parents=True)
+    stale_file.write_text("stale")
 
     index = write_report(tmp_path)
 
@@ -330,6 +340,7 @@ def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
     assert index.is_file() and page.is_file()
     assert not stale.exists() and not stale.parent.exists()
     assert not stale_task.exists()
+    assert not (tmp_path / "_report" / "tasks" / "build-gone").exists()
     html = index.read_text()
     assert "Findings" in html and "vector-config" in html
     # The baseline arm names itself and shows its fail fraction and rate bar.
@@ -352,3 +363,11 @@ def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
     assert f"../{run_dir.name}/t1.html" in task_html
     assert 'href="_report/tasks/build-x.html"' in html
     assert 'href="../tasks/build-x.html"' in trial_html
+
+    # Each text file gets a highlighted page, and each check links to the
+    # line that defines it; a binary file keeps its raw link.
+    check_page = tmp_path / "_report" / "tasks" / "build-x" / "tests" / "check.py.html"
+    assert 'id="L-4"' in check_page.read_text()
+    assert '<span class="k">def</span>' in check_page.read_text()
+    assert 'href="build-x/tests/check.py.html#L-4">source</a>' in task_html
+    assert f"../{run_dir.name}/task/environment/data.bin" in task_html

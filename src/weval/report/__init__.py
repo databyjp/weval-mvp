@@ -3,7 +3,8 @@
 ``write_report`` writes ``index.html`` into the outputs directory, leading
 with the findings (every failed check with its saved judgments), then each
 Treatment comparison, then each Task's reliability, plus one page per Task
-and prompt variant under ``_report/tasks/`` and one page per Trial under
+and prompt variant under ``_report/tasks/`` (with one syntax-highlighted
+page per packaged Task file beside it) and one page per Trial under
 ``_report/<run>/<trial>.html``. It renders only retained files, saved
 analyses, and saved labels: building the report never calls the analyst or
 Jev, and never modifies a run directory. Pages link to each other and to
@@ -16,7 +17,8 @@ from pathlib import Path
 from weval import analysis
 from weval.collect import Comparison, collect_runs, compare_treatments
 from weval.report.findings import failure_groups, task_reliability
-from weval.report.pages import render_index, render_task, render_trial
+from weval.report.pages import _task_name, render_index, render_task, render_trial
+from weval.report.source import render_source
 
 ROOT = Path(__file__).resolve().parents[3]
 # Generated Task and Trial pages; collect_runs skips it because it has no
@@ -29,8 +31,8 @@ TASK_PAGES_DIR = "tasks"
 def write_report(outputs_dir: Path) -> Path:
     """Write the report into ``outputs_dir`` and return the index path.
 
-    Task and Trial pages left over from deleted runs are removed; no other
-    file under ``outputs_dir`` is touched.
+    Task, file, and Trial pages left over from deleted runs are removed; no
+    other file under ``outputs_dir`` is touched.
     """
     runs = collect_runs(outputs_dir)
     expected = {task: _expected(task) for task in {run.task for run in runs}}
@@ -60,9 +62,14 @@ def write_report(outputs_dir: Path) -> Path:
         / f"{_task_page_name(row.task, row.prompt_variant)}.html"
         for row in reliability
     }
+    file_pages: dict[Path, Path] = {}
     for row in reliability:
         page = task_pages[row.task, row.prompt_variant]
         page.parent.mkdir(parents=True, exist_ok=True)
+        task_files = _write_file_pages(
+            row.runs[0].path / "task", page, _task_name(row.task)
+        )
+        file_pages.update(task_files)
         docs = ROOT / "docs" / f"{row.task}.md"
         page.write_text(
             render_task(
@@ -70,6 +77,7 @@ def write_report(outputs_dir: Path) -> Path:
                 page_dir=page.parent,
                 index=index,
                 trial_pages=trial_pages,
+                file_pages=task_files,
                 docs=docs if docs.is_file() else None,
             )
         )
@@ -88,7 +96,10 @@ def write_report(outputs_dir: Path) -> Path:
                     proposals=proposals.get(trial.path.name, {}),
                 )
             )
-    _remove_stale_pages(pages_dir, {*trial_pages.values(), *task_pages.values()})
+    _remove_stale_pages(
+        pages_dir,
+        {*trial_pages.values(), *task_pages.values(), *file_pages.values()},
+    )
 
     index.write_text(
         render_index(
@@ -103,6 +114,31 @@ def write_report(outputs_dir: Path) -> Path:
         )
     )
     return index
+
+
+def _write_file_pages(
+    package: Path, task_page: Path, task_name: str
+) -> dict[Path, Path]:
+    """Write a page for each text file in ``package`` into the folder named
+    after ``task_page``, and map each file to its page."""
+    if not package.is_dir():
+        return {}
+    pages = {}
+    for path in sorted(p for p in package.rglob("*") if p.is_file()):
+        label = str(path.relative_to(package))
+        page = task_page.with_suffix("") / f"{label}.html"
+        html = render_source(
+            path,
+            label=label,
+            page_dir=page.parent,
+            task_page=task_page,
+            task_name=task_name,
+        )
+        if html is not None:
+            page.parent.mkdir(parents=True, exist_ok=True)
+            page.write_text(html)
+            pages[path] = page
+    return pages
 
 
 def _task_page_name(task: str, prompt_variant: str) -> str:
@@ -162,9 +198,15 @@ def _trial_proposals(
 def _remove_stale_pages(pages_dir: Path, current: set[Path]) -> None:
     if not pages_dir.is_dir():
         return
-    for page in pages_dir.glob("*/*.html"):
+    for page in pages_dir.rglob("*.html"):
         if page not in current:
             page.unlink()
-    for run_dir in pages_dir.iterdir():
-        if run_dir.is_dir() and not any(run_dir.iterdir()):
-            run_dir.rmdir()
+    # Deepest first, so a folder emptied by removing its subfolders goes too.
+    folders = sorted(
+        (p for p in pages_dir.rglob("*") if p.is_dir()),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    )
+    for folder in folders:
+        if not any(folder.iterdir()):
+            folder.rmdir()

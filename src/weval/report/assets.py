@@ -32,6 +32,7 @@ STYLE = """
   --accent: linear-gradient(90deg, #55cde0, #06cd00);
   --header: linear-gradient(90deg, #0c1428, #1b1464);
   --band: #e6f6fa; --panel: #f3f8fb; --pill-fg: #ffffff; --pill-bg: #130c49;
+  --code-keyword: #6b2fb3; --code-string: #1e6f38; --code-name: #0069b4; --code-number: #a14600;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -42,6 +43,7 @@ STYLE = """
     --pass-fg: #8fe3a3; --pass-bg: rgba(97, 189, 115, 0.2); --fail-fg: #ff8a94; --fail-bg: rgba(244, 64, 78, 0.22);
     --warn-fg: #f1e96a; --warn-bg: rgba(249, 241, 93, 0.16); --flag-fg: #c9b8f0; --flag-bg: rgba(165, 144, 221, 0.22);
     --band: #1a2b4c; --panel: #16203e; --pill-fg: #0c1428; --pill-bg: #7ad6eb;
+    --code-keyword: #c9b8f0; --code-string: #8fe3a3; --code-name: #7ad6eb; --code-number: #f2b36b;
   }
 }
 body { background: var(--bg); color: var(--fg);
@@ -64,6 +66,23 @@ a:hover { text-decoration: underline; }
 code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 .secondary, .muted { color: var(--muted); }
+
+/* Source pages: Pygments token classes, one row per line. Every token color
+   keeps 4.5:1 on --surface. */
+.source .line { display: flex; min-height: 1.55em; line-height: 1.55; }
+.source .line > span { min-width: 0; }
+.source .linenos { flex: none; width: 4ch; margin-right: 14px; text-align: right;
+  color: var(--muted); user-select: none; }
+.source .linenos:hover { color: var(--fg); text-decoration: none; }
+.source .line:target { background: var(--hover); }
+.source .line:target .linenos { color: var(--fg); font-weight: 600; }
+.source :is(.k, .kc, .kd, .kn, .kp, .kr, .kt, .ow) { color: var(--code-keyword); }
+.source :is(.s, .s1, .s2, .sa, .sb, .sc, .sd, .se, .sh, .si, .sx, .sr, .ss, .dl) { color: var(--code-string); }
+.source :is(.nf, .fm, .nc, .nn, .nd, .nt, .na) { color: var(--code-name); }
+.source :is(.m, .mi, .mf, .mh, .mo, .mb, .il) { color: var(--code-number); }
+.source :is(.c, .c1, .cm, .ch, .cs, .cp, .cpf) { color: var(--muted); font-style: italic; }
+.source :is(.gh, .gu, .gs) { font-weight: 600; }
+.source .ge { font-style: italic; }
 .note { color: var(--muted); font-size: 12px; margin-left: 6px; }
 .logo { height: 24px; width: auto; vertical-align: -3px; margin-right: 10px; }
 
