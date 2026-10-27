@@ -181,9 +181,11 @@ def run(
         finalize_run(
             run_dir, task_path, agent, attempts, prompt_variant, treatment, versions
         )
+        # Before labelling and analysis, which read other runs and could
+        # raise: the scrub must not depend on them.
+        redact(run_dir)
         label_run(run_dir)
         analyse_run(run_dir)
-        redact(run_dir)
     return run_dir
 
 
