@@ -7,13 +7,12 @@ It is the baseline arm for the `weaviate-docs` Treatment.
 | Trial | Failed REQUIRED | Cost (USD) | Output tokens | URLs |
 |---|---|---|---|---|
 | `hANvYSV` | `python-client-version-latest` | 0.083 | 3,108 | 5 |
-| `JtwVga5` | `python-client-version-latest`, `current-vector-config` | 0.085 | 4,000 | 7 |
-| `HUvNZF2` | `python-client-version-latest`, `current-vector-config` | 0.088 | 3,429 | 6 |
+| `HUvNZF2` | `python-client-version-latest`, `current-vector-config` | 0.085 | 4,000 | 7 |
+| `JtwVga5` | `python-client-version-latest`, `current-vector-config` | 0.088 | 3,429 | 6 |
 | `LrQKZKu` | `current-vector-config` | 0.144 | 4,657 | 10 |
 | `SEqcL3X` | `current-vector-config` | 0.166 | 4,613 | 11 |
 
-The rows are in the order of each Trial's `weval.json`. Total cost was
-$0.566. At verify time the latest releases were Weaviate 1.40.2 and
+Total cost was $0.566. At verify time the latest releases were Weaviate 1.40.2 and
 `weaviate-client` 4.24.1. Each snapshot took both from the GitHub API and
 PyPI, so the Atom-feed fallback was not needed. Every Trial named 1.40.2 and
 passed `weaviate-version-latest`.
