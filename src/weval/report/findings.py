@@ -29,15 +29,19 @@ CLASS_ORDER = (
     "infrastructure failure",
 )
 BASELINE = "baseline"
+# Classes that blame weval rather than the agent or Weaviate.
+SCORER_CLASSES = ("scorer bug", "Task defect")
 
 
 @dataclass
 class FailureGroup:
     """One failed check of one Task and prompt variant, across every arm.
 
-    ``arms`` maps each arm (``baseline`` or the Treatment name, baseline
-    first) to ``(failing, scored)`` Trial counts, and ``arm_trials`` to the
-    same arms' scored Trials with their runs; ``failing`` lists the scored
+    ``arms`` maps each ``(agent, arm)`` pair, where the arm is ``baseline``
+    or the Treatment name, to ``(failing, scored)`` Trial counts, so no count
+    pools different Agents; ``arm_trials`` maps the same pairs to their
+    scored Trials with their runs. Both are ordered by Agent, baseline first
+    within each. ``failing`` lists the scored
     Trials that failed the check, with their runs, newest first.
     ``patterns`` holds the analyst patterns covering the check (each with its
     ``model`` and ``treatment`` added), ``proposals`` the rule's per-Trial
@@ -51,8 +55,8 @@ class FailureGroup:
     check: str
     required: bool
     description: str = ""
-    arms: dict[str, tuple[int, int]] = field(default_factory=dict)
-    arm_trials: dict[str, list[tuple[RunSummary, TrialSummary]]] = field(
+    arms: dict[tuple[str, str], tuple[int, int]] = field(default_factory=dict)
+    arm_trials: dict[tuple[str, str], list[tuple[RunSummary, TrialSummary]]] = field(
         default_factory=dict
     )
     failing: list[tuple[RunSummary, TrialSummary]] = field(default_factory=list)
@@ -76,15 +80,35 @@ class FailureGroup:
 
 
 @dataclass
+class ArmReliability:
+    """One arm of a Task's reliability, pooled across Agents.
+
+    ``arm`` is ``baseline`` or the Treatment name, and ``runs`` its retained
+    runs, newest first. ``non_results`` counts Trials with no scored outcome;
+    ``mixed_runs`` counts runs whose scored Trials both pass and fail, which
+    at identical settings is either real discrimination or flakiness;
+    ``scorer_flags`` counts analyst patterns and rule proposals that class a
+    failure in this arm as a scorer bug or Task defect. An analyst pattern
+    citing Trials of both arms counts once in each.
+    """
+
+    arm: str
+    runs: list[RunSummary]
+    scored: int
+    passed: int
+    non_results: int
+    mixed_runs: int
+    scorer_flags: int
+
+
+@dataclass
 class TaskReliability:
     """How far one Task and prompt variant's numbers can be trusted.
 
-    ``runs`` is every retained run, newest first. ``non_results`` counts
-    Trials with no scored outcome; ``mixed_runs`` counts runs whose scored
-    Trials both pass and fail, which at identical arms is either real
-    discrimination or flakiness; ``scorer_flags`` counts analyst patterns and
-    rule proposals that class a failure as a scorer bug or Task defect;
-    ``calibrated`` says an Oracle snapshot fixture exists in ``tests/``.
+    ``runs`` is every retained run, newest first, and ``scored`` and
+    ``passed`` count their Trials; ``arms`` splits the same runs by arm,
+    baseline first. ``calibrated`` says an Oracle snapshot fixture exists in
+    ``tests/``.
     """
 
     task: str
@@ -92,10 +116,8 @@ class TaskReliability:
     runs: list[RunSummary]
     scored: int
     passed: int
-    non_results: int
-    mixed_runs: int
-    scorer_flags: int
     calibrated: bool
+    arms: list[ArmReliability]
 
 
 def failure_groups(
@@ -105,17 +127,17 @@ def failure_groups(
     ``analyses`` (each Comparison with its saved ``analysis.analyse`` result),
     ordered by proposed class (``CLASS_ORDER``), required first, most failing
     Trials first."""
-    scored_by_arm: dict[tuple[str, str, str], list] = {}
+    # Keyed by (task, prompt variant, agent, arm).
+    scored_by_arm: dict[tuple[str, str, str, str], list] = {}
     for run in runs:
         arm = run.treatment or BASELINE
-        scored_by_arm.setdefault((run.task, run.prompt_variant, arm), []).extend(
-            (run, trial) for trial in run.scored
-        )
+        key = (run.task, run.prompt_variant, run.agent, arm)
+        scored_by_arm.setdefault(key, []).extend((run, trial) for trial in run.scored)
 
     groups: dict[tuple[str, str, str], FailureGroup] = {}
     fail_counts: dict[tuple[str, str, str], Counter] = {}
     label_cache: dict[Path, dict] = {}
-    for (task, prompt_variant, arm), pairs in scored_by_arm.items():
+    for (task, prompt_variant, agent, arm), pairs in scored_by_arm.items():
         for run, trial in pairs:
             for check, required in [(c, True) for c in trial.failed_required] + [
                 (c, False) for c in trial.failed_preferred
@@ -131,24 +153,24 @@ def failure_groups(
                         description=_description(trial, check),
                     ),
                 )
-                fail_counts.setdefault(key, Counter())[arm] += 1
+                fail_counts.setdefault(key, Counter())[agent, arm] += 1
                 group.failing.append((run, trial))
                 source = _answer_source(trial, check, label_cache)
                 if source:
                     group.sources[trial.path.name] = source
-    # Every arm of the group's Task and prompt variant gets a count, so a
-    # check failing in one arm still shows the other arm's 0 of N.
+    # Every Agent and arm of the group's Task and prompt variant gets a
+    # count, so a check failing in one arm still shows the others' 0 of N.
     for key, group in groups.items():
         group.arm_trials = _baseline_first(
             {
-                arm: pairs
-                for (task, variant, arm), pairs in scored_by_arm.items()
+                (agent, arm): pairs
+                for (task, variant, agent, arm), pairs in scored_by_arm.items()
                 if (task, variant) == key[:2]
             }
         )
         group.arms = {
-            arm: (fail_counts[key][arm], len(pairs))
-            for arm, pairs in group.arm_trials.items()
+            agent_arm: (fail_counts[key][agent_arm], len(pairs))
+            for agent_arm, pairs in group.arm_trials.items()
         }
 
     for comparison, found in analyses:
@@ -199,19 +221,54 @@ def task_reliability(
     for run in runs:
         by_task.setdefault((run.task, run.prompt_variant), []).append(run)
 
+    # Keyed by (task, prompt variant, arm). Rule proposals are per Trial and
+    # can repeat when two comparisons share a baseline, so they are collected
+    # as a set; each analyst pattern belongs to one comparison.
     flags: Counter = Counter()
+    rule_flags: set[tuple[str, str, str, str, str]] = set()
     for comparison, found in analyses:
         key = (comparison.task, comparison.prompt_variant)
-        patterns = ((found.get("analysis") or {}).get("patterns")) or []
-        flags[key] += sum(
-            row["class"] in ("scorer bug", "Task defect")
-            for row in [*patterns, *found["rule"]]
-        )
+        arm_of = {
+            trial.path.name: run.treatment or BASELINE
+            for run in [*comparison.baseline, *comparison.treated]
+            for trial in run.trials
+        }
+        for pattern in ((found.get("analysis") or {}).get("patterns")) or []:
+            if pattern["class"] not in SCORER_CLASSES:
+                continue
+            arms = {arm_of[t] for t in pattern.get("trials") or [] if t in arm_of}
+            for arm in arms or {BASELINE, comparison.treatment}:
+                flags[*key, arm] += 1
+        for row in found["rule"]:
+            if row["class"] in SCORER_CLASSES and row["trial"] in arm_of:
+                rule_flags.add((*key, arm_of[row["trial"]], row["trial"], row["check"]))
+    for task, prompt_variant, arm, _, _ in rule_flags:
+        flags[task, prompt_variant, arm] += 1
 
     rows = []
     for (task, prompt_variant), task_runs in sorted(by_task.items()):
-        scored = [t for run in task_runs for t in run.scored]
-        statuses = [{t.status for t in run.scored} for run in task_runs]
+        by_arm: dict[str, list[RunSummary]] = {}
+        for run in task_runs:
+            by_arm.setdefault(run.treatment or BASELINE, []).append(run)
+        arms = [
+            ArmReliability(
+                arm=arm,
+                runs=arm_runs,
+                scored=sum(len(run.scored) for run in arm_runs),
+                passed=sum(
+                    t.status == "passed" for run in arm_runs for t in run.scored
+                ),
+                non_results=sum(len(run.trials) - len(run.scored) for run in arm_runs),
+                mixed_runs=sum(
+                    "passed" in statuses and len(statuses) > 1
+                    for statuses in ({t.status for t in run.scored} for run in arm_runs)
+                ),
+                scorer_flags=flags[task, prompt_variant, arm],
+            )
+            for arm, arm_runs in sorted(
+                by_arm.items(), key=lambda item: (item[0] != BASELINE, item[0])
+            )
+        ]
         fixture = (
             fixtures_dir
             / f"{task.removeprefix('tasks/').replace('/', '-')}-oracle-snapshot.json"
@@ -221,19 +278,21 @@ def task_reliability(
                 task=task,
                 prompt_variant=prompt_variant,
                 runs=task_runs,
-                scored=len(scored),
-                passed=sum(t.status == "passed" for t in scored),
-                non_results=sum(len(run.trials) - len(run.scored) for run in task_runs),
-                mixed_runs=sum("passed" in seen and len(seen) > 1 for seen in statuses),
-                scorer_flags=flags[(task, prompt_variant)],
+                scored=sum(arm.scored for arm in arms),
+                passed=sum(arm.passed for arm in arms),
                 calibrated=fixture.is_file(),
+                arms=arms,
             )
         )
     return rows
 
 
-def _baseline_first[V](arms: dict[str, V]) -> dict[str, V]:
-    ordered = sorted(arms.items(), key=lambda item: (item[0] != BASELINE, item[0]))
+def _baseline_first[V](arms: dict[tuple[str, str], V]) -> dict[tuple[str, str], V]:
+    """``arms`` keyed by ``(agent, arm)``, ordered by Agent with the baseline
+    first within each."""
+    ordered = sorted(
+        arms.items(), key=lambda item: (item[0][0], item[0][1] != BASELINE, item[0][1])
+    )
     return dict(ordered)
 
 

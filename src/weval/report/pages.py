@@ -43,6 +43,9 @@ KEY_FILES = (
     ("submission", "artifacts/submission"),
 )
 ENVIRONMENTS = {"modal": "Modal", "docker": "local"}
+# Waffle cells group by Trial status in this order, so an arm's pass rate
+# reads as one block of colour; unknown statuses go last.
+STATUS_ORDER = ("passed", "failed", "timed-out", "non-result", "incomplete")
 
 
 def render_index(
@@ -53,12 +56,14 @@ def render_index(
     *,
     index_dir: Path,
     trial_pages: dict[Path, Path],
+    task_pages: dict[tuple[str, str], Path],
     generated: datetime,
 ) -> str:
     """Return ``index.html``. ``analyses`` pairs each Comparison with its
     saved ``analysis.analyse`` result; ``trial_pages`` maps each Trial
-    directory to its page. Links are relative to ``index_dir``."""
-    links = _Links(index_dir)
+    directory to its page, and ``task_pages`` each ``(task, prompt variant)``
+    to its Task page. Links are relative to ``index_dir``."""
+    links = _Links(index_dir, task_pages)
     trial_count = sum(len(run.trials) for run in runs)
     tasks = sorted({run.task for run in runs})
     body = f"""
@@ -77,7 +82,7 @@ Generated {generated:%Y-%m-%d %H:%M}.</span>
 <a href="#reliability">Task reliability</a></nav></header>
 {_findings_section(groups, links, trial_pages)}
 {_comparisons_section(analyses, links, trial_pages)}
-{_reliability_section(reliability, links, trial_pages)}"""
+{_reliability_section(reliability, links)}"""
     return _page("Weaviate AX Evaluation", body)
 
 
@@ -88,7 +93,8 @@ def _findings_section(
     groups: list[FailureGroup], links: "_Links", trial_pages: dict[Path, Path]
 ) -> str:
     intro = (
-        "Each card is one check that failed, with how often it failed in each arm. The counts come "
+        "Each card is one check that failed, with how often it failed in each arm: the bar fills to "
+        "the failure rate, and the whisker across it spans the 95% interval. The counts come "
         "straight from the retained records. Everything else on a card is a saved opinion about why "
         "it failed, and each opinion names its judge: the LLM analyst, a hand-coded rule, or the Jev "
         "labeller. Open a failing Trial to see the evidence; the final call on a class is yours."
@@ -107,12 +113,16 @@ def _finding(
     requires = []
     if group.description:
         requires.append(("Requires", _inline_markdown(group.description)))
-    facts = []
-    for arm, pairs in group.arm_trials.items():
-        failed, scored = group.arms[arm]
+    # One block of arm rows per Agent: a failure rate pooled across Agents
+    # would describe none of them.
+    by_agent: dict[str, list[tuple[str, str]]] = {}
+    for (agent, arm), (failed, scored) in group.arms.items():
         label = escape(arm) if arm == BASELINE else f"+ {escape(arm)}"
-        waffle = _check_waffle(pairs, group.check, links, trial_pages)
-        facts.append((label, f"{waffle}{failed}/{scored} failed"))
+        by_agent.setdefault(agent, []).append((label, _rate(failed, scored, "failed")))
+    panel = "".join(
+        f'<div class="agent">{escape(agent)}</div>{_facts(rows)}'
+        for agent, rows in by_agent.items()
+    )
     failing = (
         f"{len(group.failing)} failing Trial{'' if len(group.failing) == 1 else 's'}"
     )
@@ -121,13 +131,13 @@ def _finding(
             escape(group.check),
             f'<span class="muted">proposed cause</span> {_class_chip(group.proposed_class)}',
             [
-                f"{escape(_task_name(group.task))}{_variant_note(group.prompt_variant)}",
+                links.task(group.task, group.prompt_variant),
                 f"{'required' if group.required else 'preferred'} check",
                 failing,
             ],
         ),
         _facts(requires),
-        f'<div class="panel">{_facts(facts)}</div>',
+        f'<div class="panel">{panel}</div>',
     ]
 
     # Everything below the skeleton folds away, so a page of cards stays
@@ -148,7 +158,7 @@ def _finding(
         )
     folded.append(_failing_trials(group, links, trial_pages))
     parts.append(f'<details class="more">{"".join(folded)}</details>')
-    anchor = f"finding-{_slug(group.task)}-{escape(group.check)}"
+    anchor = _finding_anchor(group.task, group.prompt_variant, group.check)
     return f'<div class="card" id="{anchor}">{"".join(parts)}</div>'
 
 
@@ -160,8 +170,10 @@ def _failing_trials(
     rule = {row["trial"]: row for row in group.proposals}
     disputed = {row["trial"] for row in group.disputed}
     rows = []
-    # Baseline first, as in the card's per-arm rows.
-    failing = sorted(group.failing, key=lambda pair: bool(pair[0].treatment))
+    # By Agent, baseline first, as in the card's arm panel.
+    failing = sorted(
+        group.failing, key=lambda pair: (pair[0].agent, bool(pair[0].treatment))
+    )
     for run, trial in failing:
         name = trial.path.name
         source = ""
@@ -180,6 +192,7 @@ def _failing_trials(
         rows.append(
             "<tr>"
             f"<td>{links.link(trial_pages[trial.path], name, css='mono')}</td>"
+            f"<td>{escape(run.agent)}</td>"
             f"<td>{f'+ {escape(run.treatment)}' if run.treatment else BASELINE}</td>"
             f'<td class="wrapping">{source}</td>'
             f"<td>{proposed}</td>"
@@ -189,7 +202,7 @@ def _failing_trials(
         '<div class="part"><div class="who"><span class="pill">Failing Trials</span>'
         '<span class="note">judged one by one by the hand-coded rule and Jev</span></div>'
         '<table class="plain trials"><thead><tr>'
-        "<th>Trial</th><th>Arm</th><th>Jev's answer source</th>"
+        "<th>Trial</th><th>Agent</th><th>Arm</th><th>Jev's answer source</th>"
         "<th>Rule's class</th><th>Rule's reason</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
@@ -205,9 +218,9 @@ def _comparisons_section(
 ) -> str:
     intro = (
         "Did the Treatment help? Each card compares one Treatment's Trials with baseline Trials of "
-        "the same Task, Agent, and versions, one column per arm. Every square is one Trial; click it "
-        "to open that Trial. The range under a pass count is its 95% interval, and the p-value "
-        "(Fisher's exact test) says how easily the difference in passes could be chance. Usage rows "
+        "the same Task, Agent, and versions, one column per arm. Each bar fills to the pass rate, "
+        "and the whisker across it spans the 95% interval; the p-value (Fisher's exact test) says how "
+        "easily the difference in passes could be chance. Usage rows "
         "are means per Trial, and the last column gives the Treatment's change from the baseline. "
         "The analyst's text is the saved <code>weval analyse</code> answer; the report never calls "
         "the analyst itself."
@@ -260,7 +273,16 @@ def _comparison(
             pass_change = _delta(f"{gained:+d}", gained) + " "
         pass_change += f'<span class="note">p = {p:.2g}</span>'
     rows = [
-        row("Trials", [_waffle(runs, links, trial_pages) for runs in arms], css="num"),
+        row(
+            "Pass rate",
+            [
+                f'{_rate_bar(count, len(arm), "passed")}<span class="pct">{100 * count / len(arm):.0f}%</span>'
+                if arm
+                else ""
+                for count, arm in zip(passed, scored)
+            ],
+            css="num",
+        ),
         row(
             "Passed",
             [
@@ -277,7 +299,9 @@ def _comparison(
     if any(failed):
         rows.append(group("Failed required checks"))
         for check in sorted(set(failed[0]) | set(failed[1])):
-            anchor = f"#finding-{_slug(comparison.task)}-{escape(check)}"
+            anchor = "#" + _finding_anchor(
+                comparison.task, comparison.prompt_variant, check
+            )
             rows.append(
                 row(
                     f'<a class="mono" href="{anchor}">{escape(check)}</a>',
@@ -330,7 +354,7 @@ def _comparison(
         f'<span class="muted">passed</span> {passed[0]}/{len(scored[0])} '
         f"&rarr; {passed[1]}/{len(scored[1])}",
         [
-            f"{escape(_task_name(comparison.task))}{_variant_note(comparison.prompt_variant)}",
+            links.task(comparison.task, comparison.prompt_variant),
             escape(comparison.agent),
             f"versions {versions}" if versions else "unversioned",
         ],
@@ -350,7 +374,7 @@ def _analysis(found: dict, comparison: Comparison) -> str:
     folded, counts = [], []
     if found["disagreements"]:
         items = "".join(
-            f'<li><a class="mono" href="#finding-{_slug(comparison.task)}-{escape(d["check"])}">'
+            f'<li><a class="mono" href="#{_finding_anchor(comparison.task, comparison.prompt_variant, d["check"])}">'
             f"{escape(d['check'])}</a> in {escape(d['trial'])}: the analyst says "
             f"{escape(d['analyst'])}, the rule says {escape(d['class'])}</li>"
             for d in found["disagreements"]
@@ -379,90 +403,258 @@ def _analysis(found: dict, comparison: Comparison) -> str:
 # --- Task reliability ----------------------------------------------------------
 
 
-def _reliability_section(
-    reliability: list[TaskReliability],
-    links: "_Links",
-    trial_pages: dict[Path, Path],
-) -> str:
+def _reliability_section(reliability: list[TaskReliability], links: "_Links") -> str:
     intro = (
-        "Before trusting a number above, check its Task here. An oracle fixture means the reference "
+        "Before trusting a number above, check its Task here, arm by arm. An oracle fixture means the reference "
         "solution's snapshot is kept in the test suite, so the checks are calibrated against a known "
         "good answer. Scorer flags count saved opinions that blame the check or the Task itself "
         "rather than the agent. A mixed run has both passing and failing Trials in the same arm: "
-        "either the Task separates good runs from bad, or it is flaky. The squares open every "
-        "retained Trial."
+        "either the Task separates good runs from bad, or it is flaky. An arm that every Trial "
+        "passes, or none does, cannot show a Treatment's effect. Open a Task for its "
+        "definition and every retained run and Trial."
     )
-    rows = "".join(_reliability_row(row, links, trial_pages) for row in reliability)
+    rows = "".join(_reliability_row(row, links) for row in reliability)
     return f"""
 <h2 id="reliability">Task reliability{_count(reliability)}</h2>{_intro(intro)}
-<div class="wrap"><table>
-<thead><tr><th>Task</th><th>Calibration</th><th class="num">Passed</th><th class="num">Non-results</th>
-<th class="num">Mixed runs</th><th class="num">Scorer flags</th><th>Runs</th></tr></thead>
+<div class="wrap"><table class="reliability">
+<thead><tr><th>Task</th><th>Treatment</th><th>Passed</th><th class="num">Non-results</th>
+<th class="num">Mixed runs</th><th class="num">Scorer flags</th><th class="num">Runs</th></tr></thead>
 <tbody>{rows}</tbody></table></div>"""
 
 
-def _reliability_row(
-    row: TaskReliability, links: "_Links", trial_pages: dict[Path, Path]
-) -> str:
-    waffles = "".join(
-        f'<div><span class="waffle small">{_cells(run, links, trial_pages)}</span>'
-        f'<span class="note">{run.date:%Y-%m-%d} {escape(run.treatment or BASELINE)}</span></div>'
-        if run.date
-        else f'<div><span class="waffle small">{_cells(run, links, trial_pages)}</span>'
-        f'<span class="note">{escape(run.treatment or BASELINE)}</span></div>'
-        for run in row.runs
-    )
+def _reliability_row(row: TaskReliability, links: "_Links") -> str:
+    """The Task's arm rows; the Task's name and calibration, which hold for
+    every arm, span them."""
     calibrated = (
         '<span class="chip pass">oracle fixture</span>'
         if row.calibrated
         else '<span class="chip partial">no fixture</span>'
     )
-    return (
-        f'<tr id="task-{_slug(row.task)}">'
-        f"<td>{escape(_task_name(row.task))}{_variant_note(row.prompt_variant)}</td>"
-        f"<td>{calibrated}</td>"
-        f'<td class="num">{row.passed}/{row.scored}</td>'
-        f'<td class="num">{row.non_results or ""}</td>'
-        f'<td class="num">{row.mixed_runs or ""}</td>'
-        f'<td class="num">{row.scorer_flags or ""}</td>'
-        f'<td class="wrapping">{waffles}</td></tr>'
+    task = (
+        f'<td class="task" rowspan="{len(row.arms)}">'
+        f"<div>{links.task(row.task, row.prompt_variant)}</div>{calibrated}</td>"
     )
+    anchor = f' id="task-{_slug(row.task)}"'
+    rows = []
+    for i, arm in enumerate(row.arms):
+        rows.append(
+            f"<tr{anchor if i == 0 else ''}>{task if i == 0 else ''}"
+            f"<td>{escape(arm.arm) if arm.arm == BASELINE else f'+ {escape(arm.arm)}'}</td>"
+            f"<td>{_rate(arm.passed, arm.scored, 'passed')}</td>"
+            f'<td class="num">{arm.non_results or ""}</td>'
+            f'<td class="num">{arm.mixed_runs or ""}</td>'
+            f'<td class="num">{arm.scorer_flags or ""}</td>'
+            f'<td class="num">{len(arm.runs)}</td></tr>'
+        )
+    return "".join(rows)
 
 
 # --- Waffle grids --------------------------------------------------------------
 
 
-def _waffle(
-    runs: list[RunSummary], links: "_Links", trial_pages: dict[Path, Path]
+def _rate_bar(count: int, total: int, outcome: str) -> str:
+    """``count`` of ``total`` Trials as a bar on a 0-100% track: the fill
+    runs to the rate and a capped whisker spans its 95% Wilson interval.
+    ``outcome`` (``passed`` or ``failed``) names what is counted and sets the
+    bar's colour; the tooltip states the figures in words."""
+    if not total:
+        return ""
+    low, high = wilson_interval(count, total)
+    title = (
+        f"{count} of {total} {outcome} ({100 * count / total:.0f}%); "
+        f"95% interval {100 * low:.0f}-{100 * high:.0f}%"
+    )
+    return (
+        f'<span class="rate {outcome}" title="{title}">'
+        f'<span class="fill" style="width: {100 * count / total:.1f}%"></span>'
+        f'<span class="interval" style="left: {100 * low:.1f}%; width: {100 * (high - low):.1f}%"></span>'
+        "</span>"
+    )
+
+
+def _rate(count: int, total: int, outcome: str, *, name_interval: bool = False) -> str:
+    """A rate bar with its count and interval written out beside it;
+    ``name_interval`` labels the interval where no section note explains it."""
+    if not total:
+        return f"0/0 {outcome}"
+    low, high = wilson_interval(count, total)
+    label = ", 95% interval" if name_interval else ""
+    return (
+        f"{_rate_bar(count, total, outcome)}{count}/{total} {outcome} "
+        f'<span class="muted">({100 * low:.0f}&ndash;{100 * high:.0f}%{label})</span>'
+    )
+
+
+def _cells(
+    trials: list[TrialSummary], links: "_Links", trial_pages: dict[Path, Path]
 ) -> str:
-    cells = "".join(_cells(run, links, trial_pages) for run in runs)
-    return f'<span class="waffle">{cells}</span>' if cells else ""
+    """One cell per Trial, coloured by status and grouped in ``STATUS_ORDER``;
+    the sort is stable, so run order holds within a status."""
 
+    def rank(trial: TrialSummary) -> int:
+        if trial.status in STATUS_ORDER:
+            return STATUS_ORDER.index(trial.status)
+        return len(STATUS_ORDER)
 
-def _check_waffle(
-    pairs: list[tuple[RunSummary, TrialSummary]],
-    check: str,
-    links: "_Links",
-    trial_pages: dict[Path, Path],
-) -> str:
-    """One arm's scored Trials, coloured by this check's outcome (not Trial
-    status): red failed the check, neutral passed it. Cells open the Trial."""
-    cells = []
-    for _, trial in pairs:
-        failed = check in trial.failed_required or check in trial.failed_preferred
-        cells.append(
-            f'<a class="{"check-failed" if failed else "check-ok"}" '
-            f'href="{links.href(trial_pages[trial.path])}" '
-            f'title="{escape(trial.path.name)}: {"failed" if failed else "passed"} this check"></a>'
-        )
-    return f'<span class="waffle">{"".join(cells)}</span>'
-
-
-def _cells(run: RunSummary, links: "_Links", trial_pages: dict[Path, Path]) -> str:
     return "".join(
         f'<a class="status-{escape(trial.status)}" href="{links.href(trial_pages[trial.path])}" '
         f'title="{escape(trial.path.name)}: {escape(trial.status)}"></a>'
-        for trial in run.trials
+        for trial in sorted(trials, key=rank)
+    )
+
+
+# --- Task page -----------------------------------------------------------------
+
+# Task package directories, in reading order, by what they hold for a reader.
+PACKAGE_PARTS = (
+    ("environment", "Workspace"),
+    ("tests", "Scoring"),
+    ("solution", "Oracle solution"),
+)
+
+
+def render_task(
+    row: TaskReliability,
+    *,
+    page_dir: Path,
+    index: Path,
+    trial_pages: dict[Path, Path],
+    docs: Path | None = None,
+) -> str:
+    """Return one Task and prompt variant's page: the definition its newest
+    run packaged (prompt, checks, and files) and every retained run, each
+    with its Trials. ``docs`` is the Task's page under ``docs/tasks/``, when
+    one exists. Links are relative to ``page_dir``."""
+    links = _Links(page_dir)
+    newest = row.runs[0]
+    package = newest.path / "task"
+    version = (newest.fingerprints or {}).get("task")
+    trial_count = sum(len(run.trials) for run in row.runs)
+
+    facts = [
+        ("Passed", _rate(row.passed, row.scored, "passed", name_interval=True)),
+        ("Runs", f"{len(row.runs)} runs, {trial_count} Trials"),
+        (
+            "Definition",
+            "as packaged for "
+            + links.link(newest.path, newest.path.name, css="mono")
+            + (
+                f' <span class="note">Task version {escape(version[:8])}</span>'
+                if version
+                else ""
+            ),
+        ),
+    ]
+    if docs:
+        facts.append(("Documentation", links.link(docs, docs.name)))
+
+    sections = [
+        (
+            f'<div class="breadcrumb"><a href="{links.href(index)}">&larr; Report</a>'
+            ' <span class="muted">/ Task</span></div>'
+        ),
+        f"<h1>{LOGO}{escape(_task_name(row.task))}{_variant_note(row.prompt_variant)}</h1>",
+        _facts(facts),
+    ]
+    prompt_file = package / "instruction.md"
+    if prompt_file.is_file():
+        sections.append(
+            "<h2>Prompt</h2>"
+            '<p class="intro">Exactly what the agent was told, including the shared '
+            "Trial-environment notes appended to every Task. Raw file: "
+            f"{links.link(prompt_file, 'instruction.md')}.</p>"
+            f'<div class="card"><pre class="message">{escape(prompt_file.read_text())}</pre></div>'
+        )
+    sections.append("<h2>Checks</h2>" + _task_checks(row, index, links))
+    sections.append(
+        "<h2>Files</h2>"
+        '<p class="intro">The Task package as the newest run built it.</p>'
+        + _package_files(package, links)
+    )
+    sections.append("<h2>Runs</h2>" + _task_runs(row, links, trial_pages))
+    return _page(_task_name(row.task), "\n".join(sections))
+
+
+def _task_checks(row: TaskReliability, index: Path, links: "_Links") -> str:
+    """The newest run's checks, each with its failure rate over the retained
+    Trials that recorded it; a check that failed links to its finding."""
+    newest = next(
+        (t.record for t in row.runs[0].trials if t.record and t.record.get("checks")),
+        None,
+    )
+    if not newest:
+        return '<p class="muted">No checks recorded.</p>'
+    scored = [t for run in row.runs for t in run.scored]
+    rows = []
+    for check in newest["checks"]:
+        name = check["name"]
+        recorded = [
+            t
+            for t in scored
+            if any(c["name"] == name for c in (t.record or {}).get("checks") or [])
+        ]
+        failed = sum(
+            name in t.failed_required or name in t.failed_preferred for t in recorded
+        )
+        title = escape(name)
+        if failed:
+            anchor = _finding_anchor(row.task, row.prompt_variant, name)
+            title = f'<a href="{links.href(index)}#{anchor}">{title}</a>'
+        rows.append(
+            f'<tr><td class="mono">{title}</td>'
+            f"<td>{'required' if check.get('required') else 'preferred'}</td>"
+            f'<td class="wrapping">{_inline_markdown(check.get("description") or "")}</td>'
+            f"<td>{_rate(failed, len(recorded), 'failed')}</td></tr>"
+        )
+    return (
+        '<div class="card"><table class="plain trials"><thead><tr><th>Check</th><th>Kind</th>'
+        '<th>Requires</th><th>Failed <span class="note">with 95% interval</span></th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _package_files(package: Path, links: "_Links") -> str:
+    """Links to every file in the Task package, grouped by what each part
+    holds; files outside the named parts are listed as the package itself."""
+    if not package.is_dir():
+        return '<p class="muted">The run kept no Task package.</p>'
+    groups: dict[str, list[str]] = {label: [] for _, label in PACKAGE_PARTS}
+    groups["Package"] = []
+    names = dict(PACKAGE_PARTS)
+    for path in sorted(p for p in package.rglob("*") if p.is_file()):
+        relative = path.relative_to(package)
+        label = (
+            names.get(relative.parts[0], "Package")
+            if len(relative.parts) > 1
+            else "Package"
+        )
+        groups[label].append(links.link(path, str(relative), css="mono"))
+    return _facts(
+        [(label, "<br>".join(files)) for label, files in groups.items() if files]
+    )
+
+
+def _task_runs(
+    row: TaskReliability, links: "_Links", trial_pages: dict[Path, Path]
+) -> str:
+    rows = []
+    for run in row.runs:
+        passed = sum(t.status == "passed" for t in run.scored)
+        version = (run.fingerprints or {}).get("task") or ""
+        rows.append(
+            f"<tr><td>{links.link(run.path, run.date.strftime('%Y-%m-%d %H:%M') if run.date else run.path.name)}</td>"
+            f"<td>{escape(run.agent)}</td>"
+            f"<td>{f'+ {escape(run.treatment)}' if run.treatment else BASELINE}</td>"
+            f'<td class="mono">{escape(version[:8])}</td>'
+            f'<td class="num">{passed}/{len(run.scored)}</td>'
+            f'<td class="wrapping"><span class="waffle small">{_cells(run.trials, links, trial_pages)}</span></td></tr>'
+        )
+    return (
+        '<p class="intro">Newest first. Each square is one Trial, passes first; click it to open '
+        "that Trial.</p>"
+        '<div class="card"><table class="plain trials"><thead><tr><th>Run</th><th>Agent</th>'
+        '<th>Arm</th><th>Task version</th><th class="num">Passed</th><th>Trials</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -475,18 +667,19 @@ def render_trial(
     *,
     page_dir: Path,
     index: Path,
+    task_page: Path,
     expected: dict | None = None,
     proposals: dict[str, list[dict]] | None = None,
 ) -> str:
-    """Return one Trial's page; links are relative to ``page_dir``.
+    """Return one Trial's page; links are relative to ``page_dir``, and the
+    Task's name links to ``task_page``.
     ``expected`` is the Task's ``EXPECTED``, for the checks' diagnostics;
     ``proposals`` maps a failed check to its saved class proposals, each
     ``{"class", "who", "reason"}``."""
-    links = _Links(page_dir)
+    links = _Links(page_dir, {(run.task, run.prompt_variant): task_page})
     record = trial.record or {}
     agent = record.get("agent") or {}
     usage = record.get("usage") or {}
-    task_anchor = f"{links.href(index)}#task-{_slug(run.task)}"
 
     facts = [
         (
@@ -498,7 +691,7 @@ def render_trial(
                 else ""
             ),
         ),
-        ("Task", f'<a href="{task_anchor}">{escape(_task_name(run.task))}</a>'),
+        ("Task", links.task(run.task, run.prompt_variant)),
         ("Prompt variant", escape(run.prompt_variant)),
         (
             "Agent",
@@ -894,10 +1087,20 @@ def _tree_node(key: str, value: object, *, open_depth: int, depth: int) -> str:
 
 
 class _Links:
-    """Relative links from pages written in ``page_dir``."""
+    """Relative links from pages written in ``page_dir``. ``task_pages`` maps
+    each ``(task, prompt variant)`` to its Task page."""
 
-    def __init__(self, page_dir: Path):
+    def __init__(
+        self, page_dir: Path, task_pages: dict[tuple[str, str], Path] | None = None
+    ):
         self.page_dir = page_dir
+        self.task_pages = task_pages or {}
+
+    def task(self, task: str, prompt_variant: str) -> str:
+        """The Task's name, linked to its page when one was written."""
+        name = f"{escape(_task_name(task))}{_variant_note(prompt_variant)}"
+        page = self.task_pages.get((task, prompt_variant))
+        return f'<a href="{self.href(page)}">{name}</a>' if page else name
 
     def href(self, target: Path) -> str:
         return escape(os.path.relpath(target, self.page_dir))
@@ -999,6 +1202,10 @@ def _task_name(task: str) -> str:
     return task.removeprefix("tasks/")
 
 
+def _finding_anchor(task: str, prompt_variant: str, check: str) -> str:
+    return escape(f"finding-{_slug(task)}-{prompt_variant}-{check}")
+
+
 def _slug(task: str) -> str:
     return _task_name(task).replace("/", "-")
 
@@ -1012,8 +1219,9 @@ def _inline_markdown(text: str) -> str:
 
 def _block_markdown(text: str) -> str:
     """Render the Markdown blocks agents write in their messages: headings,
-    bullet and numbered lists, fenced code, and paragraphs, with
-    ``_inline_markdown`` inside each. Unrecognised syntax stays as written."""
+    bullet and numbered lists (a wrapped item's following lines stay in that
+    item), fenced code, and paragraphs, with ``_inline_markdown`` inside each.
+    Unrecognised syntax stays as written."""
     html: list[str] = []
     paragraph: list[str] = []
     items: list[str] = []
@@ -1026,7 +1234,8 @@ def _block_markdown(text: str) -> str:
             html.append(f"<p>{_inline_markdown(' '.join(paragraph))}</p>")
             paragraph.clear()
         if items:
-            html.append(f"<{list_tag}>{''.join(items)}</{list_tag}>")
+            rendered = "".join(f"<li>{_inline_markdown(i)}</li>" for i in items)
+            html.append(f"<{list_tag}>{rendered}</{list_tag}>")
             items.clear()
             list_tag = ""
 
@@ -1052,12 +1261,14 @@ def _block_markdown(text: str) -> str:
             if list_tag != "ul":
                 flush()
                 list_tag = "ul"
-            items.append(f"<li>{_inline_markdown(item[1])}</li>")
+            items.append(item[1])
         elif item := re.match(r"\d+[.)] +(.*)", stripped):
             if list_tag != "ol":
                 flush()
                 list_tag = "ol"
-            items.append(f"<li>{_inline_markdown(item[1])}</li>")
+            items.append(item[1])
+        elif items:  # A continuation line, as CommonMark reads it.
+            items[-1] += f" {stripped}"
         else:
             paragraph.append(stripped)
     if fence is not None:  # An unclosed fence still shows its lines.

@@ -2,8 +2,9 @@
 
 ``write_report`` writes ``index.html`` into the outputs directory, leading
 with the findings (every failed check with its saved judgments), then each
-Treatment comparison, then each Task's reliability, plus one page per Trial
-under ``_report/<run>/<trial>.html``. It renders only retained files, saved
+Treatment comparison, then each Task's reliability, plus one page per Task
+and prompt variant under ``_report/tasks/`` and one page per Trial under
+``_report/<run>/<trial>.html``. It renders only retained files, saved
 analyses, and saved labels: building the report never calls the analyst or
 Jev, and never modifies a run directory. Pages link to each other and to
 retained files relatively, so the site opens from ``file://``.
@@ -15,18 +16,21 @@ from pathlib import Path
 from weval import analysis
 from weval.collect import Comparison, collect_runs, compare_treatments
 from weval.report.findings import failure_groups, task_reliability
-from weval.report.pages import render_index, render_trial
+from weval.report.pages import render_index, render_task, render_trial
 
 ROOT = Path(__file__).resolve().parents[3]
-# Generated Trial pages; collect_runs skips it because it has no job/ directory.
+# Generated Task and Trial pages; collect_runs skips it because it has no
+# job/ directory.
 PAGES_DIR = "_report"
+# Task pages, inside PAGES_DIR; no run directory name can collide with it.
+TASK_PAGES_DIR = "tasks"
 
 
 def write_report(outputs_dir: Path) -> Path:
     """Write the report into ``outputs_dir`` and return the index path.
 
-    Trial pages left over from deleted runs are removed; no other file under
-    ``outputs_dir`` is touched.
+    Task and Trial pages left over from deleted runs are removed; no other
+    file under ``outputs_dir`` is touched.
     """
     runs = collect_runs(outputs_dir)
     expected = {task: _expected(task) for task in {run.task for run in runs}}
@@ -49,6 +53,26 @@ def write_report(outputs_dir: Path) -> Path:
         for run in runs
         for trial in run.trials
     }
+    reliability = task_reliability(runs, analyses, ROOT / "tests/fixtures")
+    task_pages = {
+        (row.task, row.prompt_variant): pages_dir
+        / TASK_PAGES_DIR
+        / f"{_task_page_name(row.task, row.prompt_variant)}.html"
+        for row in reliability
+    }
+    for row in reliability:
+        page = task_pages[row.task, row.prompt_variant]
+        page.parent.mkdir(parents=True, exist_ok=True)
+        docs = ROOT / "docs" / f"{row.task}.md"
+        page.write_text(
+            render_task(
+                row,
+                page_dir=page.parent,
+                index=index,
+                trial_pages=trial_pages,
+                docs=docs if docs.is_file() else None,
+            )
+        )
     for run in runs:
         for trial in run.trials:
             page = trial_pages[trial.path]
@@ -59,24 +83,32 @@ def write_report(outputs_dir: Path) -> Path:
                     trial,
                     page_dir=page.parent,
                     index=index,
+                    task_page=task_pages[run.task, run.prompt_variant],
                     expected=expected[run.task],
                     proposals=proposals.get(trial.path.name, {}),
                 )
             )
-    _remove_stale_pages(pages_dir, set(trial_pages.values()))
+    _remove_stale_pages(pages_dir, {*trial_pages.values(), *task_pages.values()})
 
     index.write_text(
         render_index(
             runs,
             analyses,
             failure_groups(runs, analyses),
-            task_reliability(runs, analyses, ROOT / "tests/fixtures"),
+            reliability,
             index_dir=outputs_dir,
             trial_pages=trial_pages,
+            task_pages=task_pages,
             generated=datetime.now(),
         )
     )
     return index
+
+
+def _task_page_name(task: str, prompt_variant: str) -> str:
+    """``tasks/build/x`` as ``build-x``, with ``--<variant>`` unless default."""
+    name = task.removeprefix("tasks/").replace("/", "-")
+    return name if prompt_variant == "default" else f"{name}--{prompt_variant}"
 
 
 def _expected(task: str) -> dict:

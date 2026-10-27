@@ -95,6 +95,8 @@ thead th { color: var(--muted); font-size: 13px; font-weight: 600; border-bottom
 .wrap thead th { position: sticky; top: 0; z-index: 1; }
 .num { text-align: right; font-variant-numeric: lining-nums tabular-nums; }
 td.wrapping, th.wrapping { white-space: normal; }
+table.reliability td.task { vertical-align: top; }
+table.reliability td.task .chip { margin-top: 4px; }
 table.plain { width: auto; }
 table.plain th, table.plain td { padding: 5px 12px 5px 0; background: none; }
 table.plain td + td, table.plain th + th { padding-left: 12px; }
@@ -120,15 +122,31 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
 .waffle a.status-non-result, .waffle a.status-incomplete { background: var(--cell-warn); }
 .waffle a:hover { outline: 2px solid var(--link); }
 .waffle.small a { width: 10px; height: 10px; border-radius: 2px; }
-/* In a finding, cells mean this check's outcome, not the Trial's status. */
-.waffle a.check-failed { background: var(--cell-fail); }
-.waffle a.check-ok { background: var(--cell-none); }
+
+/* Rate bars: the fill runs to the rate on a light track of the same hue, and
+   a light, dotted whisker across the bar spans the 95% interval. The count is
+   always written beside the bar, so colour is never the only cue. */
+.rate { position: relative; display: inline-block; width: 120px; height: 8px; border-radius: 4px;
+  vertical-align: middle; margin-right: 10px; }
+.rate .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.rate .interval { position: absolute; top: -3px; bottom: -3px; min-width: 3px; box-sizing: border-box;
+  border-left: 1.5px solid var(--muted); border-right: 1.5px solid var(--muted);
+  background: repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 4px) center / 100% 1.5px no-repeat;
+  opacity: 0.6; }
+.rate.passed { background: var(--pass-bg); }
+.rate.passed .fill { background: var(--cell-pass); }
+.rate.failed { background: var(--fail-bg); }
+.rate.failed .fill { background: var(--cell-fail); }
+.pct { display: inline-block; min-width: 4ch; }
 
 /* Findings and comparisons sit as cards on the page background, with one
    shared head and one label column width so the two sections read alike. */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   padding: 0 18px 14px; margin: 0 0 16px; max-width: 130ch; overflow-x: auto;
   box-shadow: 0 1px 3px rgba(19, 12, 73, 0.08); }
+/* A card without a head band still needs room above its content. */
+.card > :first-child:not(.card-head) { margin-top: 12px; }
+.card > pre.message { max-width: 110ch; margin-bottom: 0; }
 .card-head { margin: 0 -18px 10px; padding: 12px 18px 10px; background: var(--band);
   border-bottom: 1px solid var(--line); }
 .card .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
@@ -143,6 +161,8 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
    label column. */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; margin: 8px 0;
   width: fit-content; max-width: 100%; box-sizing: border-box; }
+.panel .agent { font-size: 12px; font-weight: 600; margin-top: 4px; }
+.panel .agent + dl.facts { margin-top: 0; }
 .card .panel dl.facts { grid-template-columns: calc(14em - 13px) max-content; margin: 2px 0; align-items: center; }
 /* Inside a card, each judge's part opens with a pill and a rule above it. */
 .part { border-top: 1px solid var(--line-strong); margin-top: 12px; padding-top: 10px; }

@@ -5,12 +5,13 @@ renders a retained run offline, removing stale Trial pages.
 """
 
 import json
+import re
 from pathlib import Path
 
 from weval.collect import Comparison, RunSummary, TrialSummary
 from weval.report import write_report
 from weval.report.findings import failure_groups, task_reliability
-from weval.report.pages import _block_markdown
+from weval.report.pages import _block_markdown, _cells, _Links
 
 TASK = "tasks/build/x"
 
@@ -36,7 +37,9 @@ def make_trial(
     )
 
 
-def make_run(tmp_path: Path, name: str, treatment: str, trials) -> RunSummary:
+def make_run(
+    tmp_path: Path, name: str, treatment: str, trials, agent: str = "agent"
+) -> RunSummary:
     base = tmp_path / name
     return RunSummary(
         path=base,
@@ -44,7 +47,7 @@ def make_run(tmp_path: Path, name: str, treatment: str, trials) -> RunSummary:
         task=TASK,
         prompt_variant="default",
         treatment=treatment,
-        agent="agent",
+        agent=agent,
         trials=[make_trial(base, *t) for t in trials],
     )
 
@@ -64,10 +67,17 @@ def test_failure_groups_count_every_arm_even_at_zero_failures(tmp_path):
     )
     groups = {g.check: g for g in failure_groups([baseline, treated], [])}
 
-    assert groups["vector-config"].arms == {"baseline": (2, 2), "skills": (0, 2)}
-    assert groups["other-check"].arms == {"baseline": (0, 2), "skills": (1, 2)}
+    assert groups["vector-config"].arms == {
+        ("agent", "baseline"): (2, 2),
+        ("agent", "skills"): (0, 2),
+    }
+    assert groups["other-check"].arms == {
+        ("agent", "baseline"): (0, 2),
+        ("agent", "skills"): (1, 2),
+    }
     # The non-result Trial is not scored, so it is in no count and no arm.
-    assert [t.path.name for _, t in groups["vector-config"].arm_trials["skills"]] == [
+    skills = groups["vector-config"].arm_trials["agent", "skills"]
+    assert [t.path.name for _, t in skills] == [
         "t3",
         "t4",
     ]
@@ -92,6 +102,27 @@ def analysed(comparison: Comparison, patterns: list[dict], rule: list[dict]) -> 
             "note": None,
         },
     )
+
+
+def test_failure_groups_count_each_agent_separately(tmp_path):
+    claude = make_run(
+        tmp_path,
+        "20260101-000001__build__x__claude",
+        "",
+        [("t1", "failed", ["vector-config"]), ("t2", "passed")],
+        agent="claude",
+    )
+    pi = make_run(
+        tmp_path,
+        "20260101-000002__build__x__pi",
+        "",
+        [("t3", "passed"), ("t4", "passed"), ("t5", "passed")],
+        agent="pi",
+    )
+    (group,) = failure_groups([pi, claude], [])
+
+    # Pooled, the baseline would read 1 of 5; each Agent keeps its own count.
+    assert group.arms == {("claude", "baseline"): (1, 2), ("pi", "baseline"): (0, 3)}
 
 
 def test_saved_judgments_attach_and_order_the_groups(tmp_path):
@@ -163,7 +194,7 @@ def test_disagreeing_judges_leave_a_group_unclassified(tmp_path):
     assert group.proposed_class == "unclassified"
 
 
-def test_task_reliability_counts_what_erodes_trust(tmp_path):
+def test_task_reliability_counts_what_erodes_trust_per_arm(tmp_path):
     fixtures = tmp_path / "fixtures"
     fixtures.mkdir()
     (fixtures / "build-x-oracle-snapshot.json").write_text("{}")
@@ -173,19 +204,38 @@ def test_task_reliability_counts_what_erodes_trust(tmp_path):
         "",
         [("t1", "passed"), ("t2", "failed", ["vector-config"]), ("t3", "non-result")],
     )
+    treated = make_run(
+        tmp_path,
+        "20260101-000002__build__x__agent+skills",
+        "skills",
+        [("t4", "passed"), ("t5", "passed")],
+    )
     comparison = Comparison(
-        TASK, "default", "agent", "skills", baseline=[mixed], treated=[]
+        TASK, "default", "agent", "skills", baseline=[mixed], treated=[treated]
     )
     rule = [
         {"trial": "t2", "check": "vector-config", "class": "scorer bug", "reason": "x"}
     ]
-    (row,) = task_reliability([mixed], [analysed(comparison, [], rule)], fixtures)
+    # A pattern citing Trials of both arms flags each arm once.
+    pattern = {
+        "class": "Task defect",
+        "checks": ["vector-config"],
+        "trials": ["t2", "t4"],
+    }
+    found = analysed(comparison, [pattern], rule)
+    (row,) = task_reliability([treated, mixed], [found], fixtures)
 
-    assert (row.passed, row.scored) == (1, 2)
-    assert row.non_results == 1
-    assert row.mixed_runs == 1
-    assert row.scorer_flags == 1
     assert row.calibrated
+    assert (row.passed, row.scored) == (3, 4)
+    baseline, skills = row.arms
+    assert (baseline.arm, baseline.passed, baseline.scored) == ("baseline", 1, 2)
+    assert (baseline.non_results, baseline.mixed_runs, baseline.scorer_flags) == (
+        1,
+        1,
+        2,
+    )
+    assert (skills.arm, skills.passed, skills.scored) == ("skills", 2, 2)
+    assert (skills.non_results, skills.mixed_runs, skills.scorer_flags) == (0, 0, 1)
 
 
 def test_block_markdown_renders_the_blocks_agents_write():
@@ -203,6 +253,38 @@ def test_block_markdown_renders_the_blocks_agents_write():
     assert "<li>added <code>page_size</code></li><li>capped at 100</li>" in html
     assert "<pre>curl &#x27;http://x?q=&lt;sku&gt;&#x27;</pre>" in html
     assert "<p>Not a full test suite.</p>" in html
+
+
+def test_block_markdown_keeps_a_wrapped_list_item_in_its_item():
+    text = (
+        "Environment notes:\n"
+        "- Your shell runs inside the container, so\n"
+        "  `docker ps` lists it.\n"
+        "- Restart it by stopping that process."
+    )
+    html = _block_markdown(text)
+    assert html == (
+        "<p>Environment notes:</p><ul>"
+        "<li>Your shell runs inside the container, so <code>docker ps</code> lists it.</li>"
+        "<li>Restart it by stopping that process.</li></ul>"
+    )
+
+
+def test_waffle_cells_group_by_outcome_in_run_order(tmp_path):
+    trials = [
+        make_trial(tmp_path, "t1", "failed", ["vector-config"]),
+        make_trial(tmp_path, "t2", "passed"),
+        make_trial(tmp_path, "t3", "non-result"),
+        make_trial(tmp_path, "t4", "failed", ["vector-config"]),
+        make_trial(tmp_path, "t5", "passed"),
+    ]
+    pages = {t.path: tmp_path / f"{t.path.name}.html" for t in trials}
+    links = _Links(tmp_path)
+
+    def order(html: str) -> list[str]:
+        return re.findall(r'title="(t\d)', html)
+
+    assert order(_cells(trials, links, pages)) == ["t2", "t5", "t1", "t4", "t3"]
 
 
 def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
@@ -232,23 +314,41 @@ def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
             }
         )
     )
+    (run_dir / "task" / "environment").mkdir(parents=True)
+    (run_dir / "task" / "instruction.md").write_text("Build **semantic search**.")
+    (run_dir / "task" / "environment" / "WORKSPACE.md").write_text("notes")
     stale = tmp_path / "_report" / "gone-run" / "gone-trial.html"
     stale.parent.mkdir(parents=True)
     stale.write_text("stale")
+    stale_task = tmp_path / "_report" / "tasks" / "build-gone.html"
+    stale_task.parent.mkdir(parents=True)
+    stale_task.write_text("stale")
 
     index = write_report(tmp_path)
 
     page = tmp_path / "_report" / run_dir.name / "t1.html"
     assert index.is_file() and page.is_file()
     assert not stale.exists() and not stale.parent.exists()
+    assert not stale_task.exists()
     html = index.read_text()
     assert "Findings" in html and "vector-config" in html
-    # The baseline arm names itself and shows its fail fraction and waffle.
+    # The baseline arm names itself and shows its fail fraction and rate bar.
     assert "<dt>baseline</dt>" in html
     assert "1/1 failed" in html
-    assert 'class="check-failed"' in html
+    assert 'class="rate failed"' in html
     # No Treatment runs: the comparison section says so rather than erroring.
     assert "No Treatment runs are retained." in html
     trial_html = page.read_text()
     assert "collection uses the legacy vectorizer" in trial_html
     assert "weval.json" in trial_html
+
+    # The Task page shows the packaged definition and opens every Trial, and
+    # each page names the Task with a link to it.
+    task_page = tmp_path / "_report" / "tasks" / "build-x.html"
+    task_html = task_page.read_text()
+    assert "Build **semantic search**." in task_html
+    assert "environment/WORKSPACE.md" in task_html
+    assert "the collection configures a named vector" in task_html
+    assert f"../{run_dir.name}/t1.html" in task_html
+    assert 'href="_report/tasks/build-x.html"' in html
+    assert 'href="../tasks/build-x.html"' in trial_html
