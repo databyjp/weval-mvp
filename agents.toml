@@ -9,6 +9,11 @@ harness = "pi"
 version = "0.85.1"
 model = "openrouter/z-ai/glm-5.3-flash"
 
+["pi-kimi-k3.1-pro"]
+harness = "pi"
+version = "0.85.1"
+model = "openrouter/moonshotai/kimi-k3.1-pro"
+
 ["claude-code-haiku-5.5"]
 harness = "claude-code"
 # npm "stable" tag on 2026-10-16; "latest" was 2.1.301.
