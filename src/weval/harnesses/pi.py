@@ -5,6 +5,8 @@ installs ``pi-web-access`` with ``npm ci`` from the pinned lockfile in
 ``pi_web_access/`` and fails setup unless the exact pinned version resolved.
 Copies of the lockfile, search config, and provenance go to ``/logs/agent`` so
 each Trial records the web tooling it ran with.
+
+Harness protocol members are documented in ``weval.harnesses``.
 """
 
 import json

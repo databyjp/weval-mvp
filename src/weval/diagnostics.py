@@ -85,12 +85,13 @@ def _treatment_used(skills: Path, called: list[str] | None) -> dict | None:
         return None
     names = [path.name for path in skills.iterdir() if (path / "SKILL.md").exists()]
     # Claude Code loads a skill with its Skill tool; Pi reads the SKILL.md.
-    loaded = any(
+    skill_tool_called = any(
         text.startswith("Skill ")
         and json.loads(text[len("Skill ") :]).get("skill") in names
-        or any(f"{name}/SKILL.md" in text for name in names)
         for text in called
     )
+    skill_md_read = any(f"{name}/SKILL.md" in text for text in called for name in names)
+    loaded = skill_tool_called or skill_md_read
     files = sorted(
         str(path.relative_to(skills))
         for path in skills.rglob("*")

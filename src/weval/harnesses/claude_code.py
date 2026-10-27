@@ -12,6 +12,8 @@ Harbor sets every model alias, including the subagent model, to the Agent's
 Claude Code is installed from a binary the host downloads once per version and
 platform (``CachedClaudeCode``), not by Harbor's per-Trial download. Modal
 Trials read it from a Modal Volume (``modal_environment``).
+
+Harness protocol members are documented in ``weval.harnesses``.
 """
 
 import asyncio

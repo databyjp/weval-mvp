@@ -161,6 +161,12 @@ def test_facts_give_each_arm_its_statistics_and_each_failure_its_evidence(compar
     assert treated["pass_interval_95_percent"] == [9, 91]
     assert given["fisher_p"] == 1.0
     assert base["mean_uncached_input_tokens"] == 600
+    # Both arms record identical usage, so every change is zero percent.
+    assert given["usage_change_percent"] == {
+        "cost_usd": 0,
+        "uncached_input": 0,
+        "turns": 0,
+    }
     assert given["treatment_readme"] == "Question: does a local copy help?"
     failures = {
         (t["id"], f["check"]): f

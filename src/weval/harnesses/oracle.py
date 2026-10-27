@@ -1,4 +1,7 @@
-"""Harbor's built-in Oracle: runs the Task's ``solution/solve.sh``, no model."""
+"""Harbor's built-in Oracle: runs the Task's ``solution/solve.sh``, no model.
+
+Harness protocol members are documented in ``weval.harnesses``.
+"""
 
 from harbor.models.trial.config import AgentConfig
 

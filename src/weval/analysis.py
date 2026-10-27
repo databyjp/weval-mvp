@@ -163,20 +163,38 @@ def facts(comparison: Comparison, expected: dict) -> dict:
             "treatment": comparison.treatment_version,
         },
         "arms": arms,
-        "fisher_p": float(
-            f"{fisher_exact(treated['passed'], treated['scored'], base['passed'], base['scored']):.2g}"
+        "fisher_p": _two_significant_figures(
+            fisher_exact(
+                treated["passed"], treated["scored"], base["passed"], base["scored"]
+            )
         )
         if base["scored"] and treated["scored"]
         else None,
-        # Treatment mean against baseline mean, in whole percent.
-        "usage_change_percent": {
-            attribute: round(100 * (value - reference) / reference)
-            if (value := mean_usage(treated_trials, attribute)) is not None
-            and (reference := mean_usage(baseline_trials, attribute))
-            else None
-            for attribute in ("cost_usd", "uncached_input", "turns")
-        },
+        "usage_change_percent": _usage_change_percent(treated_trials, baseline_trials),
     }
+
+
+def _two_significant_figures(p: float) -> float:
+    """Round to the two significant figures the analyst is told to quote."""
+    return float(f"{p:.2g}")
+
+
+def _usage_change_percent(
+    treated_trials: list[TrialSummary], baseline_trials: list[TrialSummary]
+) -> dict[str, int | None]:
+    """Treatment mean against baseline mean, in whole percent, per usage
+    attribute. ``None`` when either arm has no figures, or the baseline mean
+    is zero and gives no ratio."""
+    changes: dict[str, int | None] = {}
+    for attribute in ("cost_usd", "uncached_input", "turns"):
+        treated = mean_usage(treated_trials, attribute)
+        baseline = mean_usage(baseline_trials, attribute)
+        changes[attribute] = (
+            round(100 * (treated - baseline) / baseline)
+            if treated is not None and baseline
+            else None
+        )
+    return changes
 
 
 def propose_class(failure: dict) -> dict:
@@ -491,10 +509,7 @@ def _failed_checks(trial: TrialSummary, expected: dict) -> list[dict]:
                 "required": check["required"],
                 "notes": str(check.get("notes") or "")[:NOTES_CHARS],
                 "expected": value,
-                "labels": {
-                    question: answers[question]
-                    for question in labels.QUESTIONS
-                }
+                "labels": {question: answers[question] for question in labels.QUESTIONS}
                 if answers
                 else None,
                 "error_stage": record.get("error_stage"),
