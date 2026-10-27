@@ -142,9 +142,9 @@ hex digits of a SHA-256 over file paths and contents:
 
 | Key | Covers | A change means |
 |---|---|---|
-| `task` | The packaged Task in the run's `task/` (prompt with the shared instructions, `environment/`, `snapshot.py`, `verify.py`) without `check.py`, plus the Compose overlays | the Trials must be re-run |
-| `check` | The packaged `check.py` | the Trials can be re-scored with `weval check` |
-| `treatment` | The run's `treatment/` copy; `null` for a baseline | a different Treatment version |
+| `task` | The Task directory without `check.py`, including every prompt variant, plus `shared-instructions.md`, `verify.py`, and the Compose overlays. One version spans all prompt variants. | the Trials must be re-run |
+| `check` | The Task's `check.py` | the Trials can be re-scored with `weval check` |
+| `treatment` | The Treatment's `skills/`, the files the Agent gets; `null` for a baseline. Its `README.md` is not covered. | a different Treatment version |
 
 Trials recorded before fingerprints existed have `fingerprints` missing or
 `null`. The docs site and the latest releases change too and can't be

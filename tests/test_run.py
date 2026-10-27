@@ -178,41 +178,37 @@ def test_finalize_records_the_treatment(tmp_path):
     assert finalize(trial, TASK_PATH, oracle, treatment="weaviate-docs")["treatment"] == "weaviate-docs"
 
 
-def packaged_run(run_dir: Path, treatment: bool = False) -> Path:
-    package_task(PROMPT_VARIANT_TASK, run_dir / "task")
-    if treatment:
-        shutil.copytree(ROOT / "treatments/weaviate-docs", run_dir / "treatment")
-    return run_dir
-
-
 def test_fingerprints_version_the_task_and_check_separately(tmp_path):
-    run_dir = packaged_run(tmp_path / "run")
-    overlays = compose_overlays(PROMPT_VARIANT_TASK)
-    before = fingerprints(run_dir, overlays)
+    task_dir = tmp_path / "current-practices"
+    shutil.copytree(PROMPT_VARIANT_TASK, task_dir, ignore=shutil.ignore_patterns("__pycache__"))
+    before = fingerprints(task_dir, None)
 
-    assert before == fingerprints(packaged_run(tmp_path / "again"), overlays)
+    assert before == fingerprints(PROMPT_VARIANT_TASK, None)
     assert before["treatment"] is None
 
-    (run_dir / "task/tests/check.py").write_text("REQUIRED = []\n")
-    after_check = fingerprints(run_dir, overlays)
+    (task_dir / "check.py").write_text("REQUIRED = []\n")
+    after_check = fingerprints(task_dir, None)
     assert after_check["task"] == before["task"]
     assert after_check["check"] != before["check"]
 
-    with (run_dir / "task/instruction.md").open("a") as prompt:
+    # One Task version covers every prompt variant.
+    with (task_dir / "prompts/legal-archive.md").open("a") as prompt:
         prompt.write("One more sentence.\n")
-    after_prompt = fingerprints(run_dir, overlays)
+    after_prompt = fingerprints(task_dir, None)
     assert after_prompt["task"] != before["task"]
     assert after_prompt["check"] == after_check["check"]
 
 
-def test_fingerprints_cover_the_overlays_and_the_treatment(tmp_path):
-    run_dir = packaged_run(tmp_path / "run", treatment=True)
-    versions = fingerprints(run_dir, [SHARED_COMPOSE, WEAVIATE_COMPOSE])
+def test_treatment_fingerprint_covers_the_skills_only(tmp_path):
+    treatment = tmp_path / "treatment"
+    shutil.copytree(ROOT / "treatments/weaviate-docs", treatment)
+    versions = fingerprints(PROMPT_VARIANT_TASK, treatment / "skills")
 
-    assert versions["task"] != fingerprints(run_dir, [SHARED_COMPOSE])["task"]
-    assert versions["treatment"] is not None
-    (run_dir / "treatment/skills/weaviate-docs/SKILL.md").write_text("changed\n")
-    assert fingerprints(run_dir, [SHARED_COMPOSE, WEAVIATE_COMPOSE])["treatment"] != versions["treatment"]
+    (treatment / "README.md").write_text("A different question.\n")
+    assert fingerprints(PROMPT_VARIANT_TASK, treatment / "skills") == versions
+
+    (treatment / "skills/weaviate-docs/SKILL.md").write_text("changed\n")
+    assert fingerprints(PROMPT_VARIANT_TASK, treatment / "skills")["treatment"] != versions["treatment"]
 
 
 def test_finalize_records_the_fingerprints(tmp_path):

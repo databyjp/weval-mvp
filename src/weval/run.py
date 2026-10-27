@@ -142,7 +142,7 @@ def run(
         shutil.copytree(skills.parent, run_dir / "treatment", ignore=shutil.ignore_patterns(".*"))
         agent_config.skills = [str(run_dir / "treatment/skills")]
     # Before the Trials run, so the fingerprints cover exactly what they were given.
-    versions = fingerprints(run_dir, compose_overlays(task_dir))
+    versions = fingerprints(task_dir, run_dir / "treatment/skills" if skills else None)
     config = JobConfig(
         job_name="job",
         jobs_dir=run_dir,
@@ -171,36 +171,36 @@ def treatment_skills(treatment: str) -> Path:
     return skills
 
 
-def fingerprints(run_dir: Path, overlays: list[Path]) -> dict[str, str | None]:
+def fingerprints(task_dir: Path, skills: Path | None) -> dict[str, str | None]:
     """Content hashes that version what a run's Trials were given, for
     ``weval.json``'s ``fingerprints``.
 
-    - ``task``: the packaged Task in ``run_dir/task`` (the prompt with the
-      shared instructions, the environment, ``snapshot.py``, and the
-      verifier) without ``check.py``, plus the Compose ``overlays``. A
-      change here needs new Trials.
-    - ``check``: the packaged ``check.py``. A change here needs only a
+    - ``task``: the Task directory without ``check.py``, covering every
+      prompt variant, plus what packaging and the environment add: the shared
+      instructions, ``verify.py``, and the Compose overlays. One version
+      spans all prompt variants. A change here needs new Trials.
+    - ``check``: the Task's ``check.py``. A change here needs only a
       re-score (``weval check``).
-    - ``treatment``: the run's ``treatment/`` copy, or ``None`` for a baseline.
+    - ``treatment``: the Treatment's ``skills``, the files the Agent gets, or
+      ``None`` for a baseline. The Treatment's ``README.md`` is not covered.
 
     Each is 12 hex digits of a SHA-256 over file paths and contents, so it is
     independent of timestamps and directory order.
     """
-    package = run_dir / "task"
-    check = package / "tests/check.py"
-    task_files = {str(path.relative_to(package)): path for path in _tree(package) if path != check}
-    task_files |= {f"overlays/{path.name}": path for path in overlays}
-    treatment = run_dir / "treatment"
+    check = task_dir / "check.py"
+    task_files = {str(path.relative_to(task_dir)): path for path in _tree(task_dir) if path != check}
+    added = [SHARED_INSTRUCTIONS, Path(verify.__file__), *compose_overlays(task_dir)]
+    task_files |= {f"weval/{path.name}": path for path in added}
     return {
         "task": _digest(task_files),
         "check": check_fingerprint(check),
-        "treatment": _digest({str(path.relative_to(treatment)): path for path in _tree(treatment)})
-        if treatment.exists() else None,
+        "treatment": _digest({str(path.relative_to(skills)): path for path in _tree(skills)})
+        if skills else None,
     }
 
 
 def check_fingerprint(check_file: Path) -> str:
-    """The ``check`` fingerprint of a ``check.py``, packaged or in its Task."""
+    """The ``check`` fingerprint of a ``check.py``."""
     return _digest({"check.py": check_file})
 
 
