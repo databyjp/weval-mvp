@@ -12,4 +12,5 @@ answers can cite it.
 `fetch_pages.py` regenerates `pages/` from the live site. The committed
 pages were fetched on 2026-10-27. They copy the docs as published, including
 the release-notes tables that give the latest server patch as `v1.40.0`
-(1.40.2 was out) and Python clients by minor line (`4.24.x`).
+(1.40.2 was out) and Python clients by minor line (`4.24.x`). The client
+patch, `v4.24.1`, is only on the Python client page.

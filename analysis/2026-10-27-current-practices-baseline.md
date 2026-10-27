@@ -25,16 +25,23 @@ versions by minor line. The two Trials that also checked PyPI named 4.24.1.
 `JtwVga5` wrote "check PyPI and npm for the exact patch" and stopped there.
 PyPI published 4.24.1 on 2026-10-26 and 4.24.0 on 2026-10-21.
 
-The docs gave no patch to find. On 2026-10-27, the release-notes page and
-the Python client page list clients by minor line only, and the
-release-notes table of supported versions gives the latest server patch as
-`v1.40.0` while 1.40.2 was out. The Docker installation page pins 1.40.2.
-Agents that stop at the docs page are one step short, so I classified the
-failure as a Weaviate gap: a page that named the patch would likely have
-given the answer. (The first version of this note called it an agent gap;
-the maintainer read it as a docs gap.) `WORKSPACE.md` describes the item as
-"the corresponding Weaviate client versions", which can be read as the
-compatible line; the check stays as it is.
+On 2026-10-27, the pages agents read first give no client patch. The
+release-notes page and the client-libraries index list clients by minor
+line, and the release-notes table of supported versions gives the latest
+server patch as `v1.40.0` while 1.40.2 was out. The patch is one page
+deeper: the Python client page opens with "The latest Python client is
+version `v4.24.1`", and the Docker installation page pins 1.40.2. No
+baseline Trial fetched the Python client page.
+
+I classified the failure as a Weaviate gap: the release-notes page, which
+every Trial fetched, stops agents one step short. The `weaviate-docs`
+Treatment supports this. Its three Trials that read the Python client page
+named 4.24.1, and its two that didn't gave "4.24.x"
+(`analysis/2026-10-27-treatment-runs.md`). The first version of this note
+called it an agent gap; the maintainer read it as a docs gap.
+`WORKSPACE.md` describes the item as "the corresponding Weaviate client
+versions", which can be read as the compatible line; the check stays as it
+is.
 
 ## current-vector-config: agent gap
 
@@ -51,7 +58,6 @@ Trials of the default prompt variant from 20 and 21 October also named
 ## For the Treatment comparison
 
 The baseline passes 0 of 5, so `weaviate-docs` can move the pass rate as
-well as usage. The Treatment's `release-notes.md` and
-`client-libraries-python.md` copy the minor-line tables, so the Treatment
-may reproduce the client-version failure. A variant whose pages name the
-patch would test the Weaviate-gap reading directly.
+well as usage. The Treatment's `release-notes.md` copies the minor-line
+tables, so the Treatment may reproduce the client-version failure in Trials
+that don't open `client-libraries-python.md`.
