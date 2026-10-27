@@ -15,25 +15,38 @@ sources below before writing configuration.
   (https://github.com/weaviate/weaviate/releases) or the Docker image tags
   for `cr.weaviate.io/semitechnologies/weaviate`. Pin the full
   `major.minor.patch` tag, not `latest`.
-- Use the latest Python client, `weaviate-client` on PyPI
+- Use the latest client from the package manager, for example `weaviate-client` on PyPI
   (https://pypi.org/pypi/weaviate-client/json). The docs release-notes table
-  lists client versions by minor line (`4.24.x`); PyPI has the patch.
+  lists client versions by minor line (`4.24.x`); see the package manager for the patch.
 - If a project already pins a client version, keep the server within the
   range that client supports, and write code for the pinned client.
-- Python client v3 (`weaviate.Client(...)`) is deprecated. Use v4:
+- Watch for deprecated versions and syntax. For example, the
+  Python client v3 (`weaviate.Client(...)`) is deprecated. Use v4:
   `weaviate.connect_to_local()`, `weaviate.connect_to_custom()`, or
   `weaviate.connect_to_weaviate_cloud()`, and close the client when done.
 
 ## Collections and vectors
 
-- Define collections explicitly rather than relying on auto-schema.
+- Define collections and the data schema explicitly rather than relying on auto-schema.
+- If a use case involves many identical sub-collections with the same data schema,
+  such as a SaaS product with many end users.
+- Consider what might be the optimal index type, and configuration.
+  For example, Weaviate now offers "HFresh" index type, which is a disk-based index with a much smaller footprint.
+  And there is a new filtering algorithm called PathSeer (https://weaviate.io/blog/pathseer-filtered-vector-search)
+  which proves to be very performant in a variety of situations.
+  This is in addition to various quantization options, and other index settings.
+  Look to research various options, and formulate a set of options that would suit the user's stated goals.
+  If insufficient information is available, look to establish a balanced set of options that don't lead to
+  huge resource requirements, without significant performance degradation.
+  For example, an HNSW index with RQ1 might be a reasonable starting point.
 - Since Python client 4.16.0, vectorizers are configured with
   `vector_config=Configure.Vectors.<module>(...)`. Each entry is a named
   vector, which can take `name=` and `source_properties=`. The legacy forms,
   `vectorizer_config=Configure.Vectorizer...` and `Configure.NamedVectors`,
   are deprecated. Use `Configure.Vectors.self_provided()` when the
   application supplies its own vectors.
-- A vectorizer module must be enabled on the server (`ENABLE_MODULES`) and,
+- A vectorizer module must be enabled on the server (via `ENABLE_MODULES`
+  or default-enabled modules) and,
   for local models, its inference service must run beside Weaviate:
   `text2vec-transformers` with `TRANSFORMERS_INFERENCE_API`, or
   `text2vec-ollama` with an Ollama endpoint. Weaviate applies no default
@@ -72,6 +85,15 @@ client.collections.create(
 
 ## Import
 
+- Where the server supports it, use server-side batching
+  (see https://docs.weaviate.io/weaviate/manage-objects/import#server-side-batching):
+   ```python
+   with collection.batch.stream() as batch:
+    for data_row in data_rows:
+        batch.add_object(
+            properties=data_row,
+        )
+    ```
 - Import with a batch context: `collection.batch.dynamic()` or
   `collection.batch.fixed_size(batch_size=...)`. After the context exits,
   read `collection.batch.failed_objects`; batch errors do not raise.
