@@ -128,7 +128,7 @@ def _request(result: dict, sources: dict[str, str], messages: list[str]) -> dict
     options["own_knowledge"] = OWN_KNOWLEDGE
     return {
         "model": MODEL,
-        "state": {"failed_check": f"{result['name']}: {result['notes']}", "agent_messages": messages},
+        "state": {"failed_check": f"{result['name']}: {result.get('notes') or ''}", "agent_messages": messages},
         "questions": {
             "answer_source": {
                 "type": "choice",

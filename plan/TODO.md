@@ -16,12 +16,11 @@ Produce the facts the 2026-10-27 analyses gathered by hand
    warnings. Only current-practices defines `EXPECTED` so far.
 3. Done: the Treatments tab shows uncached input tokens, a Wilson interval
    for each pass rate, and Fisher's exact p-value for each pair.
-4. Typed labels from Jev (`typesafe/jev-router` on OpenRouter) for each
-   failed check: `answer-source` (one of the pages the Trial read, or
-   none), `verification` (verified, deferred to the user, guessed, not
-   attempted), and `api-recommended` (current, legacy, both, none). Record
-   the model, prompt version, and confidence; below a threshold, a person
-   reviews.
+4. Done for `answer-source` and `verification` (`src/weval/labels.py`,
+   TypeSafe's API directly: OpenRouter lists only `jev-router`, which
+   routes to other models). Open: `api-recommended`, which belongs with the
+   judge (step 6); and crediting a multi-file `grep` result to the file
+   each line names, since today it credits every file the call named.
 5. A hand-coded rule that proposes a failure class from steps 1 to 4, with
    its reason, tested on fixture Trials. No match is "unclassified" for a
    person to review.

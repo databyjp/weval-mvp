@@ -55,3 +55,10 @@ After the check results, `weval check` prints diagnostics from the Trial's logs;
 - under a failed check with an [expected value](define-a-task.md#expected-values), whether the agent was shown that value;
 - for a Treatment Trial, whether the skill loaded and which Treatment files a tool call named (a glob such as `*.md` reads files without naming them);
 - Weaviate deprecation warnings (`Dep024: ...`) the agent was shown, and those in `verifier/application.log`.
+
+`weval run` and `weval check` also label each failed check with TypeSafe's Jev model, given `TYPESAFEAI_API_KEY`:
+
+- `answer source`: which source the agent took the failed value or approach from, out of the URLs, searches, and Treatment files whose results it was shown, or `own-knowledge`;
+- `verification`: `verified`, `deferred_to_user`, `not_attempted`, or `guessed`.
+
+Each label has Jev's confidence from 0 to 1; read a low one (below about 0.5) as "check by hand". A source is credited with every tool result that named it, so a `grep` over several files credits all of them. Labels are saved in the run directory's `labels/<trial>.json` and reused until the request changes, such as after a `check.py` change; the report shows saved labels only and never calls Jev.

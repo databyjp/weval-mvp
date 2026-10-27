@@ -270,3 +270,26 @@ def test_uncached_input_leaves_out_cache_reads(tmp_path):
     [run] = collect_runs(tmp_path)
 
     assert run.trials[0].uncached_input == 30_000
+
+
+def test_trial_page_shows_saved_labels_without_calling_jev(tmp_path, monkeypatch):
+    from weval import labels
+
+    tasks_dir = write_task(tmp_path / "repo", CHECKS)
+    outputs = tmp_path / "outputs"
+    failed = record("failed", preferred_passed=True, cost=0.1)
+    write_trial(outputs / RUN, "t1", failed, agent_steps=1)
+    answer = {"type": "choice", "choice": "own_knowledge", "confidence": 0.9, "probabilities": {}}
+    monkeypatch.setenv(labels.KEY_VAR, "test-key")
+    monkeypatch.setattr(labels, "_post", lambda body, key: {
+        "model": "jev-1.14.0", "answers": {"answer_source": answer, "verification": {**answer, "choice": "guessed"}}})
+    labels.label(outputs / RUN / "job/t1", failed["checks"])
+
+    def no_call(body, key):
+        raise AssertionError("the report called Jev")
+    monkeypatch.setattr(labels, "_post", no_call)
+    write_report(outputs, tasks_dir, tmp_path / "repo/agents.toml")
+
+    trial_page = (outputs / f"_report/{RUN}/t1.html").read_text()
+    assert ("answer source <code>own-knowledge</code> (0.9) · verification <code>guessed</code> (0.9)"
+            " · jev-1.14.0") in trial_page

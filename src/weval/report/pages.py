@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from weval.diagnostics import diagnose
+from weval.labels import label
 from weval.report.assets import INDEX_SCRIPT, STYLE
 from weval.report.collect import (
     Comparison, RunSummary, TaskDefinition, TrialSummary, compare_treatments, fisher_exact, mean_usage, wilson_interval,
@@ -104,6 +105,8 @@ def render_trial(
     snapshot = _read_json(snapshot_file)
     prompt_file = run.path / "task/instruction.md"
     found = diagnose(trial.path, expected or {}, snapshot or {}, checks)
+    # Saved labels only: building the report never calls Jev.
+    labelled = label(trial.path, checks, call=False)["labels"]
 
     sections = [
         (f'<div class="breadcrumb"><a href="{results_link}">&larr; Results</a>'
@@ -111,7 +114,7 @@ def render_trial(
         f"<h1>{escape(_task_name(run.task))} <span class=\"muted\">with</span> {escape(run.agent)}</h1>",
         "<dl class=\"facts\">" + "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts) + "</dl>",
         _final_message(trial.path / "agent/trajectory.json"),
-        "<h2>Checks</h2>" + (_checks_table(checks, found) if checks else '<p class="muted">No checks recorded.</p>')
+        "<h2>Checks</h2>" + (_checks_table(checks, found, labelled) if checks else '<p class="muted">No checks recorded.</p>')
         + _diagnostics(found),
         "<h2>Usage</h2>" + _usage(trial, usage),
         "<h2>Files</h2>" + '<p class="links">'
@@ -486,13 +489,14 @@ def _usage_mean(
 # --- Trial page parts --------------------------------------------------------
 
 
-def _checks_table(checks: list[dict], found: dict) -> str:
+def _checks_table(checks: list[dict], found: dict, labelled: dict) -> str:
     seen = {item["check"]: item for item in found["expected_value_seen"] or []}
     rows = "".join(
         f'<tr><td><span class="chip {"pass" if c["passed"] else "fail"}">{"passed" if c["passed"] else "failed"}</span></td>'
         f'<td class="mono">{escape(c["name"])}</td>'
         f'<td class="secondary">{"required" if c["required"] else "preferred"}</td>'
-        f'<td class="wrapping"><pre>{escape(str(c.get("notes") or ""))}</pre>{_seen_note(seen.get(c["name"]))}</td>'
+        f'<td class="wrapping"><pre>{escape(str(c.get("notes") or ""))}</pre>{_seen_note(seen.get(c["name"]))}'
+        f'{_labels_note(labelled.get(c["name"]))}</td>'
         f'<td class="wrapping secondary">{_inline_markdown(c.get("description") or "")}</td></tr>'
         for c in sorted(checks, key=lambda c: (c["passed"], not c["required"]))
     )
@@ -505,6 +509,15 @@ def _seen_note(item: dict | None) -> str:
         return ""
     return (f'<p class="note">expected <code>{escape(item["expected"])}</code>, '
             f'{"seen" if item["seen"] else "not seen"} in what the agent was shown</p>')
+
+
+def _labels_note(answers: dict | None) -> str:
+    """A failed check's saved Jev labels, each with its confidence."""
+    if answers is None:
+        return ""
+    parts = [f'{question.replace("_", " ")} <code>{escape(str(answers[question]["choice"]))}</code> '
+             f'({answers[question]["confidence"]})' for question in ("answer_source", "verification")]
+    return f'<p class="note">{" · ".join(parts)} · {escape(str(answers["model"]))}</p>'
 
 
 def _diagnostics(found: dict) -> str:

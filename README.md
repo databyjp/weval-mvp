@@ -133,7 +133,10 @@ uv sync
 
 Create `.env` with `OPENROUTER_API_KEY`, `MODAL_TOKEN_ID`, and
 `MODAL_TOKEN_SECRET`. Claude Code Agents with `auth = "subscription"` also
-need `CLAUDE_CODE_OAUTH_TOKEN`, printed by `claude setup-token`. Git ignores it, and after each run weval replaces any
+need `CLAUDE_CODE_OAUTH_TOKEN`, printed by `claude setup-token`. Labels for
+failed checks ([how to read a Trial](docs/how-to/read-a-trial.md#re-score))
+need `TYPESAFEAI_API_KEY` from the TypeSafe console; without it, runs and
+re-scores skip them. Git ignores `.env`, and after each run weval replaces any
 of these values found in retained output with `<redacted:NAME>`.
 
 ## Use

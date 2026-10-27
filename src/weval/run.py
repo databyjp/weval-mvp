@@ -5,6 +5,7 @@ Output layout, one directory per invocation::
     experiment-outputs/<timestamp>__<stage>__<scenario>[@<prompt-variant>]__<agent>[+<treatment>]/
         task/                 Harbor task package built from tasks/<stage>/<scenario>/
         treatment/            copy of treatments/<treatment>/, when given
+        labels/<trial>.json   saved Jev labels for the Trial's failed checks (weval.labels)
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
         job/<trial>/weval.json  Agent, status, missing logs, check results, fingerprints
 """
