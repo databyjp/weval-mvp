@@ -12,6 +12,8 @@ from weval.run import (
     ROOT,
     SHARED_COMPOSE,
     WEAVIATE_COMPOSE,
+    check_fingerprint,
+    check_versions,
     compose_overlays,
     derive_status,
     finalize,
@@ -39,6 +41,20 @@ def test_finalize_records_task_path_and_rescore_resolves_it(tmp_path, monkeypatc
     monkeypatch.chdir(tmp_path)
     results = rescore(trial)
     assert results and all(r["passed"] for r in results)
+
+
+def test_check_versions_compares_the_current_check_with_the_recorded_one(tmp_path):
+    trial = tmp_path / "trial"
+    trial.mkdir()
+    (trial / "result.json").write_text(json.dumps({"verifier_result": {"rewards": {"reward": 1}}}))
+    oracle = {"name": "oracle", "harness": "oracle"}
+    current = check_fingerprint(ROOT / TASK_PATH / "check.py")
+
+    finalize(trial, TASK_PATH, oracle, versions={"task": "t", "check": current, "treatment": None})
+    assert check_versions(trial) == (current, current)
+
+    finalize(trial, TASK_PATH, oracle)
+    assert check_versions(trial) == (current, None)
 
 
 def test_finalize_records_usage_from_result_and_trajectory(tmp_path):

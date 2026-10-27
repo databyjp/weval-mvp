@@ -193,10 +193,15 @@ def fingerprints(run_dir: Path, overlays: list[Path]) -> dict[str, str | None]:
     treatment = run_dir / "treatment"
     return {
         "task": _digest(task_files),
-        "check": _digest({"check.py": check}),
+        "check": check_fingerprint(check),
         "treatment": _digest({str(path.relative_to(treatment)): path for path in _tree(treatment)})
         if treatment.exists() else None,
     }
+
+
+def check_fingerprint(check_file: Path) -> str:
+    """The ``check`` fingerprint of a ``check.py``, packaged or in its Task."""
+    return _digest({"check.py": check_file})
 
 
 def _tree(root: Path) -> list[Path]:
@@ -383,11 +388,23 @@ def rescore(trial_dir: Path, task_dir: Path | None = None) -> list[dict]:
     ``task_dir`` defaults to the Task recorded in the Trial's ``weval.json``,
     resolved against the repository root. Retained files are not modified.
     """
-    if task_dir is None:
-        task_dir = ROOT / json.loads((trial_dir / "weval.json").read_text())["task"]
+    task_dir = task_dir or _recorded_task(trial_dir)
     spec = importlib.util.spec_from_file_location("check", task_dir / "check.py")
     assert spec and spec.loader
     check = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(check)
     snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
     return verify.score(check, snapshot)
+
+
+def check_versions(trial_dir: Path, task_dir: Path | None = None) -> tuple[str, str | None]:
+    """The ``check`` fingerprint ``rescore`` scores with, and the one the
+    Trial recorded (``None`` for a Trial recorded without fingerprints).
+    ``task_dir`` defaults as in ``rescore``."""
+    record = json.loads((trial_dir / "weval.json").read_text())
+    current = check_fingerprint((task_dir or _recorded_task(trial_dir)) / "check.py")
+    return current, (record.get("fingerprints") or {}).get("check")
+
+
+def _recorded_task(trial_dir: Path) -> Path:
+    return ROOT / json.loads((trial_dir / "weval.json").read_text())["task"]

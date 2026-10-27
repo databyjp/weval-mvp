@@ -32,7 +32,7 @@ def main() -> None:
         return
 
     # Imported here so `weval --help` does not pay Harbor's import time.
-    from weval.run import rescore, run
+    from weval.run import check_versions, rescore, run
 
     if args.command == "run":
         print(run(
@@ -40,6 +40,9 @@ def main() -> None:
             local=args.local, prompt_variant=args.prompt_variant, treatment=args.treatment,
         ))
     else:
+        current, recorded = check_versions(args.trial, args.task)
+        print(f"check.py {current}, recorded {recorded or 'unversioned'}"
+              + ("" if current == recorded else "; scores may differ from weval.json"))
         for r in rescore(args.trial, args.task):
             status = "PASS" if r["passed"] else "FAIL"
             kind = "" if r["required"] else " (preferred)"

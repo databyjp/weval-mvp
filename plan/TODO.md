@@ -7,11 +7,9 @@ Remaining work, roughly in order. Delete items when done.
 Produce the facts the 2026-10-27 analyses gathered by hand
 (`analysis/2026-10-27-*.md`) the same way every time. Steps, in order:
 
-1. Version each Trial. Record fingerprints in `weval.json`: the Task (the
-   packaged Task without `check.py`, plus the Compose overlays), `check.py`,
-   and the Treatment. The report compares arms only with the same Task and
-   check fingerprints. The Trial date stays the way to correlate docs-site
-   and release changes, which can't be hashed.
+1. Done: `weval.json` records `fingerprints`, the report compares arms
+   only within one Task and check version, and `weval check` prints both
+   check versions.
 2. Computed diagnostics for each Trial, from its logs:
    - `expected-value-seen`: for a failed check whose expected value the
      snapshot holds (such as a latest release), whether that value appeared
@@ -40,11 +38,9 @@ before building them.
 
 ## Re-score tooling
 
-- `weval check` only prints, so re-score results live in analysis files that
-  record the date and commit (`analysis/2026-10-27-rescore.md`). If
-  re-scoring becomes routine, consider having `weval check` print the
-  check fingerprint (Scoring rubric, step 1) and date itself, or write a
-  file the report can read.
+- `weval check` only prints, so re-score results live in analysis files
+  that record the date and the check fingerprint `weval check` prints. If
+  re-scoring becomes routine, consider writing a file the report can read.
 - The four `investigate/stack-recommendation` Trials record a Task path that
   no longer exists; re-score them with
   `--task tasks/investigate/db-recommendation`.
