@@ -6,9 +6,9 @@ Output layout, one directory per invocation::
         task/                 Harbor task package built from tasks/<stage>/<scenario>/
         treatment/            copy of treatments/<treatment>/, when given
         labels/<trial>.json   saved Jev labels for the Trial's failed checks (weval.labels)
-    experiment-outputs/_analysis/<comparison>.json  saved analysis of each Treatment comparison (weval.analysis)
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
         job/<trial>/weval.json  Agent, status, missing logs, check results, fingerprints
+    experiment-outputs/_analysis/<comparison>.json  saved analysis of each Treatment comparison (weval.analysis)
 """
 
 import asyncio

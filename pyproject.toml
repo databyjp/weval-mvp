@@ -1,7 +1,7 @@
 [project]
 name = "weval"
 version = "0.0.1"
-description = "Add your description here"
+description = "Runs Weaviate coding Tasks against agent harnesses and scores each Trial"
 readme = "README.md"
 authors = [
     { name = "JP Hwang", email = "me@jphwang.com" }
@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "anthropic>=2.3.0",
     "harbor[modal]>=0.23.0",
+    "httpx>=0.28.1",
 ]
 
 [project.scripts]

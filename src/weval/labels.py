@@ -35,6 +35,8 @@ MAX_SOURCES = 254
 # A call that returned less showed the agent nothing to take a value from,
 # such as the write that saves an answer citing URLs.
 MIN_SHOWN_CHARS = 200
+# The two Choice questions asked per failed check, in presentation order.
+QUESTIONS = ("answer_source", "verification")
 OWN_KNOWLEDGE = (
     "The agent's own knowledge: no source it was shown states the value or approach."
 )

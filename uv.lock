@@ -2473,6 +2473,7 @@ source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "harbor", extra = ["modal"] },
+    { name = "httpx" },
 ]
 
 [package.dev-dependencies]
@@ -2485,6 +2486,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=2.3.0" },
     { name = "harbor", extras = ["modal"], specifier = ">=0.23.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
 ]
 
 [package.metadata.requires-dev]

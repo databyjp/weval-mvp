@@ -25,7 +25,10 @@ def print_diagnostics(found: dict) -> None:
 
 def print_labels(answers: dict) -> None:
     """Print one failed check's labels from ``weval.labels.label``."""
-    for question in ("answer_source", "verification"):
+    # Imported here: ``import weval`` must not pull labels' httpx dependency.
+    from weval.labels import QUESTIONS
+
+    for question in QUESTIONS:
         answer = answers[question]
         print(
             f"     {question.replace('_', ' ')}: {answer['choice']} "

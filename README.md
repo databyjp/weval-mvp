@@ -2,7 +2,7 @@
 
 ## Introduction
 
-`weval` assess how well Weaviate works with coding agents, in order to measure its current performance and improve it going forward.
+`weval` assesses how well Weaviate works with coding agents, to measure its current performance and improve it going forward.
 
 ## How
 

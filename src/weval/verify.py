@@ -83,8 +83,10 @@ def reward(results: list[dict]) -> int:
 
 
 def _compose(*args: str, timeout: int = 240) -> subprocess.CompletedProcess[str]:
+    # check=False: callers read returncode and stderr to report compose failures.
     return subprocess.run(
         ["docker", "compose", "--file", str(APP_DIR / "docker-compose.yaml"), *args],
+        check=False,
         cwd=APP_DIR,
         capture_output=True,
         text=True,

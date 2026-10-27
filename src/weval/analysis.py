@@ -493,7 +493,7 @@ def _failed_checks(trial: TrialSummary, expected: dict) -> list[dict]:
                 "expected": value,
                 "labels": {
                     question: answers[question]
-                    for question in ("answer_source", "verification")
+                    for question in labels.QUESTIONS
                 }
                 if answers
                 else None,

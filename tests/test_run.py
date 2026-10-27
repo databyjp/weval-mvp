@@ -1,5 +1,8 @@
-"""``weval.json`` records the Task path relative to the repository, and
-``weval check`` resolves it from there, whatever the working directory."""
+"""Recording and re-scoring Trials: ``finalize`` writes ``weval.json``
+(status, usage, Treatment, fingerprints), ``derive_status`` grades outcomes,
+``package_task`` builds the Harbor package with its compose overlays, and
+``weval check`` resolves the recorded repository-relative Task path from any
+working directory."""
 
 import json
 import shutil
