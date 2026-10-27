@@ -97,7 +97,7 @@ A Task is a directory that runs without framework changes:
 | `environment/` | Harbor environment: `Dockerfile`, starter app, fixtures, and an optional Compose overlay for Task-specific settings such as a healthcheck. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |
 | `snapshot.py` | `snapshot(app_url) -> dict`: dump the live state to JSON. `app_url` is `None` without an app. |
-| `check.py` | `REQUIRED` and `PREFERRED` lists of check functions over the snapshot. |
+| `check.py` | `REQUIRED` and `PREFERRED` lists of check functions over the snapshot, and an optional `EXPECTED` (see [define a Task](docs/how-to/define-a-task.md#expected-values)). |
 
 Each Task also has a page at `docs/tasks/<stage>/<scenario>.md`
 ([how to define a Task](docs/how-to/define-a-task.md#task-page)).

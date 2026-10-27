@@ -26,3 +26,15 @@ To write the calibrations:
 1. Run the Oracle (`--agent oracle`) and copy the Trial's `verifier/snapshot.json` under `tests/fixtures/`, as in `deploy-local-instance-oracle-snapshot.json`.
 2. For each check, write a function that changes the snapshot the way a plausible wrong solution would, such as a legacy vectorizer or a missing object.
 3. Assert that the Oracle snapshot passes every check, and that each broken variant fails only its targeted check, for the stated reason.
+
+## Expected values
+
+When a check looks for one value that the snapshot holds, such as the latest release, `check.py` can name it in `EXPECTED`, a mapping from check ID to a function of the snapshot:
+
+```python
+EXPECTED = {
+    "python-client-version-latest": lambda snapshot: snapshot["latest_releases"]["weaviate-client"]["version"],
+}
+```
+
+`weval check` then reports, under each failed check, whether the agent was shown that exact value in a tool result. "Not seen" means the agent's sources never gave the answer; "seen" means it had the answer and wrote something else. `EXPECTED` doesn't affect scoring, and a check without an entry gets no such line. See `tasks/investigate/current-practices/check.py`.

@@ -60,7 +60,9 @@ passed more Trials:
   `v1.40.0`.
 - `python-client-version-latest` passed 3/5 against 2/5. The three Trials
   that read `client-libraries-python.md` named 4.24.1 from its first line.
-  The two that never opened it gave "4.24.x". This is the Weaviate gap in
+  The two whose tool results never included that line gave "4.24.x";
+  `FSBariP` searched the page with `grep` patterns that missed it
+  (`weval check` reports this as "not seen"). This is the Weaviate gap in
   `analysis/2026-10-27-current-practices-baseline.md`: the most-read page
   gives the minor line, and the patch is one page deeper.
 

@@ -8,6 +8,8 @@ A Trial of a prompt variant is also scored on that prompt variant's
 ``default`` is ``instruction.md``, the others are
 ``prompts/<prompt-variant>.md``.
 ``deployment`` and ``search`` answers are not scored; see the Task page.
+``EXPECTED`` gives the value a check looks for, so diagnostics can report
+whether the agent was shown it.
 """
 
 import re
@@ -128,6 +130,10 @@ def canonical_sources(snapshot: dict) -> None:
 
 REQUIRED = [findings_file, weaviate_version_latest, python_client_version_latest, current_vector_config]
 PREFERRED = [canonical_sources]
+EXPECTED = {
+    "weaviate-version-latest": lambda snapshot: snapshot["latest_releases"]["weaviate"]["version"],
+    "python-client-version-latest": lambda snapshot: snapshot["latest_releases"]["weaviate-client"]["version"],
+}
 # Placeholders for checks that differ by use case.
 PROMPT_VARIANT_REQUIRED: dict[str, list] = {
     "default": [],

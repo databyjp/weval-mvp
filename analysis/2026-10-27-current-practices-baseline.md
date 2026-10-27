@@ -35,8 +35,9 @@ baseline Trial fetched the Python client page.
 
 I classified the failure as a Weaviate gap: the release-notes page, which
 every Trial fetched, stops agents one step short. The `weaviate-docs`
-Treatment supports this. Its three Trials that read the Python client page
-named 4.24.1, and its two that didn't gave "4.24.x"
+Treatment supports this. Its three Trials that read the Python client
+page's first line named 4.24.1, and its two that were never shown it gave
+"4.24.x"
 (`analysis/2026-10-27-treatment-runs.md`). The first version of this note
 called it an agent gap; the maintainer read it as a docs gap.
 `WORKSPACE.md` describes the item as "the corresponding Weaviate client

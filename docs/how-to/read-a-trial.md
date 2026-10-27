@@ -45,3 +45,9 @@ uv run weval check experiment-outputs/<run>/job/<trial>
 ```
 
 `weval check` loads the Task's current `check.py` from the Task path recorded in `weval.json`. If the Task has moved since the run, pass `--task tasks/<stage>/<scenario>`. Its first line gives that `check.py`'s fingerprint beside the one the Trial recorded; when they differ, the scores may differ from `weval.json`.
+
+After the check results, `weval check` prints diagnostics from the Trial's logs. They explain results and don't change them:
+
+- under a failed check with an [expected value](define-a-task.md#expected-values), whether the agent was shown that value;
+- for a Treatment Trial, whether the skill loaded and which Treatment files a tool call named (a glob such as `*.md` reads files without naming them);
+- Weaviate deprecation warnings (`Dep024: ...`) the agent was shown, and those in `verifier/application.log`.
