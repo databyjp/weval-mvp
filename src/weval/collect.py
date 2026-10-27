@@ -1,16 +1,11 @@
-"""Read the Task catalog, ``agents.toml``, and retained runs into report data.
+"""Read retained runs under ``experiment-outputs/`` into summaries.
 
-Everything here only reads files. Retained runs under ``experiment-outputs/``
-are never modified, and each Task's ``check.py`` is imported only to read its
-check lists and docstrings.
+The summaries serve ``weval analyse`` and any later presentation of results.
+Everything here only reads files; retained runs are never modified.
 """
 
-import importlib.util
-import inspect
 import json
 import math
-import tomllib
-import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -18,16 +13,6 @@ from statistics import mean
 
 # Statuses whose reward the verifier recorded; see docs/reference.md.
 SCORED = ("passed", "failed", "timed-out")
-# Per-Trial files linked from the report, by label, relative to the Trial directory.
-KEY_FILES = {
-    "weval.json": "weval.json",
-    "checks": "verifier/checks.json",
-    "snapshot": "verifier/snapshot.json",
-    "test output": "verifier/test-stdout.txt",
-    "trajectory": "agent/trajectory.json",
-    "submission": "artifacts/submission",
-}
-ENVIRONMENTS = {"modal": "Modal", "docker": "local"}
 
 
 @dataclass
@@ -54,7 +39,6 @@ class TrialSummary:
     uncached_input: int | None = None
     turns: int | None = None
     duration_s: float | None = None
-    files: dict[str, Path] = field(default_factory=dict)
 
 
 @dataclass
@@ -74,7 +58,6 @@ class RunSummary:
     prompt_variant: str
     treatment: str
     agent: str
-    environment: str
     trials: list[TrialSummary]
     fingerprints: dict | None = None
 
@@ -108,49 +91,6 @@ class Comparison:
     task_version: str | None = None
     check_version: str | None = None
     treatment_version: str | None = None
-
-
-@dataclass
-class CheckDefinition:
-    """One check function that a Task's ``check.py`` scores.
-
-    ``prompt_variant`` is ``None`` for a check scored under every prompt
-    variant, or the one prompt variant whose list adds it.
-    """
-
-    id: str
-    required: bool
-    description: str
-    prompt_variant: str | None = None
-
-
-@dataclass
-class TaskDefinition:
-    """One Task directory, read as an agent and its verifier see it.
-
-    ``path`` is ``tasks/<stage>/<scenario>``, the form ``weval.json`` records.
-    ``prompts`` maps each prompt variant to its prompt; ``default`` is
-    ``instruction.md``. ``motivation`` and ``summary`` come from
-    ``task.toml``'s ``[metadata]``, or else from the Task page, and are blank
-    without either. When ``check.py`` fails to import, ``checks`` is empty and
-    ``check_error`` holds the exception line. ``expected`` is ``check.py``'s
-    ``EXPECTED`` (docs/how-to/define-a-task.md), empty when it has none.
-    """
-
-    path: str
-    directory: Path
-    page: Path | None
-    motivation: str
-    summary: str
-    prompts: dict[str, str]
-    checks: list[CheckDefinition]
-    check_error: str | None
-    config: dict
-    expected: dict = field(default_factory=dict)
-
-    def checks_for(self, prompt_variant: str) -> list[CheckDefinition]:
-        """The checks a Trial of ``prompt_variant`` is scored on."""
-        return [c for c in self.checks if c.prompt_variant in (None, prompt_variant)]
 
 
 def collect_runs(outputs_dir: Path) -> list[RunSummary]:
@@ -278,8 +218,6 @@ def summarise_run(run_dir: Path) -> RunSummary:
     else:
         task, prompt_variant, agent, treatment = _parse_run_name(run_dir.name)
         fingerprints = None
-    config = _read_json(run_dir / "job/config.json") or {}
-    environment_type = (config.get("environment") or {}).get("type", "")
     return RunSummary(
         path=run_dir,
         date=_parse_stamp(run_dir.name),
@@ -287,7 +225,6 @@ def summarise_run(run_dir: Path) -> RunSummary:
         prompt_variant=prompt_variant,
         treatment=treatment,
         agent=agent,
-        environment=ENVIRONMENTS.get(environment_type, environment_type),
         trials=[
             summarise_trial(path, record) for path, record in zip(trial_dirs, records)
         ],
@@ -296,13 +233,8 @@ def summarise_run(run_dir: Path) -> RunSummary:
 
 
 def summarise_trial(trial_dir: Path, record: dict | None) -> TrialSummary:
-    files = {
-        label: trial_dir / rel
-        for label, rel in KEY_FILES.items()
-        if (trial_dir / rel).exists()
-    }
     if record is None:
-        return TrialSummary(path=trial_dir, status="unrecorded", files=files)
+        return TrialSummary(path=trial_dir, status="unrecorded")
 
     checks = record.get("checks") or []
     preferred = [check["passed"] for check in checks if not check["required"]]
@@ -335,116 +267,7 @@ def summarise_trial(trial_dir: Path, record: dict | None) -> TrialSummary:
         if trajectory
         else None,
         duration_s=_duration_s(result.get("agent_execution")),
-        files=files,
     )
-
-
-def collect_tasks(tasks_dir: Path) -> list[TaskDefinition]:
-    """Read every Task under ``tasks_dir`` (``tasks/<stage>/<scenario>/``),
-    ordered by path. Task pages are read from the sibling ``docs/tasks/``."""
-    repo = tasks_dir.parent
-    return [
-        read_task(task_toml.parent, repo)
-        for task_toml in sorted(tasks_dir.glob("*/*/task.toml"))
-    ]
-
-
-def read_task(task_dir: Path, repo: Path) -> TaskDefinition:
-    path = task_dir.relative_to(repo).as_posix()
-    page = repo / "docs" / (path + ".md")
-    config = tomllib.loads((task_dir / "task.toml").read_text())
-    metadata = config.get("metadata") or {}
-    if "motivation" in metadata:
-        motivation, summary = (
-            " ".join(metadata.get(key, "").split()) for key in ("motivation", "summary")
-        )
-    else:
-        motivation, summary = _read_task_page(page) if page.is_file() else ("", "")
-    prompts = {"default": (task_dir / "instruction.md").read_text()}
-    for prompt in sorted((task_dir / "prompts").glob("*.md")):
-        prompts[prompt.stem] = prompt.read_text()
-    checks, check_error, expected = _read_checks(task_dir / "check.py")
-    return TaskDefinition(
-        path=path,
-        directory=task_dir,
-        page=page if page.is_file() else None,
-        motivation=motivation,
-        summary=summary,
-        prompts=prompts,
-        checks=checks,
-        check_error=check_error,
-        config=config,
-        expected=expected,
-    )
-
-
-def load_agents(agents_file: Path) -> dict[str, dict]:
-    """Named Agents from ``agents.toml``, in file order; empty when the file is missing."""
-    return tomllib.loads(agents_file.read_text()) if agents_file.is_file() else {}
-
-
-def _read_checks(check_file: Path) -> tuple[list[CheckDefinition], str | None, dict]:
-    # A per-Task module name keeps Tasks' check modules apart; none is added to
-    # sys.modules, so `weval check` and tests import their own copies.
-    name = "weval_report_check_" + "_".join(check_file.parent.parts[-2:]).replace(
-        "-", "_"
-    )
-    spec = importlib.util.spec_from_file_location(name, check_file)
-
-    def definitions(
-        functions: list, required: bool, prompt_variant: str | None = None
-    ) -> list[CheckDefinition]:
-        return [
-            CheckDefinition(
-                id=function.__name__.replace("_", "-"),
-                required=required,
-                description=" ".join((inspect.getdoc(function) or "").split()),
-                prompt_variant=prompt_variant,
-            )
-            for function in functions
-        ]
-
-    try:
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        checks = definitions(module.REQUIRED, True) + definitions(
-            module.PREFERRED, False
-        )
-        for attribute, required in (
-            ("PROMPT_VARIANT_REQUIRED", True),
-            ("PROMPT_VARIANT_PREFERRED", False),
-        ):
-            for prompt_variant, functions in getattr(module, attribute, {}).items():
-                checks += definitions(functions, required, prompt_variant)
-    except Exception as error:  # noqa: BLE001  A broken Task must not break the report.
-        return [], "".join(traceback.format_exception_only(error)).strip(), {}
-    return checks, None, getattr(module, "EXPECTED", {})
-
-
-def _read_task_page(page: Path) -> tuple[str, str]:
-    """Return the page's front-matter ``motivation`` and its first paragraph
-    after the title, each joined into one line."""
-    text = page.read_text()
-    front_matter, body = "", text
-    if text.startswith("---\n"):
-        front_matter, _, body = text[4:].partition("\n---\n")
-
-    # The front matter holds one folded scalar; a YAML parser is not a runtime dependency.
-    motivation_lines, in_motivation = [], False
-    for line in front_matter.splitlines():
-        if line.startswith("motivation:"):
-            in_motivation = True
-            value = line.removeprefix("motivation:").strip()
-            if value not in (">", "|", ">-", "|-"):
-                motivation_lines.append(value)
-        elif in_motivation and line.startswith((" ", "\t")):
-            motivation_lines.append(line.strip())
-        else:
-            in_motivation = False
-
-    paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
-    summary = next((p for p in paragraphs if not p.startswith("#")), "")
-    return " ".join(motivation_lines), " ".join(summary.split())
 
 
 def _duration_s(span: dict | None) -> float | None:

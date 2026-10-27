@@ -33,7 +33,7 @@ from pathlib import Path
 import anthropic
 
 from weval import diagnostics, labels
-from weval.report.collect import (
+from weval.collect import (
     Comparison,
     TrialSummary,
     fisher_exact,

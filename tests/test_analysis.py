@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from weval import analysis
-from weval.report.collect import collect_runs, compare_treatments
+from weval.collect import collect_runs, compare_treatments
 
 BASELINE = "20261027-154757__investigate__current-practices__claude-code-sonnet-5.5"
 TREATED = BASELINE.replace("154757", "154759") + "+weaviate-docs"
@@ -336,33 +336,3 @@ def test_without_the_key_or_a_call_no_request_is_made(
         f"not analysed ({analysis.KEY_VAR} is not set)"
     )
     assert fake.requests == []
-
-
-def test_the_report_shows_a_saved_analysis_without_calling_the_analyst(
-    tmp_path, comparison, monkeypatch
-):
-    from weval.report import write_report
-
-    use(monkeypatch, FakeAnalyst(answer()))
-    analysis.analyse(comparison, EXPECTED, tmp_path)
-
-    def no_call(body, key):
-        raise AssertionError("the report called the analyst")
-
-    monkeypatch.setattr(analysis, "_post", no_call)
-    # The report reads EXPECTED from the Task, so the facts match the saved request.
-    task = tmp_path / "repo/tasks/investigate/current-practices"
-    task.mkdir(parents=True)
-    (task / "task.toml").write_text("")
-    (task / "instruction.md").write_text("Answer.\n")
-    (task / "check.py").write_text(
-        'REQUIRED, PREFERRED = [], []\nEXPECTED = {"%s": lambda snapshot: snapshot["python_client_version"]}\n'
-        % VERSION
-    )
-    page = write_report(
-        tmp_path, task.parents[1], tmp_path / "repo/agents.toml"
-    ).read_text()
-
-    treatments = page[page.index('<section class="tab" id="treatments"') :]
-    assert "The Treatment passed 1 of 2 against 0 of 2 (p 1)." in treatments
-    assert "<h3>Rule disagreements</h3>" in treatments

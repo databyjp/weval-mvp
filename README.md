@@ -155,9 +155,6 @@ uv run weval check experiment-outputs/<run>/job/<trial>
 
 # Analyse the Treatment comparisons that include a retained run, with an LLM
 uv run --env-file .env weval analyse experiment-outputs/<run>
-
-# Write the Task catalog and every retained run to experiment-outputs/index.html
-uv run weval report
 ```
 
 Each run writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/`. Each

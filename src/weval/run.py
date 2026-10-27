@@ -16,7 +16,6 @@ import hashlib
 import importlib.util
 import json
 import os
-import re
 import shutil
 import tomllib
 from datetime import datetime
@@ -335,9 +334,9 @@ def analyse_run(run_dir: Path) -> None:
     comparison among the retained runs beside ``run_dir`` that includes it,
     and print each result. Like ``label_run``, a failure is printed, not
     raised."""
-    # Imported here: the report's collect module is not needed to run Trials.
+    # Imported here: analysis and its SDK are not needed to run Trials.
     from weval import analysis
-    from weval.report.collect import collect_runs, compare_treatments
+    from weval.collect import collect_runs, compare_treatments
 
     for comparison in compare_treatments(collect_runs(run_dir.parent)):
         if run_dir.resolve() not in {

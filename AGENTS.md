@@ -16,8 +16,8 @@ If subagents are available, use them to run tests or searches unless there is a 
 - `treatments/<treatment>/`: one Treatment each: `skills/` for the Agent and a
   `README.md` stating its question ([reference](docs/reference.md#treatments)).
 - `src/weval/run.py`: builds the Harbor package, runs it on Modal, writes `weval.json`.
-- `src/weval/report/`: `weval report`, a static site of the Task catalog,
-  retained runs, and one page per Trial.
+- `src/weval/collect.py`: reads retained runs into summaries and Treatment
+  comparisons for `weval analyse`.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
 - `src/weval/shared-instructions.md`: Trial-environment notes appended to every
   Task's prompt when it is packaged.

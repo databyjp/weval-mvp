@@ -1,36 +1,27 @@
 # How to read a Trial
 
-To find a Trial, or compare runs, build the report offline:
-
-```sh
-uv run weval report
-```
-
-Then view `experiment-outputs/index.html` in a browser.
-
-To compare a [Treatment](../reference.md#treatments) with its baseline, open
-the Treatments tab. Each row pair holds one Task, prompt variant, and Agent:
-the baseline runs, then the Treatment runs, with required pass rate, failed
-checks, and mean usage per Trial. Each pass rate has its 95% Wilson
-interval, and the Treatment row adds Fisher's exact p-value against the
-baseline; at 5 Trials per arm, only large differences reach a small
-p-value. Uncached input leaves out prompt-cache reads, which make up most
-of each Trial's input tokens. The Tasks tab shows baseline runs only.
-A row pair holds only runs with the same Task and check versions, and one
-Treatment version; the short [fingerprints](../reference.md#the-trial-directory)
-under the Task and Treatment names identify them. Runs recorded before
-fingerprints existed are marked unversioned and pooled with each other, so
-after a `check.py` change, re-score both arms with `weval check` (below).
-
-Under each row pair is its saved analysis. `weval run` writes it after
-labelling (below) when the run is part of a row pair, given
-`OPENROUTER_API_KEY`; to analyse retained runs, run:
+To compare a [Treatment](../reference.md#treatments) with its baseline,
+analyse the retained runs:
 
 ```sh
 uv run --env-file .env weval analyse experiment-outputs/<run>
 ```
 
-An LLM analyst (`MODEL` in `src/weval/analysis.py`) reads the row pair's
+`weval run` also writes this analysis after labelling (below) when the run is
+part of a comparison, given `OPENROUTER_API_KEY`.
+
+A comparison holds one Task, prompt variant, and Agent: the baseline runs and
+the Treatment runs, with required pass rate, failed checks, and mean usage per
+Trial. Each pass rate has its 95% Wilson interval, and the Treatment arm adds
+Fisher's exact p-value against the baseline; at 5 Trials per arm, only large
+differences reach a small p-value. Uncached input leaves out prompt-cache
+reads, which make up most of each Trial's input tokens.
+A comparison holds only runs with the same Task and check versions, and one
+Treatment version ([fingerprints](../reference.md#the-trial-directory)). Runs
+recorded before fingerprints existed are pooled with each other, so after a
+`check.py` change, re-score both arms with `weval check` (below).
+
+An LLM analyst (`MODEL` in `src/weval/analysis.py`) reads the comparison's
 computed facts, never the transcripts: pass counts and intervals, the
 p-value, mean usage, and each failed check's failure message,
 [expected value](define-a-task.md#expected-values), and labels. It answers
@@ -48,11 +39,10 @@ proposes a class for each failed check from the same facts:
 - otherwise unclassified.
 
 Where the rule and the analyst name different classes for the same failed
-check, the row lists the disagreement for you to decide. The analysis knows
+check, the disagreement is listed for you to decide. The analysis knows
 only the facts, so what a docs page says stays in its open questions.
 Analyses are saved in `experiment-outputs/_analysis/` and reused until the
-facts, prompt, or model change, such as after a new run joins the row pair;
-the report shows saved analyses only and never calls the analyst.
+facts, prompt, or model change, such as after a new run joins the comparison.
 
 For one Trial, start at `weval.json` in the Trial directory ([layout reference](../reference.md#the-trial-directory)).
 
@@ -82,7 +72,7 @@ uv run weval check experiment-outputs/<run>/job/<trial>
 
 `weval check` loads the Task's current `check.py` from the Task path recorded in `weval.json`. If the Task has moved since the run, pass `--task tasks/<stage>/<scenario>`. Its first line gives that `check.py`'s fingerprint beside the one the Trial recorded; when they differ, the scores may differ from `weval.json`.
 
-After the check results, `weval check` prints diagnostics from the Trial's logs; the report's Trial page shows the same under its checks table. They explain results and don't change them:
+After the check results, `weval check` prints diagnostics from the Trial's logs. They explain results and don't change them:
 
 - under a failed check with an [expected value](define-a-task.md#expected-values), whether the agent was shown that value;
 - for a Treatment Trial, whether the skill loaded and which Treatment files a tool call named (a glob such as `*.md` reads files without naming them);
@@ -93,4 +83,4 @@ After the check results, `weval check` prints diagnostics from the Trial's logs;
 - `answer source`: which source the agent took the failed value or approach from, out of the URLs, searches, and Treatment files whose results it was shown, or `own-knowledge`;
 - `verification`: `verified`, `deferred_to_user`, `not_attempted`, or `guessed`.
 
-Each label has Jev's confidence from 0 to 1; read a low one (below about 0.5) as "check by hand". A source is credited with every tool result that named it, so a `grep` over several files credits all of them. Labels are saved in the run directory's `labels/<trial>.json` and reused until the request changes, such as after a `check.py` change; the report shows saved labels only and never calls Jev.
+Each label has Jev's confidence from 0 to 1; read a low one (below about 0.5) as "check by hand". A source is credited with every tool result that named it, so a `grep` over several files credits all of them. Labels are saved in the run directory's `labels/<trial>.json` and reused until the request changes, such as after a `check.py` change.

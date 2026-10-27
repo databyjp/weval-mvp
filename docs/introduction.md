@@ -31,4 +31,4 @@ These docs follow the diataxis framework.
 - [How to run a Trial](how-to/run-a-trial.md)
 - [How to read a Trial](how-to/read-a-trial.md)
 - [Reference](reference.md): `task.toml`, verifier flags, and the Trial directory
-- Tasks: one directory each under [`tasks/`](../tasks/), named `<stage>/<scenario>`. `uv run weval report experiment-outputs` writes the catalog, with each Task's motivation, prompts and checks, to `experiment-outputs/index.html`.
+- Tasks: one directory each under [`tasks/`](../tasks/), named `<stage>/<scenario>`.
