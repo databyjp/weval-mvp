@@ -44,9 +44,12 @@ Nothing is running.
 ## Observations
 
 `snapshot.py` records the submitted `findings.json` and the latest releases at
-verify time: Weaviate from GitHub's releases API and the Python client from
-PyPI. Latest releases change, so later criteria need the values from the
-Trial's own time.
+verify time: the Python client from PyPI, and Weaviate from GitHub's releases
+API, or from the releases Atom feed when the API refuses. The API's
+unauthenticated limit is per IP, and Modal Trials share egress IPs with agents
+that call the same API; the limit cost 3 of 15 retained Modal Trials their
+Weaviate release. Latest releases change, so the checks compare answers with
+the values from the Trial's own time.
 
 `weval.json` records, for every Trial of every Task, the tokens and cost from
 Harbor's `result.json`, and the URLs and search queries in the agent's tool
@@ -55,22 +58,30 @@ read through search results without its own fetch is not listed.
 
 ## Checks
 
-Criteria for the answers and their sources are deferred until the
-observations above have been seen in real Trials. Every variant is scored on
-the checks below; `PROMPT_VARIANT_REQUIRED` and `PROMPT_VARIANT_PREFERRED` in `check.py` are
-empty placeholders for checks that differ by use case.
+Every prompt variant is scored on the checks below;
+`PROMPT_VARIANT_REQUIRED` and `PROMPT_VARIANT_PREFERRED` in `check.py` are
+empty placeholders for checks that differ by use case. `deployment` and
+`search` answers are not scored: their expected answers need judgment, and
+the Oracle's came from summaries of single docs pages that baseline Trials
+disagree with.
 
 | Check | Tier | Validation |
 |---|---|---|
 | `findings-file` | REQUIRED | `/app/findings.json` is a JSON object with every documented item, each with an `answer` string and a `sources` list. |
+| `weaviate-version-latest` | REQUIRED | `weaviate_version` names the latest stable Weaviate release at verify time, including its patch. |
+| `python-client-version-latest` | REQUIRED | `client_library_versions` names the latest `weaviate-client` release on PyPI at verify time, including its patch. |
+| `current-vector-config` | REQUIRED | `config_ingestion` names `vector_config`, `Configure.Vectors`, or named vectors. Detection: the prompt asks for the recommended way to configure, not for an API, and the legacy path is `vectorizer_config=Configure.Vectorizer`. |
+| `canonical-sources` | PREFERRED | Every answer cites a source, and every source is on a Weaviate site (`weaviate.io` and its subdomains, `github.com/weaviate`) or an official client's package registry. |
+
+A version check fails when its release could not be looked up at verify time;
+classify that as an infrastructure failure.
 
 ## Calibration
 
 Variants are in `tests/test_investigate_current_practices_check.py`. The
 Oracle looks up the latest releases at run time and writes the answers below,
-each citing the page it came from. They are placeholders that pass
-`findings-file`, the same for every prompt variant, until the criteria are
-designed.
+each citing the page it came from, the same for every prompt variant.
+`deployment` and `search` are not scored.
 
 | Item | Oracle answer | Source |
 |---|---|---|
@@ -80,6 +91,15 @@ designed.
 
 | Variant | Fails | Models |
 |---|---|---|
-| `missing_file` | `findings-file` | No `findings.json` was written. |
+| `missing_file` | every check | No `findings.json` was written. |
 | `missing_item` | `findings-file` | `search` is absent. |
-| `answer_not_string` | `findings-file` | An answer is a nested object. |
+| `answer_not_string` | `findings-file`, `current-vector-config` | An answer is a nested object. |
+| `server_patch_behind` | `weaviate-version-latest` | Names 1.40.1, not the latest 1.40.2. |
+| `server_minor_only` | `weaviate-version-latest` | Names 1.40 without a patch. |
+| `server_version_prefix` | `weaviate-version-latest` | The latest release is 1.40.20; the answer names 1.40.2. |
+| `server_release_unavailable` | `weaviate-version-latest` | The release lookup failed at verify time. |
+| `client_version_behind` | `python-client-version-latest` | Names an older Python client. |
+| `legacy_vectorizer_config` | `current-vector-config` | Recommends `vectorizer_config=Configure.Vectorizer`. |
+| `prose_without_api` | `current-vector-config` | Describes configuration without naming the vector API. |
+| `uncited_answer` | `canonical-sources` | `search` has no sources. |
+| `blog_source` | `canonical-sources` | `search` cites a blog post. |

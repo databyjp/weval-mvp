@@ -1,8 +1,8 @@
 """Write the Oracle's findings: the latest releases, looked up at run time, and
 the recommendations from the docs pages cited with each answer.
 
-The answers are placeholders that satisfy ``findings-file`` until the
-criteria are designed; they are the same for every prompt variant."""
+The answers are the same for every prompt variant; ``deployment`` and
+``search`` are not scored."""
 
 import json
 import re

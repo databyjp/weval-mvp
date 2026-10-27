@@ -41,21 +41,85 @@ def answer_not_string(s: dict) -> None:
     s["findings"]["parsed"]["config_ingestion"]["answer"] = {"index": "hnsw", "quantization": "rq"}
 
 
+def server_patch_behind(s: dict) -> None:
+    s["findings"]["parsed"]["weaviate_version"]["answer"] = "v1.40.1, the latest 1.40 release in the docs"
+
+
+def server_minor_only(s: dict) -> None:
+    s["findings"]["parsed"]["weaviate_version"]["answer"] = "Weaviate 1.40"
+
+
+def server_version_prefix(s: dict) -> None:
+    s["latest_releases"]["weaviate"]["version"] = "1.40.20"
+
+
+def server_release_unavailable(s: dict) -> None:
+    s["latest_releases"]["weaviate"] = {
+        "version": None, "source": None, "status": 403, "error": "API: rate limit exceeded; feed: 503",
+    }
+
+
+def client_version_behind(s: dict) -> None:
+    s["findings"]["parsed"]["client_library_versions"]["answer"] = "Python weaviate-client 4.22.0"
+
+
+def legacy_vectorizer_config(s: dict) -> None:
+    s["findings"]["parsed"]["config_ingestion"]["answer"] = (
+        "Create the collection with vectorizer_config=Configure.Vectorizer.text2vec_openai(); "
+        "import with client-side batching."
+    )
+
+
+def prose_without_api(s: dict) -> None:
+    s["findings"]["parsed"]["config_ingestion"]["answer"] = (
+        "Define the collection up front with a vectorizer and properties; import with batching."
+    )
+
+
+def uncited_answer(s: dict) -> None:
+    s["findings"]["parsed"]["search"]["sources"] = []
+
+
+def blog_source(s: dict) -> None:
+    s["findings"]["parsed"]["search"]["sources"].append("https://medium.com/some-weaviate-post")
+
+
 def test_oracle_passes_every_check():
     assert failures(ORACLE) == {}
 
 
+def test_versions_match_with_a_v_prefix_and_trailing_punctuation():
+    snapshot = copy.deepcopy(ORACLE)
+    snapshot["findings"]["parsed"]["weaviate_version"]["answer"] = "Use v1.40.2."
+    assert failures(snapshot) == {}
+
+
+def test_missing_file_fails_every_check():
+    snapshot = copy.deepcopy(ORACLE)
+    missing_file(snapshot)
+    assert set(failures(snapshot)) == {r["name"] for r in score(check, snapshot)}
+
+
 @pytest.mark.parametrize(
-    ("break_snapshot", "failing_check", "reason"),
+    ("break_snapshot", "failing_checks", "reason"),
     [
-        (missing_file, "findings-file", "does not exist"),
-        (missing_item, "findings-file", "missing ['search']"),
-        (answer_not_string, "findings-file", "malformed ['config_ingestion']"),
+        (missing_item, ["findings-file"], "missing ['search']"),
+        # The malformed answer also cannot be searched for the vector API.
+        (answer_not_string, ["findings-file", "current-vector-config"], "malformed ['config_ingestion']"),
+        (server_patch_behind, ["weaviate-version-latest"], "names the latest release 1.40.2"),
+        (server_minor_only, ["weaviate-version-latest"], "names the latest release 1.40.2"),
+        (server_version_prefix, ["weaviate-version-latest"], "names the latest release 1.40.20"),
+        (server_release_unavailable, ["weaviate-version-latest"], "rate limit exceeded"),
+        (client_version_behind, ["python-client-version-latest"], "latest Python client release 4.24.1"),
+        (legacy_vectorizer_config, ["current-vector-config"], "Configure.Vectorizer"),
+        (prose_without_api, ["current-vector-config"], "names vector_config"),
+        (uncited_answer, ["canonical-sources"], "uncited ['search']"),
+        (blog_source, ["canonical-sources"], "non-canonical ['https://medium.com/some-weaviate-post']"),
     ],
 )
-def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):
+def test_broken_variant_fails_only_its_checks(break_snapshot, failing_checks, reason):
     snapshot = copy.deepcopy(ORACLE)
     break_snapshot(snapshot)
     failed = failures(snapshot)
-    assert list(failed) == [failing_check]
-    assert reason in failed[failing_check]
+    assert list(failed) == failing_checks
+    assert reason in failed[failing_checks[0]]
