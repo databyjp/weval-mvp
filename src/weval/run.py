@@ -26,7 +26,7 @@ from harbor.models.environment_type import EnvironmentType
 from harbor.models.job.config import JobConfig
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig
 
-from weval import diagnostics, verify
+from weval import diagnostics, labels, verify
 from weval.harnesses import claude_code, oracle, pi
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,14 +41,10 @@ SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
 WEAVIATE_COMPOSE = Path(__file__).with_name("weaviate-compose.yaml")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
-SECRET_VARS = ("OPENROUTER_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET")
+SECRET_VARS = ("OPENROUTER_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET",
+               "TYPESAFEAI_API_KEY")
 # Harbor's per-Trial token and cost fields in result.json's agent_result.
 USAGE_FIELDS = ("n_input_tokens", "n_cache_tokens", "n_output_tokens", "cost_usd")
-# A URL's host must contain a dot, which excludes Compose service names such as
-# weaviate:8080 and localhost; loopback addresses are excluded separately.
-# Backslashes end a URL because arguments are matched in their JSON encoding.
-URL = re.compile(r"https?://(?!127\.0\.0\.1|0\.0\.0\.0)[^\s/'\"`:\\]+\.[^\s/'\"`:\\]+[^\s'\"`<>)\]}\\]*")
-
 # VM with Docker-in-Docker so Tasks can run their own Compose stacks.
 MODAL = EnvironmentConfig(
     type=EnvironmentType.MODAL,
@@ -156,6 +152,7 @@ def run(
         asyncio.run(_run_job(config))
     finally:
         finalize_run(run_dir, task_path, agent, attempts, prompt_variant, treatment, versions)
+        label_run(run_dir)
         redact(run_dir)
     return run_dir
 
@@ -272,6 +269,20 @@ def finalize_run(
         print(f"WARNING: {attempts} Trials requested, {len(trial_dirs)} found under {run_dir / 'job'}")
 
 
+def label_run(run_dir: Path) -> None:
+    """Label each recorded Trial's failed checks (``labels.label``) and print
+    any note. Labelling explains results, so a failure here is printed, not
+    raised: the run's record is already complete."""
+    for record_file in sorted((run_dir / "job").glob("*/weval.json")):
+        checks = json.loads(record_file.read_text()).get("checks") or []
+        try:
+            note = labels.label(record_file.parent, checks)["note"]
+        except Exception as error:  # noqa: BLE001  Labels must not break a finished run.
+            note = f"labelling failed: {error!r}"
+        if note:
+            print(f"{record_file.parent}: {note}")
+
+
 def derive_status(result: dict, missing: list[str]) -> str:
     """Classify one Trial by whose outcome it records (statuses: docs/reference.md).
 
@@ -361,7 +372,7 @@ def usage(trial_dir: Path, result: dict) -> dict:
         for call in step.get("tool_calls") or []:
             name, arguments = call["function_name"], call.get("arguments") or {}
             tool_calls[name] = tool_calls.get(name, 0) + 1
-            urls.update(dict.fromkeys(URL.findall(json.dumps(arguments))))
+            urls.update(dict.fromkeys(diagnostics.URL.findall(json.dumps(arguments))))
             query = arguments.get("queries") or arguments.get("query") or []
             queries.extend([query] if isinstance(query, str) else query)
     return {**record, "tool_calls": tool_calls, "urls": list(urls), "search_queries": queries}

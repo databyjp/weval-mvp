@@ -17,6 +17,14 @@ def print_diagnostics(found: dict) -> None:
     print(f"Deprecations in application.log: {'; '.join(found['deprecations_logged']) or 'none'}")
 
 
+def print_labels(answers: dict) -> None:
+    """Print one failed check's labels from ``weval.labels.label``."""
+    for question in ("answer_source", "verification"):
+        answer = answers[question]
+        print(f"     {question.replace('_', ' ')}: {answer['choice']} "
+              f"(confidence {answer['confidence']}, {answers['model']})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="weval")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -45,6 +53,7 @@ def main() -> None:
         return
 
     # Imported here so `weval --help` does not pay Harbor's import time.
+    from weval.labels import label
     from weval.run import check_versions, diagnose, rescore, run
 
     if args.command == "run":
@@ -58,6 +67,7 @@ def main() -> None:
               + ("" if current == recorded else "; scores may differ from weval.json"))
         results = rescore(args.trial, args.task)
         found = diagnose(args.trial, results, args.task)
+        labelled = label(args.trial, results)
         seen = {item["check"]: item for item in found["expected_value_seen"] or []}
         for r in results:
             status = "PASS" if r["passed"] else "FAIL"
@@ -66,4 +76,8 @@ def main() -> None:
             if r["name"] in seen:
                 item = seen[r["name"]]
                 print(f"     expected {item['expected']}, {'seen' if item['seen'] else 'not seen'} in what the agent was shown")
+            if r["name"] in labelled["labels"]:
+                print_labels(labelled["labels"][r["name"]])
         print_diagnostics(found)
+        if labelled["note"]:
+            print(f"Labels: {labelled['note']}")

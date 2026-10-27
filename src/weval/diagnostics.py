@@ -12,6 +12,11 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+# External URLs in a tool call's arguments. A URL's host must contain a dot,
+# which excludes Compose service names such as weaviate:8080 and localhost;
+# loopback addresses are excluded separately. Backslashes end a URL because
+# arguments are matched in their JSON encoding.
+URL = re.compile(r"https?://(?!127\.0\.0\.1|0\.0\.0\.0)[^\s/'\"`:\\]+\.[^\s/'\"`:\\]+[^\s'\"`<>)\]}\\]*")
 # The Weaviate Python client numbers its deprecation warnings ("Dep024: ...").
 # Other libraries' warnings (authlib's, in every Trial) are left out.
 DEPRECATION = re.compile(r"\bDep\d{3}:[^\n]*")
