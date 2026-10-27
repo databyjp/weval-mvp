@@ -13,7 +13,9 @@ import urllib.request
 from pathlib import Path
 
 COLLECTION = "Product"
-WEAVIATE = f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+WEAVIATE = (
+    f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+)
 
 INVALID = (0, -1, "abc", "1.5")
 PAGINATION_QUERY = "useful equipment for home and travel"

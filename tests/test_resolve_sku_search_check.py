@@ -15,7 +15,9 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/resolve-sku-search-oracle-snapshot.json").read_text())
+ORACLE = json.loads(
+    (ROOT / "tests/fixtures/resolve-sku-search-oracle-snapshot.json").read_text()
+)
 
 _spec = importlib.util.spec_from_file_location(
     "resolve_sku_search_check", ROOT / "tasks/resolve/sku-search/check.py"
@@ -29,7 +31,9 @@ def results(snapshot: dict) -> dict[str, dict]:
 
 
 def failures(snapshot: dict) -> dict[str, str]:
-    return {name: r["notes"] for name, r in results(snapshot).items() if not r["passed"]}
+    return {
+        name: r["notes"] for name, r in results(snapshot).items() if not r["passed"]
+    }
 
 
 def schema_property(s: dict, name: str) -> dict:
@@ -44,13 +48,17 @@ def set_ranking(s: dict, query: str, skus: tuple[str, ...]) -> None:
 def word_tokenized_ranking(s: dict) -> None:
     # The seeded baseline's /search order, observed in the local dry run.
     for query in ("ZXQ-9917", "9917@ZXQ"):
-        set_ranking(s, query, ("9917-ZXQ", "ZXQ-9917", "9917@ZXQ", "ZXQ-4831", "AQ1-9917"))
+        set_ranking(
+            s, query, ("9917-ZXQ", "ZXQ-9917", "9917@ZXQ", "ZXQ-4831", "AQ1-9917")
+        )
 
 
 def hoisted_filter_matches(s: dict) -> None:
     # HrrRY7G's workaround: word-tokenized equal() matches, in seed order, ahead of BM25.
     for query in ("9917-ZXQ", "9917@ZXQ"):
-        set_ranking(s, query, ("ZXQ-9917", "9917@ZXQ", "9917-ZXQ", "ZXQ-4831", "AQ1-9917"))
+        set_ranking(
+            s, query, ("ZXQ-9917", "9917@ZXQ", "9917-ZXQ", "ZXQ-4831", "AQ1-9917")
+        )
 
 
 def lowercase_tokenized_ranking(s: dict) -> None:
@@ -96,11 +104,19 @@ def test_oracle_passes_every_check():
         (word_tokenized_ranking, "exact-sku-retrieval", "'ZXQ-9917': ['9917-ZXQ'"),
         (hoisted_filter_matches, "exact-sku-retrieval", "'9917-ZXQ': ['ZXQ-9917'"),
         (lowercase_tokenized_ranking, "exact-sku-retrieval", "'zxq-9917': ['ZXQ-9917'"),
-        (whitespace_tokenized_ranking, "exact-sku-retrieval", "'9917 ZXQ': ['ZXQ 9917'"),
+        (
+            whitespace_tokenized_ranking,
+            "exact-sku-retrieval",
+            "'9917 ZXQ': ['ZXQ 9917'",
+        ),
         (exact_match_only_search, "search-contract", "returns TRAIL-001"),
         (dropped_catalog, "document-preservation", "holds 31 objects"),
         (price_as_text, "collection-definition", "'price': 'text'"),
-        (name_field_tokenization, "other-properties-word-tokenization", "changed: {'name': 'field'}"),
+        (
+            name_field_tokenization,
+            "other-properties-word-tokenization",
+            "changed: {'name': 'field'}",
+        ),
         (app_side_workaround, "sku-field-tokenization", "got 'word'"),
     ],
 )

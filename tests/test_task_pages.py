@@ -35,13 +35,18 @@ def frontmatter(page: str) -> dict:
 
 def check_functions(task_dir: Path) -> dict[str, tuple[str, object]]:
     """Map each check ID to its tier and function."""
-    spec = importlib.util.spec_from_file_location(f"{task_dir.name}_check", task_dir / "check.py")
+    spec = importlib.util.spec_from_file_location(
+        f"{task_dir.name}_check", task_dir / "check.py"
+    )
     assert spec and spec.loader
     check = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(check)
     return {
         function.__name__.replace("_", "-"): (tier, function)
-        for tier, functions in (("REQUIRED", check.REQUIRED), ("PREFERRED", check.PREFERRED))
+        for tier, functions in (
+            ("REQUIRED", check.REQUIRED),
+            ("PREFERRED", check.PREFERRED),
+        )
         for function in functions
     }
 
@@ -51,16 +56,30 @@ def test_task_states_its_motivation_and_checks(task_dir):
     page_path = ROOT / "docs/tasks" / f"{task_id(task_dir)}.md"
     metadata = tomllib.loads((task_dir / "task.toml").read_text()).get("metadata") or {}
     if "motivation" in metadata:
-        assert metadata["motivation"].strip(), "task.toml's [metadata] motivation is not blank"
-        assert not page_path.exists(), f"the spec is in the Task's files; remove {page_path.relative_to(ROOT)}"
-        undocumented = [name for name, (_, function) in check_functions(task_dir).items() if not function.__doc__]
-        assert not undocumented, f"every check has a docstring; missing for {undocumented}"
+        assert metadata["motivation"].strip(), (
+            "task.toml's [metadata] motivation is not blank"
+        )
+        assert not page_path.exists(), (
+            f"the spec is in the Task's files; remove {page_path.relative_to(ROOT)}"
+        )
+        undocumented = [
+            name
+            for name, (_, function) in check_functions(task_dir).items()
+            if not function.__doc__
+        ]
+        assert not undocumented, (
+            f"every check has a docstring; missing for {undocumented}"
+        )
         return
 
-    assert page_path.exists(), f"{task_id(task_dir)} has no page at {page_path.relative_to(ROOT)}"
+    assert page_path.exists(), (
+        f"{task_id(task_dir)} has no page at {page_path.relative_to(ROOT)}"
+    )
     page = page_path.read_text()
 
-    assert frontmatter(page).get("motivation"), "the page's frontmatter states a motivation"
+    assert frontmatter(page).get("motivation"), (
+        "the page's frontmatter states a motivation"
+    )
 
     documented = dict(CHECK_ROW.findall(page))
     tiers = {name: tier for name, (tier, _) in check_functions(task_dir).items()}

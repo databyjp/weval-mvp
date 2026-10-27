@@ -17,10 +17,15 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/deploy-document-search-upgrade-oracle-snapshot.json").read_text())
+ORACLE = json.loads(
+    (
+        ROOT / "tests/fixtures/deploy-document-search-upgrade-oracle-snapshot.json"
+    ).read_text()
+)
 
 _spec = importlib.util.spec_from_file_location(
-    "deploy_document_search_upgrade_check", ROOT / "tasks/deploy/document-search-upgrade/check.py"
+    "deploy_document_search_upgrade_check",
+    ROOT / "tasks/deploy/document-search-upgrade/check.py",
 )
 check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)
@@ -71,7 +76,11 @@ def test_oracle_passes_every_check():
     ("break_snapshot", "failing_check", "reason"),
     [
         (server_not_upgraded, "server-version", "running 1.30.16"),
-        (requirements_not_updated, "client-version", "declares ['weaviate-client==4.12.1']"),
+        (
+            requirements_not_updated,
+            "client-version",
+            "declares ['weaviate-client==4.12.1']",
+        ),
         (reimported_with_new_uuids, "document-preservation", "500 differ"),
         (
             recreated_with_default_tokenization,
@@ -79,7 +88,11 @@ def test_oracle_passes_every_check():
             "'properties.document_id': [['text'], 'word', True]",
         ),
         (search_returns_server_error, "search-contract", "got 500"),
-        (inference_service_removed, "vectorizer-availability", "can be inserted; got 500"),
+        (
+            inference_service_removed,
+            "vectorizer-availability",
+            "can be inserted; got 500",
+        ),
     ],
 )
 def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):

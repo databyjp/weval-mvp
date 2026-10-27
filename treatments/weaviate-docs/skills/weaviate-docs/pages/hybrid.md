@@ -141,9 +141,7 @@ A hybrid search on a collection that has [named vectors](/weaviate/config-refs/c
 ```python
 reviews = client.collections.use("WineReviewNV")
 response = reviews.query.hybrid(
-    query="A French Riesling",
-    target_vector="title_country",
-    limit=3
+    query="A French Riesling", target_vector="title_country", limit=3
 )
 
 for o in response.objects:
@@ -1482,11 +1480,7 @@ group_by = GroupBy(
 
 # Query
 jeopardy = client.collections.use("JeopardyQuestion")
-response = jeopardy.query.hybrid(
-    alpha=0.75,
-    query="California",
-    group_by=group_by
-)
+response = jeopardy.query.hybrid(alpha=0.75, query="California", group_by=group_by)
 
 for grp_name, grp_content in response.groups.items():
     print(grp_name, grp_content.objects)
@@ -1566,11 +1560,7 @@ Optionally, use `offset` to paginate the results.
 
 ```py
 jeopardy = client.collections.use("JeopardyQuestion")
-response = jeopardy.query.hybrid(
-    query="food",
-    limit=3,
-    offset=1
-)
+response = jeopardy.query.hybrid(query="food", limit=3, offset=1)
 
 for o in response.objects:
     print(o.properties)
@@ -1684,9 +1674,7 @@ from weaviate.classes.query import HybridFusion
 
 jeopardy = client.collections.use("JeopardyQuestion")
 response = jeopardy.query.hybrid(
-    query="food",
-    fusion_type=HybridFusion.RELATIVE_SCORE,
-    auto_limit=1
+    query="food", fusion_type=HybridFusion.RELATIVE_SCORE, auto_limit=1
 )
 
 for o in response.objects:

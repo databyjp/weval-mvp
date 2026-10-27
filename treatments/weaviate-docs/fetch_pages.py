@@ -33,13 +33,21 @@ PAGES = {
 }
 # Page chrome with no content: heading anchors, the code-language selector,
 # breadcrumbs, and footer navigation.
-CHROME = ("a.hash-link, [class^=codeDropdownHeader], nav, button, .theme-doc-footer, "
-          ".pagination-nav, .theme-doc-breadcrumbs, svg, script, style")
+CHROME = (
+    "a.hash-link, [class^=codeDropdownHeader], nav, button, .theme-doc-footer, "
+    ".pagination-nav, .theme-doc-breadcrumbs, svg, script, style"
+)
 
 
 def code_language(element) -> str:
-    return next((c.removeprefix("language-") for c in element.get("class") or []
-                 if c.startswith("language-")), "")
+    return next(
+        (
+            c.removeprefix("language-")
+            for c in element.get("class") or []
+            if c.startswith("language-")
+        ),
+        "",
+    )
 
 
 def page_markdown(url: str) -> str:
@@ -61,7 +69,9 @@ def page_markdown(url: str) -> str:
             marker = soup.new_tag("p")
             marker.string = f"Tab: {label}"
             panel.insert_before(marker)
-    text = markdownify(str(article), heading_style="ATX", code_language_callback=code_language)
+    text = markdownify(
+        str(article), heading_style="ATX", code_language_callback=code_language
+    )
     text = "\n".join(line.rstrip() for line in text.splitlines())
     while "\n\n\n" in text:
         text = text.replace("\n\n\n", "\n\n")

@@ -50,9 +50,16 @@ def test_concurrent_callers_share_one_download(monkeypatch, tmp_path):
     # Threads hold separate flock opens, as separate processes do.
     fetched = serve(monkeypatch, tmp_path, hashlib.sha256(BINARY).hexdigest())
     fetch = claude_code._fetch
-    monkeypatch.setattr(claude_code, "_fetch", lambda url: (time.sleep(0.1), fetch(url))[1])
+    monkeypatch.setattr(
+        claude_code, "_fetch", lambda url: (time.sleep(0.1), fetch(url))[1]
+    )
 
-    callers = [threading.Thread(target=claude_code.cached_binary, args=("2.1.292", "linux-x64")) for _ in range(4)]
+    callers = [
+        threading.Thread(
+            target=claude_code.cached_binary, args=("2.1.292", "linux-x64")
+        )
+        for _ in range(4)
+    ]
     for caller in callers:
         caller.start()
     for caller in callers:
@@ -99,8 +106,14 @@ class FakeVolume:
 
 def use_volume(monkeypatch, tmp_path, paths: list[str]) -> FakeVolume:
     volume = FakeVolume(paths)
-    monkeypatch.setattr(claude_code.modal.Volume, "from_name", lambda name, create_if_missing: volume)
-    monkeypatch.setattr(claude_code, "cached_binary", lambda version, platform: tmp_path / f"{version}-{platform}.gz")
+    monkeypatch.setattr(
+        claude_code.modal.Volume, "from_name", lambda name, create_if_missing: volume
+    )
+    monkeypatch.setattr(
+        claude_code,
+        "cached_binary",
+        lambda version, platform: tmp_path / f"{version}-{platform}.gz",
+    )
     return volume
 
 
@@ -110,7 +123,9 @@ def test_volume_gets_each_version_once(monkeypatch, tmp_path):
     claude_code.publish_to_volume("2.1.292")
     claude_code.publish_to_volume("2.1.300")
 
-    assert volume.uploaded == [(tmp_path / "2.1.300-linux-x64.gz", "/2.1.300/claude-linux-x64.gz")]
+    assert volume.uploaded == [
+        (tmp_path / "2.1.300-linux-x64.gz", "/2.1.300/claude-linux-x64.gz")
+    ]
 
 
 def test_modal_environment_mounts_the_volume_read_only(monkeypatch, tmp_path):
@@ -118,6 +133,15 @@ def test_modal_environment_mounts_the_volume_read_only(monkeypatch, tmp_path):
 
     environment = claude_code.modal_environment({"version": "2.1.292"}, MODAL)
 
-    assert environment.kwargs == {**MODAL.kwargs, "volumes": {"/opt/weval/claude-code": "weval-claude-code"}}
-    assert environment.mounts == [{"type": "bind", "source": "/opt/weval/claude-code",
-                                   "target": "/opt/weval/claude-code", "read_only": True}]
+    assert environment.kwargs == {
+        **MODAL.kwargs,
+        "volumes": {"/opt/weval/claude-code": "weval-claude-code"},
+    }
+    assert environment.mounts == [
+        {
+            "type": "bind",
+            "source": "/opt/weval/claude-code",
+            "target": "/opt/weval/claude-code",
+            "read_only": True,
+        }
+    ]

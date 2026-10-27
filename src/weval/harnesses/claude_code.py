@@ -45,14 +45,30 @@ EXPECTED_LOGS = (
 # other prices, and has none for Haiku 5.5. WebFetch summarises pages with
 # Haiku 4.5 whatever the Agent's model.
 PRICES = {
-    "claude-haiku-5-5": {"inputTokens": 0.10, "outputTokens": 0.50,
-                         "cacheReadInputTokens": 0.01, "cacheCreationInputTokens": 0.125},
-    "claude-sonnet-5-5": {"inputTokens": 2.00, "outputTokens": 10.00,
-                          "cacheReadInputTokens": 0.10, "cacheCreationInputTokens": 2.50},
-    "claude-opus-5-5": {"inputTokens": 4.00, "outputTokens": 20.00,
-                        "cacheReadInputTokens": 0.20, "cacheCreationInputTokens": 5.00},
-    "claude-haiku-4-5": {"inputTokens": 1.00, "outputTokens": 5.00,
-                         "cacheReadInputTokens": 0.10, "cacheCreationInputTokens": 1.25},
+    "claude-haiku-5-5": {
+        "inputTokens": 0.10,
+        "outputTokens": 0.50,
+        "cacheReadInputTokens": 0.01,
+        "cacheCreationInputTokens": 0.125,
+    },
+    "claude-sonnet-5-5": {
+        "inputTokens": 2.00,
+        "outputTokens": 10.00,
+        "cacheReadInputTokens": 0.10,
+        "cacheCreationInputTokens": 2.50,
+    },
+    "claude-opus-5-5": {
+        "inputTokens": 4.00,
+        "outputTokens": 20.00,
+        "cacheReadInputTokens": 0.20,
+        "cacheCreationInputTokens": 5.00,
+    },
+    "claude-haiku-4-5": {
+        "inputTokens": 1.00,
+        "outputTokens": 5.00,
+        "cacheReadInputTokens": 0.10,
+        "cacheCreationInputTokens": 1.25,
+    },
 }
 
 
@@ -64,7 +80,10 @@ def agent_config(agent: dict) -> AgentConfig:
         # would prefer to the token. Harbor's CLAUDE_FORCE_OAUTH flag does the
         # same, but Harbor treats its value "1" as a secret and scrubs every "1"
         # from the Trial output.
-        env = {"CLAUDE_CODE_OAUTH_TOKEN": "${CLAUDE_CODE_OAUTH_TOKEN}", "ANTHROPIC_API_KEY": ""}
+        env = {
+            "CLAUDE_CODE_OAUTH_TOKEN": "${CLAUDE_CODE_OAUTH_TOKEN}",
+            "ANTHROPIC_API_KEY": "",
+        }
     else:
         env = {
             "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
@@ -81,7 +100,10 @@ def agent_config(agent: dict) -> AgentConfig:
 
 RELEASES = "https://downloads.claude.ai/claude-code-releases"
 # One gzipped binary per version and platform, kept across runs.
-CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "weval/claude-code"
+CACHE_DIR = (
+    Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    / "weval/claude-code"
+)
 REMOTE_ARCHIVE = "/tmp/weval-claude.gz"
 # The Modal Volume holds the same layout as CACHE_DIR, mounted read-only at
 # VOLUME_MOUNT in the agent's container.
@@ -110,8 +132,12 @@ class CachedClaudeCode(ClaudeCode):
     @override
     async def install(self, environment: BaseEnvironment) -> None:
         if not self._version:
-            raise ValueError("a Claude Code Agent needs a version to install from the cache")
-        await self.ensure_system_dependencies(environment, ("curl", "bash", "nodejs", "npm", "procps"))
+            raise ValueError(
+                "a Claude Code Agent needs a version to install from the cache"
+            )
+        await self.ensure_system_dependencies(
+            environment, ("curl", "bash", "nodejs", "npm", "procps")
+        )
         platform = (await environment.exec(command=PLATFORM_COMMAND)).stdout.strip()
         archive = f"{VOLUME_MOUNT}/{shlex.quote(self._version)}/claude-{platform}.gz"
         if (await environment.exec(command=f"test -f {archive}")).return_code != 0:
@@ -142,11 +168,18 @@ def modal_environment(agent: dict, environment: EnvironmentConfig) -> Environmen
     the Agent's ``linux-x64`` binary to it if the Volume lacks it."""
     publish_to_volume(agent["version"])
     # Harbor binds a mount's target path on the sandbox VM, where Modal mounts the Volume.
-    mount = {"type": "bind", "source": VOLUME_MOUNT, "target": VOLUME_MOUNT, "read_only": True}
-    return environment.model_copy(update={
-        "kwargs": {**environment.kwargs, "volumes": {VOLUME_MOUNT: VOLUME}},
-        "mounts": [*(environment.mounts or []), mount],
-    })
+    mount = {
+        "type": "bind",
+        "source": VOLUME_MOUNT,
+        "target": VOLUME_MOUNT,
+        "read_only": True,
+    }
+    return environment.model_copy(
+        update={
+            "kwargs": {**environment.kwargs, "volumes": {VOLUME_MOUNT: VOLUME}},
+            "mounts": [*(environment.mounts or []), mount],
+        }
+    )
 
 
 def publish_to_volume(version: str) -> None:
@@ -158,7 +191,9 @@ def publish_to_volume(version: str) -> None:
     remote = f"{version}/claude-{MODAL_PLATFORM}.gz"
     with _host_lock(version, "volume"):
         try:
-            if any(entry.path.strip("/") == remote for entry in volume.listdir(version)):
+            if any(
+                entry.path.strip("/") == remote for entry in volume.listdir(version)
+            ):
                 return
         except modal.exception.NotFoundError:
             pass
@@ -185,7 +220,9 @@ def cached_binary(version: str, platform: str) -> Path:
         binary = _fetch(f"{RELEASES}/{version}/{platform}/claude")
         expected = manifest["platforms"][platform]["checksum"]
         if hashlib.sha256(binary).hexdigest() != expected:
-            raise RuntimeError(f"Claude Code {version} {platform} does not match the manifest checksum")
+            raise RuntimeError(
+                f"Claude Code {version} {platform} does not match the manifest checksum"
+            )
 
         # Written under another name first so an interrupted write is never taken as cached.
         partial = archive.with_name(archive.name + ".partial")
@@ -251,7 +288,8 @@ def token_usage(trial_dir: Path) -> dict:
         return sum(m.get(key, 0) for m in models)
 
     return {
-        "n_input_tokens": total("inputTokens") + total("cacheReadInputTokens")
+        "n_input_tokens": total("inputTokens")
+        + total("cacheReadInputTokens")
         + total("cacheCreationInputTokens"),
         "n_cache_tokens": total("cacheReadInputTokens"),
         "n_cache_creation_tokens": total("cacheCreationInputTokens"),
@@ -269,8 +307,13 @@ def cost_usd(model_usage: dict) -> float | None:
     for name, usage in model_usage.items():
         # Keys are OpenRouter names in older Trials, e.g.
         # "anthropic/claude-haiku-5.5", and dated Anthropic IDs in newer ones.
-        model = re.sub(r"^anthropic/|-\d{8}$", "", usage.get("canonicalModel", name)).replace(".", "-")
+        model = re.sub(
+            r"^anthropic/|-\d{8}$", "", usage.get("canonicalModel", name)
+        ).replace(".", "-")
         if model not in PRICES:
             return None
-        cost += sum(usage.get(field, 0) * price for field, price in PRICES[model].items()) / 1e6
+        cost += (
+            sum(usage.get(field, 0) * price for field, price in PRICES[model].items())
+            / 1e6
+        )
     return cost

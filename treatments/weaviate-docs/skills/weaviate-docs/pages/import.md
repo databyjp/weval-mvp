@@ -20,9 +20,7 @@ The following example adds objects to a collection named `MyCollection`.
 Open the `batch.stream()` context manager and add objects one at a time; the client sends them at the pace the server requests. The [async Python client](/weaviate/client-libraries/python/async#bulk-data-insertion) also supports server-side batching through the `stream()` method and the one-shot `ingest()` method.
 
 ```py
-data_rows = [
-    {"title": f"Object {i+1}"} for i in range(5)
-]
+data_rows = [{"title": f"Object {i + 1}"} for i in range(5)]
 
 collection = client.collections.use("MyCollection")
 
@@ -48,6 +46,7 @@ You can also stream from a data source with `data.ingest()`. It accepts any iter
 ```py
 import json
 
+
 # Each line of the source file holds one JSON object
 def read_objects(path):
     with open(path) as f:
@@ -57,6 +56,7 @@ def read_objects(path):
                 continue
             record = json.loads(line)
             yield {"title": record["title"]}
+
 
 collection = client.collections.use("MyCollection")
 
@@ -196,9 +196,7 @@ If your objects are already in memory, you can import the whole list with a sing
 `data.ingest()` is the safe replacement for passing a large list to `insert_many`, which sends all objects in a single request. `ingest` accepts plain property dicts or `DataObject` instances (to set object IDs, vectors, or references) and returns the same return object as `insert_many`.
 
 ```py
-data_rows = [
-    {"title": f"Object {i+1}"} for i in range(5)
-]
+data_rows = [{"title": f"Object {i + 1}"} for i in range(5)]
 
 collection = client.collections.use("MyCollection")
 
@@ -264,9 +262,7 @@ if (failedObjects.Any())
 Use manual (client-side) batching when you want to control the batch size and concurrency yourself, or when using a client that does not yet support server-side batching. The following example adds objects to the `MyCollection` collection.
 
 ```py
-data_rows = [
-    {"title": f"Object {i+1}"} for i in range(5)
-]
+data_rows = [{"title": f"Object {i + 1}"} for i in range(5)]
 
 collection = client.collections.use("MyCollection")
 
@@ -393,15 +389,12 @@ Weaviate generates an UUID for each object. Object IDs must be unique. If you se
 from weaviate.util import generate_uuid5  # Generate a deterministic ID
 from weaviate.classes.data import DataObject
 
-data_rows = [{"title": f"Object {i+1}"} for i in range(5)]
+data_rows = [{"title": f"Object {i + 1}"} for i in range(5)]
 
 collection = client.collections.use("MyCollection")
 
 data_objects = [
-    DataObject(
-        properties=data_row,
-        uuid=generate_uuid5(data_row)
-    )
+    DataObject(properties=data_row, uuid=generate_uuid5(data_row))
     for data_row in data_rows
 ]
 
@@ -519,16 +512,13 @@ Use the `vector` property to specify a vector for each object.
 ```py
 from weaviate.classes.data import DataObject
 
-data_rows = [{"title": f"Object {i+1}"} for i in range(5)]
+data_rows = [{"title": f"Object {i + 1}"} for i in range(5)]
 vectors = [[0.1] * 1536 for i in range(5)]
 
 collection = client.collections.use("MyCollection")
 
 data_objects = [
-    DataObject(
-        properties=data_row,
-        vector=vectors[i]
-    )
+    DataObject(properties=data_row, vector=vectors[i])
     for i, data_row in enumerate(data_rows)
 ]
 
@@ -649,10 +639,7 @@ When you create an object, you can specify named vectors (if [configured in your
 ```py
 from weaviate.classes.data import DataObject
 
-data_rows = [{
-    "title": f"Object {i+1}",
-    "body": f"Body {i+1}"
-} for i in range(5)]
+data_rows = [{"title": f"Object {i + 1}", "body": f"Body {i + 1}"} for i in range(5)]
 
 title_vectors = [[0.12] * 1536 for _ in range(5)]
 body_vectors = [[0.34] * 1536 for _ in range(5)]
@@ -665,7 +652,7 @@ data_objects = [
         vector={
             "title": title_vectors[i],
             "body": body_vectors[i],
-        }
+        },
     )
     for i, data_row in enumerate(data_rows)
 ]
@@ -855,7 +842,7 @@ integrations = [
     Integrations.openai(
         api_key=openai_key,
         requests_per_minute_embeddings=rpm_embeddings,
-        tokens_per_minute_embeddings=tpm_embeddings,   # e.g. OpenAI also exposes tokens per minute for embeddings
+        tokens_per_minute_embeddings=tpm_embeddings,  # e.g. OpenAI also exposes tokens per minute for embeddings
     ),
 ]
 client.integrations.configure(integrations)

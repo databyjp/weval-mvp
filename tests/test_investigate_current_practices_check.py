@@ -15,10 +15,15 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/investigate-current-practices-oracle-snapshot.json").read_text())
+ORACLE = json.loads(
+    (
+        ROOT / "tests/fixtures/investigate-current-practices-oracle-snapshot.json"
+    ).read_text()
+)
 
 _spec = importlib.util.spec_from_file_location(
-    "investigate_current_practices_check", ROOT / "tasks/investigate/current-practices/check.py"
+    "investigate_current_practices_check",
+    ROOT / "tasks/investigate/current-practices/check.py",
 )
 assert _spec and _spec.loader
 check = importlib.util.module_from_spec(_spec)
@@ -30,7 +35,11 @@ def failures(snapshot: dict) -> dict[str, str]:
 
 
 def missing_file(s: dict) -> None:
-    s["findings"] = {"text": None, "parsed": None, "error": "/app/findings.json does not exist"}
+    s["findings"] = {
+        "text": None,
+        "parsed": None,
+        "error": "/app/findings.json does not exist",
+    }
 
 
 def missing_item(s: dict) -> None:
@@ -38,11 +47,16 @@ def missing_item(s: dict) -> None:
 
 
 def answer_not_string(s: dict) -> None:
-    s["findings"]["parsed"]["config_ingestion"]["answer"] = {"index": "hnsw", "quantization": "rq"}
+    s["findings"]["parsed"]["config_ingestion"]["answer"] = {
+        "index": "hnsw",
+        "quantization": "rq",
+    }
 
 
 def server_patch_behind(s: dict) -> None:
-    s["findings"]["parsed"]["weaviate_version"]["answer"] = "v1.40.1, the latest 1.40 release in the docs"
+    s["findings"]["parsed"]["weaviate_version"]["answer"] = (
+        "v1.40.1, the latest 1.40 release in the docs"
+    )
 
 
 def server_minor_only(s: dict) -> None:
@@ -55,12 +69,17 @@ def server_version_prefix(s: dict) -> None:
 
 def server_release_unavailable(s: dict) -> None:
     s["latest_releases"]["weaviate"] = {
-        "version": None, "source": None, "status": 403, "error": "API: rate limit exceeded; feed: 503",
+        "version": None,
+        "source": None,
+        "status": 403,
+        "error": "API: rate limit exceeded; feed: 503",
     }
 
 
 def client_version_behind(s: dict) -> None:
-    s["findings"]["parsed"]["client_library_versions"]["answer"] = "Python weaviate-client 4.22.0"
+    s["findings"]["parsed"]["client_library_versions"]["answer"] = (
+        "Python weaviate-client 4.22.0"
+    )
 
 
 def legacy_vectorizer_config(s: dict) -> None:
@@ -81,11 +100,15 @@ def uncited_answer(s: dict) -> None:
 
 
 def blog_source(s: dict) -> None:
-    s["findings"]["parsed"]["search"]["sources"].append("https://medium.com/some-weaviate-post")
+    s["findings"]["parsed"]["search"]["sources"].append(
+        "https://medium.com/some-weaviate-post"
+    )
 
 
 def other_github_owner(s: dict) -> None:
-    s["findings"]["parsed"]["search"]["sources"].append("https://api.github.com/repos/someone/weaviate-notes")
+    s["findings"]["parsed"]["search"]["sources"].append(
+        "https://api.github.com/repos/someone/weaviate-notes"
+    )
 
 
 def test_oracle_passes_every_check():
@@ -121,17 +144,49 @@ def test_missing_file_fails_every_check():
     [
         (missing_item, ["findings-file"], "missing ['search']"),
         # The malformed answer also cannot be searched for the vector API.
-        (answer_not_string, ["findings-file", "current-vector-config"], "malformed ['config_ingestion']"),
-        (server_patch_behind, ["weaviate-version-latest"], "names the latest release 1.40.2"),
-        (server_minor_only, ["weaviate-version-latest"], "names the latest release 1.40.2"),
-        (server_version_prefix, ["weaviate-version-latest"], "names the latest release 1.40.20"),
-        (server_release_unavailable, ["weaviate-version-latest"], "rate limit exceeded"),
-        (client_version_behind, ["python-client-version-latest"], "latest Python client release 4.24.1"),
+        (
+            answer_not_string,
+            ["findings-file", "current-vector-config"],
+            "malformed ['config_ingestion']",
+        ),
+        (
+            server_patch_behind,
+            ["weaviate-version-latest"],
+            "names the latest release 1.40.2",
+        ),
+        (
+            server_minor_only,
+            ["weaviate-version-latest"],
+            "names the latest release 1.40.2",
+        ),
+        (
+            server_version_prefix,
+            ["weaviate-version-latest"],
+            "names the latest release 1.40.20",
+        ),
+        (
+            server_release_unavailable,
+            ["weaviate-version-latest"],
+            "rate limit exceeded",
+        ),
+        (
+            client_version_behind,
+            ["python-client-version-latest"],
+            "latest Python client release 4.24.1",
+        ),
         (legacy_vectorizer_config, ["current-vector-config"], "Configure.Vectorizer"),
         (prose_without_api, ["current-vector-config"], "names vector_config"),
         (uncited_answer, ["canonical-sources"], "uncited ['search']"),
-        (blog_source, ["canonical-sources"], "non-canonical ['https://medium.com/some-weaviate-post']"),
-        (other_github_owner, ["canonical-sources"], "non-canonical ['https://api.github.com/repos/someone/weaviate-notes']"),
+        (
+            blog_source,
+            ["canonical-sources"],
+            "non-canonical ['https://medium.com/some-weaviate-post']",
+        ),
+        (
+            other_github_owner,
+            ["canonical-sources"],
+            "non-canonical ['https://api.github.com/repos/someone/weaviate-notes']",
+        ),
     ],
 )
 def test_broken_variant_fails_only_its_checks(break_snapshot, failing_checks, reason):

@@ -55,7 +55,12 @@ def latest_server_release() -> dict:
     status, body = request(SERVER_RELEASES)
     if status == 200 and isinstance(body, list):
         tags = [r["tag_name"] for r in body if not r["draft"] and not r["prerelease"]]
-        return {"version": highest_stable(tags), "source": SERVER_RELEASES, "status": status, "error": None}
+        return {
+            "version": highest_stable(tags),
+            "source": SERVER_RELEASES,
+            "status": status,
+            "error": None,
+        }
     # The API's unauthenticated limit is per IP, and Trials share Modal's
     # egress IPs with agents that query the same API; the feed is not
     # counted against it. The feed omits drafts, and STABLE_TAG excludes
@@ -63,14 +68,27 @@ def latest_server_release() -> dict:
     feed_status, feed = request(SERVER_RELEASES_FEED)
     if feed_status == 200 and isinstance(feed, str):
         tags = re.findall(r'/releases/tag/([^"]+)"', feed)
-        return {"version": highest_stable(tags), "source": SERVER_RELEASES_FEED, "status": feed_status, "error": None}
-    return {"version": None, "source": None, "status": status,
-            "error": f"API: {str(body)[:500]}; feed: {str(feed)[:500]}"}
+        return {
+            "version": highest_stable(tags),
+            "source": SERVER_RELEASES_FEED,
+            "status": feed_status,
+            "error": None,
+        }
+    return {
+        "version": None,
+        "source": None,
+        "status": status,
+        "error": f"API: {str(body)[:500]}; feed: {str(feed)[:500]}",
+    }
 
 
 def highest_stable(tags: list[str]) -> str | None:
     """Return the highest ``X.Y.Z`` among ``tags``, without a ``v`` prefix."""
-    versions = [tuple(map(int, m.groups())) for tag in tags if (m := re.fullmatch(STABLE_TAG, tag))]
+    versions = [
+        tuple(map(int, m.groups()))
+        for tag in tags
+        if (m := re.fullmatch(STABLE_TAG, tag))
+    ]
     return ".".join(map(str, max(versions))) if versions else None
 
 

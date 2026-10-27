@@ -21,7 +21,9 @@ PAGES_DIR = "_report"
 
 
 def write_report(
-    outputs_dir: Path, tasks_dir: Path = ROOT / "tasks", agents_file: Path = ROOT / "agents.toml",
+    outputs_dir: Path,
+    tasks_dir: Path = ROOT / "tasks",
+    agents_file: Path = ROOT / "agents.toml",
 ) -> Path:
     """Write the site into ``outputs_dir`` and return the index path.
 
@@ -37,20 +39,34 @@ def write_report(
 
     trial_pages = {
         trial.path: pages_dir / run.path.name / f"{trial.path.name}.html"
-        for run in runs for trial in run.trials
+        for run in runs
+        for trial in run.trials
     }
     for run in runs:
         for trial in run.trials:
             page = trial_pages[trial.path]
             page.parent.mkdir(parents=True, exist_ok=True)
-            page.write_text(render_trial(run, trial, page_dir=page.parent, index=index,
-                                         expected=expected.get(run.task, {})))
+            page.write_text(
+                render_trial(
+                    run,
+                    trial,
+                    page_dir=page.parent,
+                    index=index,
+                    expected=expected.get(run.task, {}),
+                )
+            )
     _remove_stale_pages(pages_dir, set(trial_pages.values()))
 
-    index.write_text(render_index(
-        runs, tasks, load_agents(agents_file),
-        index_dir=outputs_dir, trial_pages=trial_pages, generated=datetime.now(),
-    ))
+    index.write_text(
+        render_index(
+            runs,
+            tasks,
+            load_agents(agents_file),
+            index_dir=outputs_dir,
+            trial_pages=trial_pages,
+            generated=datetime.now(),
+        )
+    )
     return index
 
 

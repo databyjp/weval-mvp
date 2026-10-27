@@ -13,7 +13,9 @@ def test_treatments_exist():
     assert SKILLS
 
 
-@pytest.mark.parametrize("skill", SKILLS, ids=lambda path: f"{path.parents[1].name}/{path.name}")
+@pytest.mark.parametrize(
+    "skill", SKILLS, ids=lambda path: f"{path.parents[1].name}/{path.name}"
+)
 def test_skill_has_frontmatter_naming_it(skill):
     text = (skill / "SKILL.md").read_text()
     frontmatter, _, _ = text.removeprefix("---\n").partition("\n---\n")

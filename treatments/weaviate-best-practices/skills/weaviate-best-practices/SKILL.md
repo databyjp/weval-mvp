@@ -62,7 +62,8 @@ from weaviate.classes.config import Configure, DataType, Property
 client.collections.create(
     "Article",
     vector_config=Configure.Vectors.text2vec_transformers(
-        name="body", source_properties=["title", "body"],
+        name="body",
+        source_properties=["title", "body"],
     ),
     properties=[
         Property(name="title", data_type=DataType.TEXT),

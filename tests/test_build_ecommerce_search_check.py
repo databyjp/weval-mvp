@@ -15,7 +15,9 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/build-ecommerce-search-oracle-snapshot.json").read_text())
+ORACLE = json.loads(
+    (ROOT / "tests/fixtures/build-ecommerce-search-oracle-snapshot.json").read_text()
+)
 
 _spec = importlib.util.spec_from_file_location(
     "build_ecommerce_search_check", ROOT / "tasks/build/ecommerce-search/check.py"
@@ -50,7 +52,10 @@ def word_tokenization(s: dict) -> None:
 
 
 def near_text_search(s: dict) -> None:
-    s["files"] = {k: v.replace(".query.hybrid(", ".query.near_text(") for k, v in s["files"].items()}
+    s["files"] = {
+        k: v.replace(".query.hybrid(", ".query.near_text(")
+        for k, v in s["files"].items()
+    }
 
 
 def default_page_size_10(s: dict) -> None:
@@ -66,7 +71,11 @@ def test_oracle_passes_every_check():
 @pytest.mark.parametrize(
     ("break_snapshot", "failing_check", "reason"),
     [
-        (legacy_vectorizer, "weaviate-managed-vectorization", "legacy collection-level vectorizer"),
+        (
+            legacy_vectorizer,
+            "weaviate-managed-vectorization",
+            "legacy collection-level vectorizer",
+        ),
         (missing_product, "catalog-ingestion", "holds 24 objects"),
         (word_tokenization, "sku-category-field-tokenization", "'sku': 'word'"),
         (near_text_search, "hybrid-query", "it calls .query.near_text(...)"),

@@ -18,11 +18,14 @@ def get_json(url: str) -> object:
 
 
 def latest_server_release() -> str:
-    releases = get_json("https://api.github.com/repos/weaviate/weaviate/releases?per_page=100")
+    releases = get_json(
+        "https://api.github.com/repos/weaviate/weaviate/releases?per_page=100"
+    )
     versions = [
         tuple(map(int, match.groups()))
         for release in releases
-        if not release["draft"] and not release["prerelease"]
+        if not release["draft"]
+        and not release["prerelease"]
         and (match := re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", release["tag_name"]))
     ]
     return ".".join(map(str, max(versions)))

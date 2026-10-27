@@ -13,10 +13,20 @@ EXACT_SKU = "ZXQ-9917"
 SEMANTIC_SKU = "TRAIL-001"
 PAGINATION_PAGES = 5
 PAGINATION_REFERENCE_SIZE = 24
-PROPERTY_TYPES = {"sku": "text", "name": "text", "description": "text",
-                  "category": "text", "price": "number"}
-ITEM_TYPES = {"sku": str, "name": str, "description": str, "category": str,
-              "price": (int, float)}
+PROPERTY_TYPES = {
+    "sku": "text",
+    "name": "text",
+    "description": "text",
+    "category": "text",
+    "price": "number",
+}
+ITEM_TYPES = {
+    "sku": str,
+    "name": str,
+    "description": str,
+    "category": str,
+    "price": (int, float),
+}
 # Modules covered by the Oracle and calibration; others are not scored as passing.
 LOCAL_VECTORIZERS = {"text2vec-ollama", "text2vec-transformers"}
 
@@ -24,7 +34,9 @@ LOCAL_VECTORIZERS = {"text2vec-ollama", "text2vec-transformers"}
 def collection(snapshot: dict) -> dict:
     """Return the Product class from the schema."""
     classes = {c["class"]: c for c in snapshot["schema"].get("classes") or []}
-    assert COLLECTION in classes, f"a {COLLECTION} collection exists; found {sorted(classes)}"
+    assert COLLECTION in classes, (
+        f"a {COLLECTION} collection exists; found {sorted(classes)}"
+    )
     return classes[COLLECTION]
 
 
@@ -37,7 +49,9 @@ def items(snapshot: dict, label: str) -> list[dict]:
     probe = snapshot["probes"][label]
     params = probe["params"]
     page, page_size = params.get("page", 1), params.get("page_size", DEFAULT_PAGE_SIZE)
-    assert probe["status"] == 200, f"/search {params} returns HTTP 200, got {probe['status']}"
+    assert probe["status"] == 200, (
+        f"/search {params} returns HTTP 200, got {probe['status']}"
+    )
     body = probe["body"]
     assert isinstance(body, dict) and isinstance(body.get("items"), list), (
         f"/search {params} returns an object with an items list"
@@ -47,9 +61,14 @@ def items(snapshot: dict, label: str) -> list[dict]:
         f"got page={body.get('page')!r} page_size={body.get('page_size')!r}"
     )
     for item in body["items"]:
-        bad = [k for k, t in ITEM_TYPES.items()
-               if not isinstance(item.get(k), t) or isinstance(item.get(k), bool)]
-        assert not bad, f"every result has the documented product fields; wrong or missing {bad}"
+        bad = [
+            k
+            for k, t in ITEM_TYPES.items()
+            if not isinstance(item.get(k), t) or isinstance(item.get(k), bool)
+        ]
+        assert not bad, (
+            f"every result has the documented product fields; wrong or missing {bad}"
+        )
     return body["items"]
 
 
@@ -65,16 +84,21 @@ def catalog_ingestion(snapshot: dict) -> None:
         f"{COLLECTION} holds {len(catalog)} objects, one per catalog product; got {len(stored)}"
     )
     # Compare only catalog fields.
-    unmatched = [p["sku"] for p in catalog
-                 if sum(p.items() <= o.items() for o in stored) != 1]
-    assert not unmatched, f"each catalog product is stored exactly once; not so for {unmatched}"
+    unmatched = [
+        p["sku"] for p in catalog if sum(p.items() <= o.items() for o in stored) != 1
+    ]
+    assert not unmatched, (
+        f"each catalog product is stored exactly once; not so for {unmatched}"
+    )
 
 
 def product_schema(snapshot: dict) -> None:
     """sku, name, description, and category are text properties; price is number."""
     actual = {name: p["dataType"][0] for name, p in properties(snapshot).items()}
     wrong = {k: actual.get(k) for k, t in PROPERTY_TYPES.items() if actual.get(k) != t}
-    assert not wrong, f"{COLLECTION} property data types match {PROPERTY_TYPES}; differing: {wrong}"
+    assert not wrong, (
+        f"{COLLECTION} property data types match {PROPERTY_TYPES}; differing: {wrong}"
+    )
 
 
 # Detection check: the prompt says only "local vectorizer" (see AGENTS.md).
@@ -130,7 +154,9 @@ def semantic_retrieval(snapshot: dict) -> None:
 
 def pagination(snapshot: dict) -> None:
     """Pages are stable, do not overlap, and concatenate to the larger request's order."""
-    pages = [items(snapshot, f"pagination-page-{n}") for n in range(1, PAGINATION_PAGES + 1)]
+    pages = [
+        items(snapshot, f"pagination-page-{n}") for n in range(1, PAGINATION_PAGES + 1)
+    ]
     assert items(snapshot, "pagination-page-1-repeat") == pages[0], (
         "repeating a page returns the same results"
     )
@@ -149,7 +175,10 @@ def pagination(snapshot: dict) -> None:
 
 def sku_category_field_tokenization(snapshot: dict) -> None:
     """sku and category use field tokenization."""
-    actual = {k: properties(snapshot).get(k, {}).get("tokenization") for k in ("sku", "category")}
+    actual = {
+        k: properties(snapshot).get(k, {}).get("tokenization")
+        for k in ("sku", "category")
+    }
     assert actual == {"sku": "field", "category": "field"}, (
         f"sku and category use field tokenization; got {actual}"
     )
@@ -159,12 +188,22 @@ def hybrid_query(snapshot: dict) -> None:
     """The submitted code calls collection.query.hybrid(...)."""
     # Trade-off: a substring match over submitted files, so a hybrid call
     # outside the /search route also passes.
-    callers = [name for name, text in snapshot["files"].items()
-               if name.endswith(".py") and ".query.hybrid(" in text]
-    called = sorted({method for name, text in snapshot["files"].items() if name.endswith(".py")
-                     for method in re.findall(r"\.query\.(\w+)\(", text)})
-    assert callers, ("submitted Python code calls .query.hybrid(...); it calls "
-                     + (", ".join(f".query.{method}(...)" for method in called) or "no .query method"))
+    callers = [
+        name
+        for name, text in snapshot["files"].items()
+        if name.endswith(".py") and ".query.hybrid(" in text
+    ]
+    called = sorted(
+        {
+            method
+            for name, text in snapshot["files"].items()
+            if name.endswith(".py")
+            for method in re.findall(r"\.query\.(\w+)\(", text)
+        }
+    )
+    assert callers, "submitted Python code calls .query.hybrid(...); it calls " + (
+        ", ".join(f".query.{method}(...)" for method in called) or "no .query method"
+    )
 
 
 REQUIRED = [

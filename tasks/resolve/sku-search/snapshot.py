@@ -13,10 +13,20 @@ import urllib.request
 from pathlib import Path
 
 COLLECTION = "Product"
-WEAVIATE = f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+WEAVIATE = (
+    f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+)
 # Label -> /search query parameters. check.py reads responses by label.
-EXACT_SKUS = ("ZXQ-9917", "9917-ZXQ", "9917@ZXQ", "AQ1-9917", "ZXQ-4831",
-              "zxq-9917", "ZXQ 9917", "9917 ZXQ")
+EXACT_SKUS = (
+    "ZXQ-9917",
+    "9917-ZXQ",
+    "9917@ZXQ",
+    "AQ1-9917",
+    "ZXQ-4831",
+    "zxq-9917",
+    "ZXQ 9917",
+    "9917 ZXQ",
+)
 PROBES = {
     **{f"exact-sku-{sku}": {"query": sku, "limit": 5} for sku in EXACT_SKUS},
     "keyword": {"query": "waterproof hiking boots", "limit": 5},
@@ -41,7 +51,11 @@ def objects(collection: str) -> list[dict]:
     """Return every object's id and properties, paging by cursor."""
     result, after = [], None
     while True:
-        params = {"class": collection, "limit": 100, **({"after": after} if after else {})}
+        params = {
+            "class": collection,
+            "limit": 100,
+            **({"after": after} if after else {}),
+        }
         _, body = request(f"{WEAVIATE}/v1/objects?{urllib.parse.urlencode(params)}")
         page = body.get("objects") or []
         result += [{"id": o["id"], "properties": o.get("properties", {})} for o in page]
@@ -53,7 +67,10 @@ def objects(collection: str) -> list[dict]:
 def snapshot(app_url: str) -> dict:
     """Return the resolved Product schema and objects, alias, /search probes, and catalog."""
     _, aliases = request(f"{WEAVIATE}/v1/aliases")
-    alias = next((a for a in (aliases or {}).get("aliases") or [] if a["alias"] == COLLECTION), None)
+    alias = next(
+        (a for a in (aliases or {}).get("aliases") or [] if a["alias"] == COLLECTION),
+        None,
+    )
     target = alias["class"] if alias else COLLECTION
     schema_status, schema = request(f"{WEAVIATE}/v1/schema/{target}")
     probes = {}

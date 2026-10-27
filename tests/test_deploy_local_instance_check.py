@@ -15,7 +15,9 @@ import pytest
 from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
-ORACLE = json.loads((ROOT / "tests/fixtures/deploy-local-instance-oracle-snapshot.json").read_text())
+ORACLE = json.loads(
+    (ROOT / "tests/fixtures/deploy-local-instance-oracle-snapshot.json").read_text()
+)
 
 _spec = importlib.util.spec_from_file_location(
     "deploy_local_instance_check", ROOT / "tasks/deploy/local-instance/check.py"
@@ -29,7 +31,9 @@ def results(snapshot: dict) -> dict[str, dict]:
 
 
 def failures(snapshot: dict) -> dict[str, str]:
-    return {name: r["notes"] for name, r in results(snapshot).items() if not r["passed"]}
+    return {
+        name: r["notes"] for name, r in results(snapshot).items() if not r["passed"]
+    }
 
 
 def not_ready(s: dict) -> None:
@@ -75,7 +79,11 @@ def test_oracle_passes_every_check():
         (no_vectorizer, "collection-vectorizer", "configures a vectorizer module"),
         (legacy_vectorizer, "named-vector", "legacy collection-level vectorizer"),
         (api_key_vectorizer, "vectorizer-availability", "no api key found"),
-        (no_data_mount, "persistence-configured", "covers the data path /var/lib/weaviate"),
+        (
+            no_data_mount,
+            "persistence-configured",
+            "covers the data path /var/lib/weaviate",
+        ),
     ],
 )
 def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):
@@ -88,7 +96,11 @@ def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reas
 
 def test_auth_posture_records_refused_anonymous_access():
     snapshot = copy.deepcopy(ORACLE)
-    snapshot["auth"] = {"anonymous_status": 401, "api_key_count": 1, "used_api_key": True}
+    snapshot["auth"] = {
+        "anonymous_status": 401,
+        "api_key_count": 1,
+        "used_api_key": True,
+    }
     posture = results(snapshot)["auth-posture"]
     assert posture["passed"]
     assert posture["notes"] == "anonymous /v1/schema: refused; API keys: 1"

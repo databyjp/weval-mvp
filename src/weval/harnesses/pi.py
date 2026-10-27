@@ -70,7 +70,9 @@ class WebAccessPi(Pi):
     async def install(self, environment: BaseEnvironment) -> None:
         """Install Pi and the pinned extension; fail if the version does not match."""
         await super().install(environment)
-        dirs = " ".join(shlex.quote(str(d)) for d in (_PACKAGE_DIR, _CONFIG_DIR, _AGENT_LOGS))
+        dirs = " ".join(
+            shlex.quote(str(d)) for d in (_PACKAGE_DIR, _CONFIG_DIR, _AGENT_LOGS)
+        )
         await self.exec_as_agent(environment, command=f"mkdir -p {dirs}")
         for name, remote in (
             ("package.json", _PACKAGE_DIR / "package.json"),

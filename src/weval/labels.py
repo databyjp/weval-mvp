@@ -35,7 +35,9 @@ MAX_SOURCES = 254
 # A call that returned less showed the agent nothing to take a value from,
 # such as the write that saves an answer citing URLs.
 MIN_SHOWN_CHARS = 200
-OWN_KNOWLEDGE = "The agent's own knowledge: no source it was shown states the value or approach."
+OWN_KNOWLEDGE = (
+    "The agent's own knowledge: no source it was shown states the value or approach."
+)
 VERIFICATION = {
     "verified": "It checked the value against a source that states it before answering.",
     "deferred_to_user": "It said the value was unconfirmed and told the user how to confirm it.",
@@ -61,7 +63,11 @@ def label(trial_dir: Path, results: list[dict], *, call: bool = True) -> dict:
         return {"labels": {}, "note": None}
     steps = json.loads(trajectory.read_text())["steps"]
     sources = _sources(steps, trial_dir.parents[1] / "treatment/skills")
-    messages = [str(s["message"])[:MESSAGE_CHARS] for s in steps if s.get("source") == "agent" and s.get("message")]
+    messages = [
+        str(s["message"])[:MESSAGE_CHARS]
+        for s in steps
+        if s.get("source") == "agent" and s.get("message")
+    ]
 
     cache_file = trial_dir.parents[1] / "labels" / f"{trial_dir.name}.json"
     cache = json.loads(cache_file.read_text()) if cache_file.exists() else {}
@@ -91,7 +97,13 @@ def label(trial_dir: Path, results: list[dict], *, call: bool = True) -> dict:
         cache_file.write_text(json.dumps(cache, indent=1))
     note = None
     if skipped:
-        reason = "not requested" if not call else f"{KEY_VAR} is not set" if not key else "request failed"
+        reason = (
+            "not requested"
+            if not call
+            else f"{KEY_VAR} is not set"
+            if not key
+            else "request failed"
+        )
         note = f"unlabelled ({reason}): {', '.join(skipped)}"
     return {"labels": labels, "note": note}
 
@@ -100,9 +112,16 @@ def _sources(steps: list[dict], skills: Path) -> dict[str, str]:
     """What the Trial looked up, by name, with an excerpt of what it was shown:
     each fetched URL, search, and named Treatment file whose tool call
     returned at least ``MIN_SHOWN_CHARS``, in first-use order."""
-    shown = {r.get("source_call_id"): str(r.get("content") or "")
-             for s in steps for r in (s.get("observation") or {}).get("results", [])}
-    treatment_files = [str(p.relative_to(skills)) for p in skills.rglob("*") if p.is_file()] if skills.is_dir() else []
+    shown = {
+        r.get("source_call_id"): str(r.get("content") or "")
+        for s in steps
+        for r in (s.get("observation") or {}).get("results", [])
+    }
+    treatment_files = (
+        [str(p.relative_to(skills)) for p in skills.rglob("*") if p.is_file()]
+        if skills.is_dir()
+        else []
+    )
     sources: dict[str, str] = {}
     for step in steps:
         for call in step.get("tool_calls") or []:
@@ -111,11 +130,18 @@ def _sources(steps: list[dict], skills: Path) -> dict[str, str]:
             arguments = json.dumps(call.get("arguments"))
             names = URL.findall(arguments)
             # Web search tools (Claude Code's WebSearch, Pi's web_search), not ToolSearch.
-            if call["function_name"].lower().replace("_", "") == "websearch" and not names:
-                names = [f"search: {(call.get('arguments') or {}).get('query', arguments)}"]
+            if (
+                call["function_name"].lower().replace("_", "") == "websearch"
+                and not names
+            ):
+                names = [
+                    f"search: {(call.get('arguments') or {}).get('query', arguments)}"
+                ]
             names += [f for f in treatment_files if Path(f).name in arguments]
             for name in names:
-                sources[name] = sources.get(name, "") + shown.get(call.get("tool_call_id"), "")
+                sources[name] = sources.get(name, "") + shown.get(
+                    call.get("tool_call_id"), ""
+                )
     sources = dict(list(sources.items())[:MAX_SOURCES])
     share = SOURCES_CHARS // max(len(sources), 1)
     return {name: excerpt[:share] for name, excerpt in sources.items()}
@@ -124,11 +150,17 @@ def _sources(steps: list[dict], skills: Path) -> dict[str, str]:
 def _request(result: dict, sources: dict[str, str], messages: list[str]) -> dict:
     # Option ids are positional; names and excerpts go in the descriptions,
     # which Jev reads, and _decode maps the ids back.
-    options = {f"source_{i:03d}": f"{name}\n{excerpt}" for i, (name, excerpt) in enumerate(sources.items())}
+    options = {
+        f"source_{i:03d}": f"{name}\n{excerpt}"
+        for i, (name, excerpt) in enumerate(sources.items())
+    }
     options["own_knowledge"] = OWN_KNOWLEDGE
     return {
         "model": MODEL,
-        "state": {"failed_check": f"{result['name']}: {result.get('notes') or ''}", "agent_messages": messages},
+        "state": {
+            "failed_check": f"{result['name']}: {result.get('notes') or ''}",
+            "agent_messages": messages,
+        },
         "questions": {
             "answer_source": {
                 "type": "choice",
@@ -146,10 +178,12 @@ def _request(result: dict, sources: dict[str, str], messages: list[str]) -> dict
 
 def _post(body: dict, key: str) -> dict:
     for attempt in range(3):
-        response = httpx.post(API, json=body, headers={"Authorization": f"Bearer {key}"}, timeout=60)
+        response = httpx.post(
+            API, json=body, headers={"Authorization": f"Bearer {key}"}, timeout=60
+        )
         # 429 rate limit and 529 overloaded: back off and retry, as TypeSafe's docs ask.
         if response.status_code in (429, 529) and attempt < 2:
-            time.sleep(2 ** attempt)
+            time.sleep(2**attempt)
             continue
         response.raise_for_status()
         return response.json()
@@ -163,6 +197,12 @@ def _decode(response: dict, sources: dict[str, str]) -> dict:
     source, verification = answers["answer_source"], answers["verification"]
     return {
         "model": response.get("model"),
-        "answer_source": {"choice": names.get(source["choice"], source["choice"]), "confidence": source.get("confidence")},
-        "verification": {"choice": verification["choice"], "confidence": verification.get("confidence")},
+        "answer_source": {
+            "choice": names.get(source["choice"], source["choice"]),
+            "confidence": source.get("confidence"),
+        },
+        "verification": {
+            "choice": verification["choice"],
+            "confidence": verification.get("confidence"),
+        },
     }

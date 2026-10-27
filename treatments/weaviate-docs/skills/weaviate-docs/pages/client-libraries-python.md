@@ -232,21 +232,21 @@ Introduction of three distinct algorithms using different batching styles under-
 
 ```python
 with client.batch.dynamic() as batch:
-  ...
+    ...
 ```
 
 is equivalent to:
 
 ```python
 with client.batch as batch:
-  ...
+    ...
 ```
 
 `client.batch.fixed_size() as batch` is a way to configure your batching algorithm to only use a fixed size.
 
 ```python
 with client.batch.dynamic() as batch:
-  ...
+    ...
 ```
 
 is equivalent to:
@@ -254,7 +254,7 @@ is equivalent to:
 ```python
 client.batch.configure_fixed_size()
 with client.batch as batch:
-  ...
+    ...
 ```
 
 `client.batch.rate_limit() as batch` is a new way to help avoid hitting third-party vectorization API rate limits. By specifying `request_per_minute` in the
@@ -295,6 +295,7 @@ Use `client.close()` to explicitly close your client connections.
 
 ```python
 import weaviate
+
 client = weaviate.connect_to_local()
 
 print(client.is_ready())
@@ -308,7 +309,7 @@ Use a context manager to close client connections for you.
 import weaviate
 
 with weaviate.connect_to_local() as client:
-     print(client.is_ready())
+    print(client.is_ready())
 
 # Python closes the client when you leave the 'with' block
 ```
@@ -357,11 +358,15 @@ client = weaviate.connect_to_local()
 
 jeopardy = client.collections.use("JeopardyQuestion")
 response = jeopardy.query.fetch_objects(
-    filters=wvc.query.Filter.by_property("round").equal("Double Jeopardy!") &
-            wvc.query.Filter.by_creation_time().greater_or_equal(datetime.datetime(2005, 1, 1)) |
-            wvc.query.Filter.by_creation_time().greater_or_equal(datetime.datetime(2000, 12, 31)),
-            limit=3
+    filters=wvc.query.Filter.by_property("round").equal("Double Jeopardy!")
+    & wvc.query.Filter.by_creation_time().greater_or_equal(
+        datetime.datetime(2005, 1, 1)
     )
+    | wvc.query.Filter.by_creation_time().greater_or_equal(
+        datetime.datetime(2000, 12, 31)
+    ),
+    limit=3,
+)
 
 client.close()
 ```
@@ -414,7 +419,7 @@ Use `ReferenceToMulti` for multi-target references.
       vector_index_config=wvc.config.Configure.VectorIndex.hnsw(
           distance_metric=wvc.config.VectorDistances.COSINE,
           vector_cache_max_objects=1000000,
-          quantizer=wvc.config.Configure.VectorIndex.Quantizer.pq()
+          quantizer=wvc.config.Configure.VectorIndex.Quantizer.pq(),
       ),
   )
   ```

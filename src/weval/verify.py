@@ -48,8 +48,12 @@ def score(check: ModuleType, snapshot: dict) -> list[dict]:
     without ``prompt_variant`` is the ``default`` prompt variant.
     """
     prompt_variant = snapshot.get("prompt_variant", "default")
-    required_checks = check.REQUIRED + getattr(check, "PROMPT_VARIANT_REQUIRED", {}).get(prompt_variant, [])
-    preferred_checks = check.PREFERRED + getattr(check, "PROMPT_VARIANT_PREFERRED", {}).get(prompt_variant, [])
+    required_checks = check.REQUIRED + getattr(
+        check, "PROMPT_VARIANT_REQUIRED", {}
+    ).get(prompt_variant, [])
+    preferred_checks = check.PREFERRED + getattr(
+        check, "PROMPT_VARIANT_PREFERRED", {}
+    ).get(prompt_variant, [])
     results = []
     for required, functions in ((True, required_checks), (False, preferred_checks)):
         for function in functions:
@@ -92,8 +96,18 @@ def _start_app() -> subprocess.Popen[bytes]:
     """Start the submitted ``main:app`` and wait up to 120 s for it to answer HTTP."""
     log = (LOG_DIR / "application.log").open("wb")
     process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--app-dir", str(APP_DIR),
-         "--host", "127.0.0.1", "--port", str(APP_PORT)],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "main:app",
+            "--app-dir",
+            str(APP_DIR),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(APP_PORT),
+        ],
         cwd=APP_DIR,
         stdout=log,
         stderr=subprocess.STDOUT,
@@ -102,7 +116,9 @@ def _start_app() -> subprocess.Popen[bytes]:
         if process.poll() is not None:
             raise RuntimeError(f"app exited with code {process.returncode}")
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{APP_PORT}/openapi.json", timeout=2)
+            urllib.request.urlopen(
+                f"http://127.0.0.1:{APP_PORT}/openapi.json", timeout=2
+            )
             return process
         except OSError:
             time.sleep(1)
@@ -145,7 +161,9 @@ def main() -> None:
 
     # Recorded even on failure, so the failed snapshot is scored on the
     # prompt variant's checks too.
-    snapshot["prompt_variant"] = Path(__file__).with_name("prompt_variant").read_text().strip()
+    snapshot["prompt_variant"] = (
+        Path(__file__).with_name("prompt_variant").read_text().strip()
+    )
     (LOG_DIR / "snapshot.json").write_text(json.dumps(snapshot, indent=1))
     results = score(importlib.import_module("check"), snapshot)
     (LOG_DIR / "checks.json").write_text(json.dumps(results, indent=1))

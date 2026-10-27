@@ -36,7 +36,9 @@ def baseline(snapshot: dict) -> dict:
         json.dumps(record["objects"], sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     if digest != CORPUS_SHA256 or not is_legacy_definition(record["schema"]):
-        raise RuntimeError("baseline.json is not the authored corpus and legacy collection definition")
+        raise RuntimeError(
+            "baseline.json is not the authored corpus and legacy collection definition"
+        )
     return record
 
 
@@ -49,10 +51,15 @@ def definition_fields(definition: dict) -> dict:
         "vectorIndexType": definition.get("vectorIndexType"),
         "vectorDistance": definition.get("vectorIndexConfig", {}).get("distance"),
         "vectorConfig": definition.get("vectorConfig") or None,
-        "vectorizeClassName": definition.get("moduleConfig", {}).get(module, {}).get("vectorizeClassName"),
+        "vectorizeClassName": definition.get("moduleConfig", {})
+        .get(module, {})
+        .get("vectorizeClassName"),
         "properties": {
-            p["name"]: [p["dataType"], p.get("tokenization"),
-                        p.get("moduleConfig", {}).get(module, {}).get("skip")]
+            p["name"]: [
+                p["dataType"],
+                p.get("tokenization"),
+                p.get("moduleConfig", {}).get(module, {}).get("skip"),
+            ]
             for p in definition["properties"]
         },
     }
@@ -78,7 +85,9 @@ def is_legacy_definition(definition: dict) -> bool:
 def release_at_least(version: str | None, minimum: str) -> bool:
     """Accept stable ``X.Y.Z`` releases at or above ``minimum``."""
     parts = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version or "")
-    return bool(parts) and tuple(map(int, parts.groups())) >= tuple(map(int, minimum.split(".")))
+    return bool(parts) and tuple(map(int, parts.groups())) >= tuple(
+        map(int, minimum.split("."))
+    )
 
 
 def declares_client_version(requirements: str, installed: str) -> bool:
@@ -102,7 +111,9 @@ def declares_client_version(requirements: str, installed: str) -> bool:
             if specifier.operator not in {"==", "===", ">=", ">", "~="}:
                 continue
             try:
-                selects_required_line |= Version(specifier.version.removesuffix(".*")) >= floor
+                selects_required_line |= (
+                    Version(specifier.version.removesuffix(".*")) >= floor
+                )
             except InvalidVersion:
                 return False
     return selects_required_line
@@ -126,7 +137,9 @@ def client_version(snapshot: dict) -> None:
         f"installed weaviate-client is {MIN_CLIENT_VERSION} or later; installed {installed}"
     )
     requirements = snapshot["files"].get("requirements.txt", "")
-    declared = [line.strip() for line in requirements.splitlines() if "weaviate" in line]
+    declared = [
+        line.strip() for line in requirements.splitlines() if "weaviate" in line
+    ]
     assert declares_client_version(requirements, installed), (
         f"requirements.txt declares a weaviate-client line matching installed {installed} "
         f"and at least {MIN_CLIENT_VERSION}; declares {declared}"
@@ -138,9 +151,13 @@ def document_preservation(snapshot: dict) -> None:
     expected = {o["id"]: o["properties"] for o in baseline(snapshot)["objects"]}
     observed = snapshot["objects"][COLLECTION]
     observed_by_id = {o["id"]: o["properties"] for o in observed}
-    assert len(observed) == CORPUS_SIZE, f"{COLLECTION} holds {CORPUS_SIZE} objects; got {len(observed)}"
+    assert len(observed) == CORPUS_SIZE, (
+        f"{COLLECTION} holds {CORPUS_SIZE} objects; got {len(observed)}"
+    )
     changed = [i for i in expected if observed_by_id.get(i) != expected[i]]
-    assert not changed, f"original chunks keep their UUIDs and properties; {len(changed)} differ"
+    assert not changed, (
+        f"original chunks keep their UUIDs and properties; {len(changed)} differ"
+    )
 
 
 def collection_definition(snapshot: dict) -> None:
@@ -148,7 +165,10 @@ def collection_definition(snapshot: dict) -> None:
     observed = definition_fields(snapshot["schema"])
     expected = definition_fields(baseline(snapshot)["schema"])
     # Properties are compared one by one so the message names the property.
-    observed_props, expected_props = observed.pop("properties"), expected.pop("properties")
+    observed_props, expected_props = (
+        observed.pop("properties"),
+        expected.pop("properties"),
+    )
     differing = {k: observed.get(k) for k in expected if observed.get(k) != expected[k]}
     differing |= {
         f"properties.{name}": observed_props.get(name)
@@ -165,22 +185,30 @@ def search_contract(snapshot: dict) -> None:
     """/search still returns documented chunks relevant to representative queries."""
     for query, expected_title in EXPECTED_TITLES.items():
         probe = snapshot["probes"][query]
-        assert probe["status"] == 200, f"/search {probe['params']} returns HTTP 200, got {probe['status']}"
+        assert probe["status"] == 200, (
+            f"/search {probe['params']} returns HTTP 200, got {probe['status']}"
+        )
         items = probe["body"].get("items") if isinstance(probe["body"], dict) else None
         assert isinstance(items, list) and 0 < len(items) <= SEARCH_LIMIT, (
             f"/search {probe['params']} returns 1 to {SEARCH_LIMIT} items"
         )
         for item in items:
             bad = [k for k, t in CHUNK_FIELDS.items() if not isinstance(item.get(k), t)]
-            assert not bad, f"every result has the documented chunk fields; wrong or missing {bad}"
+            assert not bad, (
+                f"every result has the documented chunk fields; wrong or missing {bad}"
+            )
         titles = [item["title"] for item in items]
-        assert expected_title in titles, f"query {query!r} returns a {expected_title!r} chunk; got {titles}"
+        assert expected_title in titles, (
+            f"query {query!r} returns a {expected_title!r} chunk; got {titles}"
+        )
 
 
 def vectorizer_availability(snapshot: dict) -> None:
     """A new chunk still gets a 384-dimension vector from local text2vec-transformers."""
     probe = snapshot["vector_probe"]
-    assert probe["create_status"] < 300, f"a new chunk can be inserted; got {probe['create_status']}"
+    assert probe["create_status"] < 300, (
+        f"a new chunk can be inserted; got {probe['create_status']}"
+    )
     assert probe["dimensions"] == VECTOR_DIMENSIONS and probe["nonzero"], (
         f"the new chunk gets a non-zero {VECTOR_DIMENSIONS}-dimension vector; got {probe}"
     )

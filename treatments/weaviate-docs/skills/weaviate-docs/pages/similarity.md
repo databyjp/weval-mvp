@@ -19,9 +19,7 @@ from weaviate.classes.query import MetadataQuery
 
 jeopardy = client.collections.use("JeopardyQuestion")
 response = jeopardy.query.near_text(
-    query="animals in movies",
-    limit=2,
-    return_metadata=MetadataQuery(distance=True)
+    query="animals in movies", limit=2, return_metadata=MetadataQuery(distance=True)
 )
 
 for o in response.objects:
@@ -161,7 +159,7 @@ Use the [`Near Image`](/weaviate/api/graphql/search-operators) operator to find 
 This example uses a base64 representation of an image.
 
 ```py
-base64_string="SOME_BASE_64_REPRESENTATION"
+base64_string = "SOME_BASE_64_REPRESENTATION"
 
 # Get the collection containing images
 dogs = client.collections.use("Dog")
@@ -246,7 +244,7 @@ jeopardy = client.collections.use("JeopardyQuestion")
 response = jeopardy.query.near_object(
     near_object=uuid,  # A UUID of an object (e.g. "56b9449e-65db-5df4-887b-0a4773f52aa7")
     limit=2,
-    return_metadata=MetadataQuery(distance=True)
+    return_metadata=MetadataQuery(distance=True),
 )
 
 for o in response.objects:
@@ -352,9 +350,9 @@ from weaviate.classes.query import MetadataQuery
 
 jeopardy = client.collections.use("JeopardyQuestion")
 response = jeopardy.query.near_vector(
-    near_vector=query_vector, # your query vector goes here
+    near_vector=query_vector,  # your query vector goes here
     limit=2,
-    return_metadata=MetadataQuery(distance=True)
+    return_metadata=MetadataQuery(distance=True),
 )
 
 for o in response.objects:
@@ -483,7 +481,7 @@ response = reviews.query.near_text(
     query="a sweet German white wine",
     limit=2,
     target_vector="title_country",  # Specify the target vector for named vector collections
-    return_metadata=MetadataQuery(distance=True)
+    return_metadata=MetadataQuery(distance=True),
 )
 
 for o in response.objects:
@@ -625,8 +623,8 @@ from weaviate.classes.query import MetadataQuery
 jeopardy = client.collections.use("JeopardyQuestion")
 response = jeopardy.query.near_text(
     query="animals in movies",
-    distance=0.25, # max accepted distance
-    return_metadata=MetadataQuery(distance=True)
+    distance=0.25,  # max accepted distance
+    return_metadata=MetadataQuery(distance=True),
 )
 
 for o in response.objects:
@@ -757,7 +755,7 @@ response = jeopardy.query.near_text(
     query="animals in movies",
     limit=2,  # return 2 objects
     offset=1,  # With an offset of 1
-    return_metadata=MetadataQuery(distance=True)
+    return_metadata=MetadataQuery(distance=True),
 )
 
 for o in response.objects:
@@ -877,8 +875,8 @@ from weaviate.classes.query import MetadataQuery
 jeopardy = client.collections.use("JeopardyQuestion")
 response = jeopardy.query.near_text(
     query="animals in movies",
-    auto_limit=1, # number of close groups
-    return_metadata=MetadataQuery(distance=True)
+    auto_limit=1,  # number of close groups
+    return_metadata=MetadataQuery(distance=True),
 )
 
 for o in response.objects:
@@ -1026,10 +1024,10 @@ group_by = GroupBy(
 )
 
 response = jeopardy.query.near_text(
-    query="animals in movies", # find object based on this query
+    query="animals in movies",  # find object based on this query
     limit=10,  # maximum total objects
     return_metadata=MetadataQuery(distance=True),
-    group_by=group_by
+    group_by=group_by,
 )
 
 for o in response.objects:

@@ -15,21 +15,39 @@ whether the agent was shown it.
 import re
 from urllib.parse import urlparse
 
-ITEMS = ("weaviate_version", "client_library_versions", "deployment",
-         "config_ingestion", "search")
+ITEMS = (
+    "weaviate_version",
+    "client_library_versions",
+    "deployment",
+    "config_ingestion",
+    "search",
+)
 # Current Python client API for vectorizer configuration (client 4.16 and
 # later); the legacy one is vectorizer_config=Configure.Vectorizer.
-CURRENT_VECTOR_CONFIG = re.compile(r"Configure\.Vectors\b|\bvector_config\b|named vectors?", re.IGNORECASE)
+CURRENT_VECTOR_CONFIG = re.compile(
+    r"Configure\.Vectors\b|\bvector_config\b|named vectors?", re.IGNORECASE
+)
 # Weaviate-owned sites, and the package registries of the official clients,
 # including the API hosts agents query for versions (registry.npmjs.org,
 # repo1.maven.org, proxy.golang.org).
-CANONICAL_HOSTS = ("weaviate.io", "pypi.org", "npmjs.com", "npmjs.org", "pkg.go.dev",
-                   "proxy.golang.org", "nuget.org", "central.sonatype.com", "maven.org")
+CANONICAL_HOSTS = (
+    "weaviate.io",
+    "pypi.org",
+    "npmjs.com",
+    "npmjs.org",
+    "pkg.go.dev",
+    "proxy.golang.org",
+    "nuget.org",
+    "central.sonatype.com",
+    "maven.org",
+)
 
 
 def answer(snapshot: dict, item: str) -> str:
     value = snapshot["findings"]["parsed"][item]["answer"]
-    assert isinstance(value, str), f"{item} answer is a string; got {type(value).__name__}"
+    assert isinstance(value, str), (
+        f"{item} answer is a string; got {type(value).__name__}"
+    )
     return value
 
 
@@ -40,7 +58,9 @@ def names_version(text: str, version: str) -> bool:
 
 def latest(snapshot: dict, package: str) -> str:
     release = snapshot["latest_releases"][package]
-    assert release["version"], f"the latest {package} release was looked up at verify time; {release['error']}"
+    assert release["version"], (
+        f"the latest {package} release was looked up at verify time; {release['error']}"
+    )
     return release["version"]
 
 
@@ -67,8 +87,10 @@ def findings_file(snapshot: dict) -> None:
     )
     missing = [item for item in ITEMS if item not in parsed]
     malformed = [
-        item for item in ITEMS
-        if item in parsed and not (
+        item
+        for item in ITEMS
+        if item in parsed
+        and not (
             isinstance(parsed[item], dict)
             and isinstance(parsed[item].get("answer"), str)
             and isinstance(parsed[item].get("sources"), list)
@@ -122,17 +144,33 @@ def canonical_sources(snapshot: dict) -> None:
     # Items missing from the file are findings-file's failure, not this check's.
     present = [item for item in ITEMS if item in parsed]
     uncited = [item for item in present if not parsed[item]["sources"]]
-    other = sorted({url for item in present for url in parsed[item]["sources"] if not is_canonical(url)})
+    other = sorted(
+        {
+            url
+            for item in present
+            for url in parsed[item]["sources"]
+            if not is_canonical(url)
+        }
+    )
     assert not (uncited or other), (
         f"every answer cites canonical sources; uncited {uncited}, non-canonical {other}"
     )
 
 
-REQUIRED = [findings_file, weaviate_version_latest, python_client_version_latest, current_vector_config]
+REQUIRED = [
+    findings_file,
+    weaviate_version_latest,
+    python_client_version_latest,
+    current_vector_config,
+]
 PREFERRED = [canonical_sources]
 EXPECTED = {
-    "weaviate-version-latest": lambda snapshot: snapshot["latest_releases"]["weaviate"]["version"],
-    "python-client-version-latest": lambda snapshot: snapshot["latest_releases"]["weaviate-client"]["version"],
+    "weaviate-version-latest": lambda snapshot: snapshot["latest_releases"]["weaviate"][
+        "version"
+    ],
+    "python-client-version-latest": lambda snapshot: snapshot["latest_releases"][
+        "weaviate-client"
+    ]["version"],
 }
 # Placeholders for checks that differ by use case.
 PROMPT_VARIANT_REQUIRED: dict[str, list] = {

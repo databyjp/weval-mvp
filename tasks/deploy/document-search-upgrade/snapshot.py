@@ -17,7 +17,9 @@ import urllib.request
 from pathlib import Path
 
 COLLECTION = "DocumentChunk"
-WEAVIATE = f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+WEAVIATE = (
+    f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+)
 SEARCH_QUERIES = ("bread dough yeast fermentation", "coral reefs ocean fish")
 VECTOR_PROBE_ID = "00000000-0000-4000-8000-00000000beef"
 VECTOR_PROBE = {
@@ -28,7 +30,9 @@ VECTOR_PROBE = {
 }
 
 
-def request(url: str, method: str = "GET", payload: object = None) -> tuple[int, object]:
+def request(
+    url: str, method: str = "GET", payload: object = None
+) -> tuple[int, object]:
     """Send a request; return the status and JSON body (or raw text if not JSON).
     Connection failures and timeouts raise."""
     data = None if payload is None else json.dumps(payload).encode()
@@ -59,7 +63,8 @@ def objects() -> list[dict]:
             {
                 "id": o["id"],
                 "properties": o.get("properties", {}),
-                "has_vector": bool(o.get("vector")) or any((o.get("vectors") or {}).values()),
+                "has_vector": bool(o.get("vector"))
+                or any((o.get("vectors") or {}).values()),
             }
             for o in page
         ]
@@ -75,8 +80,12 @@ def vector_probe() -> dict:
         "POST",
         {"class": COLLECTION, "id": VECTOR_PROBE_ID, "properties": VECTOR_PROBE},
     )
-    _, fetched = request(f"{WEAVIATE}/v1/objects/{COLLECTION}/{VECTOR_PROBE_ID}?include=vector")
-    deleted, _ = request(f"{WEAVIATE}/v1/objects/{COLLECTION}/{VECTOR_PROBE_ID}", "DELETE")
+    _, fetched = request(
+        f"{WEAVIATE}/v1/objects/{COLLECTION}/{VECTOR_PROBE_ID}?include=vector"
+    )
+    deleted, _ = request(
+        f"{WEAVIATE}/v1/objects/{COLLECTION}/{VECTOR_PROBE_ID}", "DELETE"
+    )
     vector = fetched.get("vector") if isinstance(fetched, dict) else None
     numeric = isinstance(vector, list) and all(
         isinstance(v, (int, float)) and math.isfinite(v) for v in vector

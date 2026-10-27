@@ -165,27 +165,68 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
     groups: dict[tuple, list[RunSummary]] = {}
     for run in runs:
         versions = run.fingerprints or {}
-        key = (run.treatment, versions.get("treatment"), run.task, run.prompt_variant, run.agent,
-               versions.get("task"), versions.get("check"))
+        key = (
+            run.treatment,
+            versions.get("treatment"),
+            run.task,
+            run.prompt_variant,
+            run.agent,
+            versions.get("task"),
+            versions.get("check"),
+        )
         groups.setdefault(key, []).append(run)
     comparisons = []
     for key, treated in groups.items():
-        treatment, treatment_version, task, prompt_variant, agent, task_version, check_version = key
+        (
+            treatment,
+            treatment_version,
+            task,
+            prompt_variant,
+            agent,
+            task_version,
+            check_version,
+        ) = key
         if not treatment:
             continue
-        baseline = groups.get(("", None, task, prompt_variant, agent, task_version, check_version), [])
-        comparisons.append(Comparison(
-            task, prompt_variant, agent, treatment, baseline=baseline, treated=treated,
-            task_version=task_version, check_version=check_version, treatment_version=treatment_version,
-        ))
+        baseline = groups.get(
+            ("", None, task, prompt_variant, agent, task_version, check_version), []
+        )
+        comparisons.append(
+            Comparison(
+                task,
+                prompt_variant,
+                agent,
+                treatment,
+                baseline=baseline,
+                treated=treated,
+                task_version=task_version,
+                check_version=check_version,
+                treatment_version=treatment_version,
+            )
+        )
     # Unversioned (None) sorts first.
-    return sorted(comparisons, key=lambda c: tuple(v or "" for v in (
-        c.treatment, c.task, c.prompt_variant, c.agent, c.task_version, c.check_version, c.treatment_version)))
+    return sorted(
+        comparisons,
+        key=lambda c: tuple(
+            v or ""
+            for v in (
+                c.treatment,
+                c.task,
+                c.prompt_variant,
+                c.agent,
+                c.task_version,
+                c.check_version,
+                c.treatment_version,
+            )
+        ),
+    )
 
 
 def mean_usage(trials: list[TrialSummary], attribute: str) -> float | None:
     """Mean of a usage field over the ``trials`` that report it."""
-    values = [getattr(t, attribute) for t in trials if getattr(t, attribute) is not None]
+    values = [
+        getattr(t, attribute) for t in trials if getattr(t, attribute) is not None
+    ]
     return mean(values) if values else None
 
 
@@ -195,7 +236,11 @@ def wilson_interval(passed: int, total: int, z: float = 1.96) -> tuple[float, fl
     approximation at the small Trial counts runs have."""
     rate = passed / total
     centre = (rate + z * z / (2 * total)) / (1 + z * z / total)
-    half = z * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total)) / (1 + z * z / total)
+    half = (
+        z
+        * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total))
+        / (1 + z * z / total)
+    )
     return max(0.0, centre - half), min(1.0, centre + half)
 
 
@@ -206,12 +251,18 @@ def fisher_exact(passed_a: int, total_a: int, passed_b: int, total_b: int) -> fl
     passes, total = passed_a + passed_b, total_a + total_b
 
     def probability(k: int) -> float:
-        return math.comb(total_a, k) * math.comb(total_b, passes - k) / math.comb(total, passes)
+        return (
+            math.comb(total_a, k)
+            * math.comb(total_b, passes - k)
+            / math.comb(total, passes)
+        )
 
     observed = probability(passed_a)
     splits = range(max(0, passes - total_b), min(total_a, passes) + 1)
     # The tolerance keeps ties that differ only by floating-point rounding.
-    return min(1.0, sum(p for k in splits if (p := probability(k)) <= observed * (1 + 1e-9)))
+    return min(
+        1.0, sum(p for k in splits if (p := probability(k)) <= observed * (1 + 1e-9))
+    )
 
 
 def summarise_run(run_dir: Path) -> RunSummary:
@@ -237,20 +288,30 @@ def summarise_run(run_dir: Path) -> RunSummary:
         treatment=treatment,
         agent=agent,
         environment=ENVIRONMENTS.get(environment_type, environment_type),
-        trials=[summarise_trial(path, record) for path, record in zip(trial_dirs, records)],
+        trials=[
+            summarise_trial(path, record) for path, record in zip(trial_dirs, records)
+        ],
         fingerprints=fingerprints,
     )
 
 
 def summarise_trial(trial_dir: Path, record: dict | None) -> TrialSummary:
-    files = {label: trial_dir / rel for label, rel in KEY_FILES.items() if (trial_dir / rel).exists()}
+    files = {
+        label: trial_dir / rel
+        for label, rel in KEY_FILES.items()
+        if (trial_dir / rel).exists()
+    }
     if record is None:
         return TrialSummary(path=trial_dir, status="unrecorded", files=files)
 
     checks = record.get("checks") or []
     preferred = [check["passed"] for check in checks if not check["required"]]
     usage = record.get("usage") or {}
-    token_counts = [usage[key] for key in ("n_input_tokens", "n_output_tokens") if usage.get(key) is not None]
+    token_counts = [
+        usage[key]
+        for key in ("n_input_tokens", "n_output_tokens")
+        if usage.get(key) is not None
+    ]
     result = _read_json(trial_dir / "result.json") or {}
     trajectory = _read_json(trial_dir / "agent/trajectory.json")
     return TrialSummary(
@@ -258,14 +319,21 @@ def summarise_trial(trial_dir: Path, record: dict | None) -> TrialSummary:
         status=record["status"],
         record=record,
         preferred_passed=all(preferred) if preferred else None,
-        failed_required=[c["name"] for c in checks if c["required"] and not c["passed"]],
-        failed_preferred=[c["name"] for c in checks if not c["required"] and not c["passed"]],
+        failed_required=[
+            c["name"] for c in checks if c["required"] and not c["passed"]
+        ],
+        failed_preferred=[
+            c["name"] for c in checks if not c["required"] and not c["passed"]
+        ],
         cost_usd=usage.get("cost_usd"),
         tokens=sum(token_counts) if token_counts else None,
         uncached_input=usage["n_input_tokens"] - (usage.get("n_cache_tokens") or 0)
-        if usage.get("n_input_tokens") is not None else None,
+        if usage.get("n_input_tokens") is not None
+        else None,
         # A turn is one agent message in Harbor's trajectory, with or without tool calls.
-        turns=sum(step.get("source") == "agent" for step in trajectory["steps"]) if trajectory else None,
+        turns=sum(step.get("source") == "agent" for step in trajectory["steps"])
+        if trajectory
+        else None,
         duration_s=_duration_s(result.get("agent_execution")),
         files=files,
     )
@@ -275,7 +343,10 @@ def collect_tasks(tasks_dir: Path) -> list[TaskDefinition]:
     """Read every Task under ``tasks_dir`` (``tasks/<stage>/<scenario>/``),
     ordered by path. Task pages are read from the sibling ``docs/tasks/``."""
     repo = tasks_dir.parent
-    return [read_task(task_toml.parent, repo) for task_toml in sorted(tasks_dir.glob("*/*/task.toml"))]
+    return [
+        read_task(task_toml.parent, repo)
+        for task_toml in sorted(tasks_dir.glob("*/*/task.toml"))
+    ]
 
 
 def read_task(task_dir: Path, repo: Path) -> TaskDefinition:
@@ -284,7 +355,9 @@ def read_task(task_dir: Path, repo: Path) -> TaskDefinition:
     config = tomllib.loads((task_dir / "task.toml").read_text())
     metadata = config.get("metadata") or {}
     if "motivation" in metadata:
-        motivation, summary = (" ".join(metadata.get(key, "").split()) for key in ("motivation", "summary"))
+        motivation, summary = (
+            " ".join(metadata.get(key, "").split()) for key in ("motivation", "summary")
+        )
     else:
         motivation, summary = _read_task_page(page) if page.is_file() else ("", "")
     prompts = {"default": (task_dir / "instruction.md").read_text()}
@@ -313,10 +386,14 @@ def load_agents(agents_file: Path) -> dict[str, dict]:
 def _read_checks(check_file: Path) -> tuple[list[CheckDefinition], str | None, dict]:
     # A per-Task module name keeps Tasks' check modules apart; none is added to
     # sys.modules, so `weval check` and tests import their own copies.
-    name = "weval_report_check_" + "_".join(check_file.parent.parts[-2:]).replace("-", "_")
+    name = "weval_report_check_" + "_".join(check_file.parent.parts[-2:]).replace(
+        "-", "_"
+    )
     spec = importlib.util.spec_from_file_location(name, check_file)
 
-    def definitions(functions: list, required: bool, prompt_variant: str | None = None) -> list[CheckDefinition]:
+    def definitions(
+        functions: list, required: bool, prompt_variant: str | None = None
+    ) -> list[CheckDefinition]:
         return [
             CheckDefinition(
                 id=function.__name__.replace("_", "-"),
@@ -330,8 +407,13 @@ def _read_checks(check_file: Path) -> tuple[list[CheckDefinition], str | None, d
     try:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        checks = definitions(module.REQUIRED, True) + definitions(module.PREFERRED, False)
-        for attribute, required in (("PROMPT_VARIANT_REQUIRED", True), ("PROMPT_VARIANT_PREFERRED", False)):
+        checks = definitions(module.REQUIRED, True) + definitions(
+            module.PREFERRED, False
+        )
+        for attribute, required in (
+            ("PROMPT_VARIANT_REQUIRED", True),
+            ("PROMPT_VARIANT_PREFERRED", False),
+        ):
             for prompt_variant, functions in getattr(module, attribute, {}).items():
                 checks += definitions(functions, required, prompt_variant)
     except Exception as error:  # noqa: BLE001  A broken Task must not break the report.
@@ -368,7 +450,9 @@ def _read_task_page(page: Path) -> tuple[str, str]:
 def _duration_s(span: dict | None) -> float | None:
     if not span or not span.get("started_at") or not span.get("finished_at"):
         return None
-    started, finished = (datetime.fromisoformat(span[key]) for key in ("started_at", "finished_at"))
+    started, finished = (
+        datetime.fromisoformat(span[key]) for key in ("started_at", "finished_at")
+    )
     return (finished - started).total_seconds()
 
 

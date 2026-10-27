@@ -17,15 +17,18 @@ import subprocess
 import urllib.error
 import urllib.request
 
-WEAVIATE = f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+WEAVIATE = (
+    f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+)
 COLLECTION = "DocumentChunk"
 VECTOR_PROBE_ID = "00000000-0000-4000-8000-00000000beef"
 VECTOR_PROBE_TEXT = "This temporary chunk checks that Weaviate generates vectors."
 SECRET_ENV = re.compile(r"(KEYS?|APIKEY|SECRET|TOKEN|PASSWORD)$")
 
 
-def request(url: str, method: str = "GET", body: dict | None = None,
-            key: str | None = None) -> tuple[int, object]:
+def request(
+    url: str, method: str = "GET", body: dict | None = None, key: str | None = None
+) -> tuple[int, object]:
     """Send a request; return the status and JSON body (or raw text if not JSON).
     Connection failures and timeouts raise."""
     headers = {"Content-Type": "application/json"}
@@ -47,25 +50,41 @@ def request(url: str, method: str = "GET", body: dict | None = None,
 def weaviate_container() -> dict | None:
     """Return ``docker inspect`` for the Compose ``weaviate`` service, if running."""
     ids = subprocess.run(
-        ["docker", "ps", "--quiet",
-         "--filter", f"label=com.docker.compose.project={os.environ['COMPOSE_PROJECT_NAME']}",
-         "--filter", "label=com.docker.compose.service=weaviate"],
-        capture_output=True, text=True, check=True,
+        [
+            "docker",
+            "ps",
+            "--quiet",
+            "--filter",
+            f"label=com.docker.compose.project={os.environ['COMPOSE_PROJECT_NAME']}",
+            "--filter",
+            "label=com.docker.compose.service=weaviate",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split()
     if not ids:
         return None
-    inspect = subprocess.run(["docker", "inspect", ids[0]],
-                             capture_output=True, text=True, check=True)
+    inspect = subprocess.run(
+        ["docker", "inspect", ids[0]], capture_output=True, text=True, check=True
+    )
     return json.loads(inspect.stdout)[0]
 
 
 def vector_probe(collection: dict, key: str | None) -> dict:
     """Insert one object with every text property set, summarise its vectors, then delete it."""
-    text = {p["name"]: VECTOR_PROBE_TEXT for p in collection.get("properties", [])
-            if p["dataType"] == ["text"]}
+    text = {
+        p["name"]: VECTOR_PROBE_TEXT
+        for p in collection.get("properties", [])
+        if p["dataType"] == ["text"]
+    }
     url = f"{WEAVIATE}/v1/objects/{COLLECTION}/{VECTOR_PROBE_ID}"
-    created, body = request(f"{WEAVIATE}/v1/objects", "POST",
-                            {"class": COLLECTION, "id": VECTOR_PROBE_ID, "properties": text}, key)
+    created, body = request(
+        f"{WEAVIATE}/v1/objects",
+        "POST",
+        {"class": COLLECTION, "id": VECTOR_PROBE_ID, "properties": text},
+        key,
+    )
     _, fetched = request(f"{url}?include=vector", key=key)
     deleted, _ = request(url, "DELETE", key=key)
     fetched = fetched if isinstance(fetched, dict) else {}
@@ -76,7 +95,10 @@ def vector_probe(collection: dict, key: str | None) -> dict:
     return {
         "create_status": created,
         "create_body": body if created >= 300 else None,
-        "vectors": {name: {"dimensions": len(v), "nonzero": any(v)} for name, v in vectors.items()},
+        "vectors": {
+            name: {"dimensions": len(v), "nonzero": any(v)}
+            for name, v in vectors.items()
+        },
         "delete_status": deleted,
     }
 
@@ -84,28 +106,48 @@ def vector_probe(collection: dict, key: str | None) -> dict:
 def snapshot(app_url: None) -> dict:
     """Return the container config, auth posture, meta, readiness, collection, and vector probe."""
     container = weaviate_container()
-    env = dict(e.split("=", 1) for e in (container or {}).get("Config", {}).get("Env", []))
+    env = dict(
+        e.split("=", 1) for e in (container or {}).get("Config", {}).get("Env", [])
+    )
 
     anonymous_status, _ = request(f"{WEAVIATE}/v1/schema")
-    keys = [k for k in env.get("AUTHENTICATION_APIKEY_ALLOWED_KEYS", "").split(",") if k]
+    keys = [
+        k for k in env.get("AUTHENTICATION_APIKEY_ALLOWED_KEYS", "").split(",") if k
+    ]
     key = keys[0] if anonymous_status == 401 and keys else None
 
     meta_status, meta = request(f"{WEAVIATE}/v1/meta", key=key)
     ready_status, _ = request(f"{WEAVIATE}/v1/.well-known/ready")
     _, schema = request(f"{WEAVIATE}/v1/schema", key=key)
-    classes = {c["class"]: c for c in schema.get("classes") or []} if isinstance(schema, dict) else {}
+    classes = (
+        {c["class"]: c for c in schema.get("classes") or []}
+        if isinstance(schema, dict)
+        else {}
+    )
     collection = classes.get(COLLECTION)
 
     return {
-        "container": container and {
+        "container": container
+        and {
             "image": container["Config"]["Image"],
-            "env": {k: "<redacted>" if SECRET_ENV.search(k) else v for k, v in sorted(env.items())},
-            "mounts": [{k: m.get(k) for k in ("Type", "Name", "Source", "Destination")}
-                       for m in container.get("Mounts", [])],
+            "env": {
+                k: "<redacted>" if SECRET_ENV.search(k) else v
+                for k, v in sorted(env.items())
+            },
+            "mounts": [
+                {k: m.get(k) for k in ("Type", "Name", "Source", "Destination")}
+                for m in container.get("Mounts", [])
+            ],
         },
-        "auth": {"anonymous_status": anonymous_status, "api_key_count": len(keys),
-                 "used_api_key": key is not None},
-        "meta": {"status": meta_status, "version": meta.get("version") if isinstance(meta, dict) else None},
+        "auth": {
+            "anonymous_status": anonymous_status,
+            "api_key_count": len(keys),
+            "used_api_key": key is not None,
+        },
+        "meta": {
+            "status": meta_status,
+            "version": meta.get("version") if isinstance(meta, dict) else None,
+        },
         "ready_status": ready_status,
         "collections": sorted(classes),
         "collection": collection,

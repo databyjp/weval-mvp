@@ -33,7 +33,11 @@ from weval.harnesses import claude_code, oracle, pi
 
 ROOT = Path(__file__).resolve().parents[2]
 TREATMENTS = ROOT / "treatments"
-HARNESSES: dict[str, ModuleType] = {"oracle": oracle, "pi": pi, "claude-code": claude_code}
+HARNESSES: dict[str, ModuleType] = {
+    "oracle": oracle,
+    "pi": pi,
+    "claude-code": claude_code,
+}
 # Appended to every packaged prompt: facts about the Trial environment that no
 # single Task owns.
 SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
@@ -43,8 +47,13 @@ SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
 WEAVIATE_COMPOSE = Path(__file__).with_name("weaviate-compose.yaml")
 # Every Trial must have these, whatever the harness.
 COMMON_LOGS = ("verifier/snapshot.json", "verifier/checks.json", "artifacts/submission")
-SECRET_VARS = ("OPENROUTER_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET",
-               "TYPESAFEAI_API_KEY")
+SECRET_VARS = (
+    "OPENROUTER_API_KEY",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "MODAL_TOKEN_ID",
+    "MODAL_TOKEN_SECRET",
+    "TYPESAFEAI_API_KEY",
+)
 # Harbor's per-Trial token and cost fields in result.json's agent_result.
 USAGE_FIELDS = ("n_input_tokens", "n_cache_tokens", "n_output_tokens", "cost_usd")
 # VM with Docker-in-Docker so Tasks can run their own Compose stacks.
@@ -67,20 +76,30 @@ LOCAL = EnvironmentConfig(
 )
 
 
-def package_task(task_dir: Path, destination: Path, prompt_variant: str = "default") -> None:
+def package_task(
+    task_dir: Path, destination: Path, prompt_variant: str = "default"
+) -> None:
     """Build a Harbor task package: the Task directory plus ``tests/``, which
     holds the shared verifier with the Task's snapshot and check. The packaged
     ``instruction.md`` is the prompt variant followed by the shared
     instructions: the Task's ``instruction.md`` for ``default``, otherwise
     ``prompts/<prompt-variant>.md``, which must exist.
     ``tests/prompt_variant`` holds the prompt variant name for the verifier."""
-    prompt = task_dir / ("instruction.md" if prompt_variant == "default" else f"prompts/{prompt_variant}.md")
+    prompt = task_dir / (
+        "instruction.md"
+        if prompt_variant == "default"
+        else f"prompts/{prompt_variant}.md"
+    )
     if not prompt.exists():
-        raise FileNotFoundError(f"no prompt for prompt variant {prompt_variant!r}: {prompt}")
+        raise FileNotFoundError(
+            f"no prompt for prompt variant {prompt_variant!r}: {prompt}"
+        )
     shutil.copytree(
         task_dir,
         destination,
-        ignore=shutil.ignore_patterns("__pycache__", "snapshot.py", "check.py", "prompts"),
+        ignore=shutil.ignore_patterns(
+            "__pycache__", "snapshot.py", "check.py", "prompts"
+        ),
     )
     instruction = destination / "instruction.md"
     instruction.write_text(f"{prompt.read_text()}\n{SHARED_INSTRUCTIONS.read_text()}")
@@ -123,7 +142,11 @@ def run(
     skills = treatment_skills(treatment) if treatment else None
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     # Task and Agent names contain dashes; Harbor's "__" keeps the parts separable.
-    scenario = task_dir.name if prompt_variant == "default" else f"{task_dir.name}@{prompt_variant}"
+    scenario = (
+        task_dir.name
+        if prompt_variant == "default"
+        else f"{task_dir.name}@{prompt_variant}"
+    )
     agent_part = agent_name if treatment is None else f"{agent_name}+{treatment}"
     run_name = f"{stamp}__{task_dir.parent.name}__{scenario}__{agent_part}"
     run_dir = ROOT / "experiment-outputs" / run_name
@@ -137,7 +160,9 @@ def run(
     agent_config = harness.agent_config(agent)
     if skills:
         # Harbor installs the retained copy, so the run keeps the skills its Trials had.
-        shutil.copytree(skills.parent, run_dir / "treatment", ignore=shutil.ignore_patterns(".*"))
+        shutil.copytree(
+            skills.parent, run_dir / "treatment", ignore=shutil.ignore_patterns(".*")
+        )
         agent_config.skills = [str(run_dir / "treatment/skills")]
     # Before the Trials run, so the fingerprints cover exactly what they were given.
     versions = fingerprints(task_dir, run_dir / "treatment/skills" if skills else None)
@@ -153,7 +178,9 @@ def run(
     try:
         asyncio.run(_run_job(config))
     finally:
-        finalize_run(run_dir, task_path, agent, attempts, prompt_variant, treatment, versions)
+        finalize_run(
+            run_dir, task_path, agent, attempts, prompt_variant, treatment, versions
+        )
         label_run(run_dir)
         analyse_run(run_dir)
         redact(run_dir)
@@ -188,14 +215,21 @@ def fingerprints(task_dir: Path, skills: Path | None) -> dict[str, str | None]:
     independent of timestamps and directory order.
     """
     check = task_dir / "check.py"
-    task_files = {str(path.relative_to(task_dir)): path for path in _tree(task_dir) if path != check}
+    task_files = {
+        str(path.relative_to(task_dir)): path
+        for path in _tree(task_dir)
+        if path != check
+    }
     added = [SHARED_INSTRUCTIONS, Path(verify.__file__), *compose_overlays(task_dir)]
     task_files |= {f"weval/{path.name}": path for path in added}
     return {
         "task": _digest(task_files),
         "check": check_fingerprint(check),
-        "treatment": _digest({str(path.relative_to(skills)): path for path in _tree(skills)})
-        if skills else None,
+        "treatment": _digest(
+            {str(path.relative_to(skills)): path for path in _tree(skills)}
+        )
+        if skills
+        else None,
     }
 
 
@@ -207,8 +241,10 @@ def check_fingerprint(check_file: Path) -> str:
 def _tree(root: Path) -> list[Path]:
     # Bytecode and dotfiles (.gitkeep, .DS_Store) don't change what a Trial is given.
     return [
-        path for path in root.rglob("*")
-        if path.is_file() and "__pycache__" not in path.parts
+        path
+        for path in root.rglob("*")
+        if path.is_file()
+        and "__pycache__" not in path.parts
         and not any(part.startswith(".") for part in path.relative_to(root).parts)
     ]
 
@@ -226,7 +262,9 @@ def compose_overlays(task_dir: Path) -> list[Path]:
     ``task.toml`` sets ``[metadata] weaviate_workspace = false``, for a Task
     whose workspace must not suggest a data store."""
     metadata = tomllib.loads((task_dir / "task.toml").read_text()).get("metadata", {})
-    return [SHARED_COMPOSE] + ([WEAVIATE_COMPOSE] if metadata.get("weaviate_workspace", True) else [])
+    return [SHARED_COMPOSE] + (
+        [WEAVIATE_COMPOSE] if metadata.get("weaviate_workspace", True) else []
+    )
 
 
 async def _run_job(config: JobConfig) -> None:
@@ -254,7 +292,9 @@ def finalize_run(
     trial_dirs = sorted(path for path in (run_dir / "job").glob("*") if path.is_dir())
     for trial_dir in trial_dirs:
         if (trial_dir / "result.json").exists():
-            record = finalize(trial_dir, task_path, agent, prompt_variant, treatment, versions)
+            record = finalize(
+                trial_dir, task_path, agent, prompt_variant, treatment, versions
+            )
         else:
             record = {
                 "status": "non-result",
@@ -269,7 +309,9 @@ def finalize_run(
             (trial_dir / "weval.json").write_text(json.dumps(record, indent=1))
         print(f"{trial_dir}: {record['status']}")
     if len(trial_dirs) < attempts:
-        print(f"WARNING: {attempts} Trials requested, {len(trial_dirs)} found under {run_dir / 'job'}")
+        print(
+            f"WARNING: {attempts} Trials requested, {len(trial_dirs)} found under {run_dir / 'job'}"
+        )
 
 
 def label_run(run_dir: Path) -> None:
@@ -296,12 +338,17 @@ def analyse_run(run_dir: Path) -> None:
     from weval.report.collect import collect_runs, compare_treatments
 
     for comparison in compare_treatments(collect_runs(run_dir.parent)):
-        if run_dir.resolve() not in {run.path.resolve() for run in comparison.baseline + comparison.treated}:
+        if run_dir.resolve() not in {
+            run.path.resolve() for run in comparison.baseline + comparison.treated
+        }:
             continue
         name = f"{comparison.treatment} on {comparison.task}@{comparison.prompt_variant} with {comparison.agent}"
         try:
-            result = analysis.analyse(comparison, getattr(_load_check(ROOT / comparison.task), "EXPECTED", {}),
-                                      run_dir.parent)
+            result = analysis.analyse(
+                comparison,
+                getattr(_load_check(ROOT / comparison.task), "EXPECTED", {}),
+                run_dir.parent,
+            )
         except Exception as error:  # noqa: BLE001  Analysis must not break a finished run.
             print(f"{name}: analysis failed: {error!r}")
             continue
@@ -310,7 +357,9 @@ def analyse_run(run_dir: Path) -> None:
         if result["problems"]:
             print(f"{name}: analysis rejected: {'; '.join(result['problems'])}")
         for item in result["disagreements"]:
-            print(f"{name}: {item['trial']} {item['check']}: analyst {item['analyst']}, rule {item['class']}")
+            print(
+                f"{name}: {item['trial']} {item['check']}: analyst {item['analyst']}, rule {item['class']}"
+            )
         if result["note"]:
             print(f"{name}: {result['note']}")
 
@@ -373,9 +422,8 @@ def finalize(
         "missing_logs": missing,
         "checks": json.loads(checks_file.read_text()) if checks_file.exists() else None,
         # A harness that counts requests Harbor misses replaces Harbor's figures.
-        "usage": usage(trial_dir, result) | (
-            harness.token_usage(trial_dir) if hasattr(harness, "token_usage") else {}
-        ),
+        "usage": usage(trial_dir, result)
+        | (harness.token_usage(trial_dir) if hasattr(harness, "token_usage") else {}),
     }
     (trial_dir / "weval.json").write_text(json.dumps(record, indent=1))
     return record
@@ -406,9 +454,18 @@ def usage(trial_dir: Path, result: dict) -> dict:
             tool_calls[name] = tool_calls.get(name, 0) + 1
             urls.update(dict.fromkeys(diagnostics.URL.findall(json.dumps(arguments))))
             # Claude Code's ToolSearch query selects tools, not web pages.
-            query = [] if name == "ToolSearch" else arguments.get("queries") or arguments.get("query") or []
+            query = (
+                []
+                if name == "ToolSearch"
+                else arguments.get("queries") or arguments.get("query") or []
+            )
             queries.extend([query] if isinstance(query, str) else query)
-    return {**record, "tool_calls": tool_calls, "urls": list(urls), "search_queries": queries}
+    return {
+        **record,
+        "tool_calls": tool_calls,
+        "urls": list(urls),
+        "search_queries": queries,
+    }
 
 
 def redact(run_dir: Path) -> None:
@@ -437,13 +494,17 @@ def rescore(trial_dir: Path, task_dir: Path | None = None) -> list[dict]:
     return verify.score(check, snapshot)
 
 
-def diagnose(trial_dir: Path, results: list[dict], task_dir: Path | None = None) -> dict:
+def diagnose(
+    trial_dir: Path, results: list[dict], task_dir: Path | None = None
+) -> dict:
     """``diagnostics.diagnose`` for a retained Trial and its ``rescore``
     ``results``, with the same ``check.py``. ``task_dir`` defaults as in
     ``rescore``."""
     check = _load_check(task_dir or _recorded_task(trial_dir))
     snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
-    return diagnostics.diagnose(trial_dir, getattr(check, "EXPECTED", {}), snapshot, results)
+    return diagnostics.diagnose(
+        trial_dir, getattr(check, "EXPECTED", {}), snapshot, results
+    )
 
 
 def _load_check(task_dir: Path) -> ModuleType:
@@ -454,7 +515,9 @@ def _load_check(task_dir: Path) -> ModuleType:
     return check
 
 
-def check_versions(trial_dir: Path, task_dir: Path | None = None) -> tuple[str, str | None]:
+def check_versions(
+    trial_dir: Path, task_dir: Path | None = None
+) -> tuple[str, str | None]:
     """The ``check`` fingerprint ``rescore`` scores with, and the one the
     Trial recorded (``None`` for a Trial recorded without fingerprints).
     ``task_dir`` defaults as in ``rescore``."""

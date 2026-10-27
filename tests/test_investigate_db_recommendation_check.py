@@ -18,9 +18,15 @@ from weval.verify import score
 
 ROOT = Path(__file__).parents[1]
 TASK = ROOT / "tasks/investigate/db-recommendation"
-ORACLE = json.loads((ROOT / "tests/fixtures/investigate-db-recommendation-oracle-snapshot.json").read_text())
+ORACLE = json.loads(
+    (
+        ROOT / "tests/fixtures/investigate-db-recommendation-oracle-snapshot.json"
+    ).read_text()
+)
 
-_spec = importlib.util.spec_from_file_location("investigate_db_recommendation_check", TASK / "check.py")
+_spec = importlib.util.spec_from_file_location(
+    "investigate_db_recommendation_check", TASK / "check.py"
+)
 assert _spec and _spec.loader
 check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)
@@ -31,7 +37,10 @@ def failures(snapshot: dict) -> dict[str, str]:
 
 
 def missing_file(s: dict) -> None:
-    s["recommendation"] = {"text": None, "error": "/app/RECOMMENDATION.md does not exist"}
+    s["recommendation"] = {
+        "text": None,
+        "error": "/app/RECOMMENDATION.md does not exist",
+    }
 
 
 def blank_file(s: dict) -> None:
@@ -63,7 +72,15 @@ def test_agent_visible_files_do_not_name_weaviate():
     # Compose overlays give it (not the overlay files themselves).
     assert compose_overlays(TASK) == [SHARED_COMPOSE]
     assert "WEAVIATE_" not in SHARED_COMPOSE.read_text()
-    visible = [TASK / "instruction.md", SHARED_INSTRUCTIONS,
-               *(TASK / "prompts").glob("*.md"), *(TASK / "environment").rglob("*")]
-    named = [p.relative_to(ROOT) for p in visible if p.is_file() and "weaviate" in p.read_text().lower()]
+    visible = [
+        TASK / "instruction.md",
+        SHARED_INSTRUCTIONS,
+        *(TASK / "prompts").glob("*.md"),
+        *(TASK / "environment").rglob("*"),
+    ]
+    named = [
+        p.relative_to(ROOT)
+        for p in visible
+        if p.is_file() and "weaviate" in p.read_text().lower()
+    ]
     assert named == []

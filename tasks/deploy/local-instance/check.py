@@ -16,12 +16,16 @@ DEFAULT_DATA_PATH = "/var/lib/weaviate"
 def release_at_least(version: str | None, minimum: str) -> bool:
     """Accept stable ``X.Y.Z`` releases at or above ``minimum``."""
     parts = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version or "")
-    return bool(parts) and tuple(map(int, parts.groups())) >= tuple(map(int, minimum.split(".")))
+    return bool(parts) and tuple(map(int, parts.groups())) >= tuple(
+        map(int, minimum.split("."))
+    )
 
 
 def container(snapshot: dict) -> dict:
     """Return the weaviate service container's recorded configuration."""
-    assert snapshot["container"], "a running Compose service named weaviate exists; found none"
+    assert snapshot["container"], (
+        "a running Compose service named weaviate exists; found none"
+    )
     return snapshot["container"]
 
 
@@ -112,8 +116,12 @@ def persistence_configured(snapshot: dict) -> str:
     """A volume or bind mount covers the weaviate container's PERSISTENCE_DATA_PATH."""
     config = container(snapshot)
     path = config["env"].get("PERSISTENCE_DATA_PATH", DEFAULT_DATA_PATH).rstrip("/")
-    mounts = [m for m in config["mounts"]
-              if path == m["Destination"].rstrip("/") or path.startswith(m["Destination"].rstrip("/") + "/")]
+    mounts = [
+        m
+        for m in config["mounts"]
+        if path == m["Destination"].rstrip("/")
+        or path.startswith(m["Destination"].rstrip("/") + "/")
+    ]
     assert mounts, f"a mount covers the data path {path}; mounts: {config['mounts']}"
     return f"{path} on {mounts[0]['Type']} {mounts[0]['Name'] or mounts[0]['Source']}"
 
@@ -121,9 +129,18 @@ def persistence_configured(snapshot: dict) -> str:
 def auth_posture(snapshot: dict) -> str:
     """Records whether anonymous access is enabled and how many API keys are configured."""
     auth = snapshot["auth"]
-    anonymous = "refused" if auth["anonymous_status"] == 401 else f"HTTP {auth['anonymous_status']}"
+    anonymous = (
+        "refused"
+        if auth["anonymous_status"] == 401
+        else f"HTTP {auth['anonymous_status']}"
+    )
     return f"anonymous /v1/schema: {anonymous}; API keys: {auth['api_key_count']}"
 
 
 REQUIRED = [weaviate_reachable, weaviate_ready, server_version, collection_vectorizer]
-PREFERRED = [vectorizer_availability, named_vector, persistence_configured, auth_posture]
+PREFERRED = [
+    vectorizer_availability,
+    named_vector,
+    persistence_configured,
+    auth_posture,
+]

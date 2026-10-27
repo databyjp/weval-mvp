@@ -33,7 +33,9 @@ When a check looks for one value that the snapshot holds, such as the latest rel
 
 ```python
 EXPECTED = {
-    "python-client-version-latest": lambda snapshot: snapshot["latest_releases"]["weaviate-client"]["version"],
+    "python-client-version-latest": lambda snapshot: snapshot["latest_releases"][
+        "weaviate-client"
+    ]["version"],
 }
 ```
 

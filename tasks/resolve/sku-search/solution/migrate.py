@@ -11,7 +11,9 @@ import time
 import urllib.parse
 import urllib.request
 
-BASE_URL = f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+BASE_URL = (
+    f"http://{os.environ['WEAVIATE_HTTP_HOST']}:{os.environ['WEAVIATE_HTTP_PORT']}"
+)
 SOURCE, TARGET = "Product", "ProductV2"
 
 
@@ -30,7 +32,11 @@ def call(path: str, method: str = "GET", payload: object | None = None) -> objec
 def objects(collection: str) -> list[dict]:
     result, after = [], None
     while True:
-        params = {"class": collection, "limit": 100, **({"after": after} if after else {})}
+        params = {
+            "class": collection,
+            "limit": 100,
+            **({"after": after} if after else {}),
+        }
         page = call(f"/v1/objects?{urllib.parse.urlencode(params)}")["objects"] or []
         result += page
         if len(page) < 100:
@@ -40,17 +46,34 @@ def objects(collection: str) -> list[dict]:
 
 source = call(f"/v1/schema/{SOURCE}")
 properties = [
-    {"name": p["name"], "dataType": p["dataType"],
-     **({"tokenization": "field" if p["name"] == "sku" else p["tokenization"]}
-        if "tokenization" in p else {})}
+    {
+        "name": p["name"],
+        "dataType": p["dataType"],
+        **(
+            {"tokenization": "field" if p["name"] == "sku" else p["tokenization"]}
+            if "tokenization" in p
+            else {}
+        ),
+    }
     for p in source["properties"]
 ]
-call("/v1/schema", "POST", {"class": TARGET, "vectorizer": "none", "properties": properties})
+call(
+    "/v1/schema",
+    "POST",
+    {"class": TARGET, "vectorizer": "none", "properties": properties},
+)
 
 catalog = objects(SOURCE)
-call("/v1/batch/objects", "POST", {"objects": [
-    {"class": TARGET, "id": o["id"], "properties": o["properties"]} for o in catalog
-]})
+call(
+    "/v1/batch/objects",
+    "POST",
+    {
+        "objects": [
+            {"class": TARGET, "id": o["id"], "properties": o["properties"]}
+            for o in catalog
+        ]
+    },
+)
 for _ in range(30):
     if len(objects(TARGET)) == len(catalog):
         break

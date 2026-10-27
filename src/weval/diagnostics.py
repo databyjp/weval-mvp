@@ -16,14 +16,20 @@ from pathlib import Path
 # which excludes Compose service names such as weaviate:8080 and localhost;
 # loopback addresses are excluded separately. Backslashes end a URL because
 # arguments are matched in their JSON encoding.
-URL = re.compile(r"https?://(?!127\.0\.0\.1|0\.0\.0\.0)[^\s/'\"`:\\]+\.[^\s/'\"`:\\]+[^\s'\"`<>)\]}\\]*")
+URL = re.compile(
+    r"https?://(?!127\.0\.0\.1|0\.0\.0\.0)[^\s/'\"`:\\]+\.[^\s/'\"`:\\]+[^\s'\"`<>)\]}\\]*"
+)
 # The Weaviate Python client numbers its deprecation warnings ("Dep024: ...").
 # Other libraries' warnings (authlib's, in every Trial) are left out.
 DEPRECATION = re.compile(r"\bDep\d{3}:[^\n]*")
 
 
-def diagnose(trial_dir: Path, expected: dict[str, Callable[[dict], str | None]],
-             snapshot: dict, results: list[dict]) -> dict:
+def diagnose(
+    trial_dir: Path,
+    expected: dict[str, Callable[[dict], str | None]],
+    snapshot: dict,
+    results: list[dict],
+) -> dict:
     """Diagnostics for one Trial's check ``results``, given its Task's
     ``check.py`` ``EXPECTED`` (empty when the Task defines none).
 
@@ -43,10 +49,16 @@ def diagnose(trial_dir: Path, expected: dict[str, Callable[[dict], str | None]],
     shown, called = _trajectory_text(trial_dir / "agent/trajectory.json")
     log = trial_dir / "verifier/application.log"
     return {
-        "treatment_used": _treatment_used(trial_dir.parents[1] / "treatment/skills", called),
-        "expected_value_seen": None if shown is None else _expected_value_seen(expected, snapshot, results, shown),
+        "treatment_used": _treatment_used(
+            trial_dir.parents[1] / "treatment/skills", called
+        ),
+        "expected_value_seen": None
+        if shown is None
+        else _expected_value_seen(expected, snapshot, results, shown),
         "deprecations_seen": None if shown is None else _deprecations(shown),
-        "deprecations_logged": _deprecations([log.read_text(errors="replace")]) if log.exists() else [],
+        "deprecations_logged": _deprecations([log.read_text(errors="replace")])
+        if log.exists()
+        else [],
     }
 
 
@@ -62,7 +74,9 @@ def _trajectory_text(path: Path) -> tuple[list[str] | None, list[str] | None]:
         for result in (step.get("observation") or {}).get("results", []):
             shown.append(str(result.get("content") or ""))
         for call in step.get("tool_calls") or []:
-            called.append(f"{call['function_name']} {json.dumps(call.get('arguments'))}")
+            called.append(
+                f"{call['function_name']} {json.dumps(call.get('arguments'))}"
+            )
     return shown, called
 
 
@@ -72,18 +86,24 @@ def _treatment_used(skills: Path, called: list[str] | None) -> dict | None:
     names = [path.name for path in skills.iterdir() if (path / "SKILL.md").exists()]
     # Claude Code loads a skill with its Skill tool; Pi reads the SKILL.md.
     loaded = any(
-        text.startswith("Skill ") and json.loads(text[len("Skill "):]).get("skill") in names
+        text.startswith("Skill ")
+        and json.loads(text[len("Skill ") :]).get("skill") in names
         or any(f"{name}/SKILL.md" in text for name in names)
         for text in called
     )
     files = sorted(
-        str(path.relative_to(skills)) for path in skills.rglob("*")
-        if path.is_file() and path.name != "SKILL.md" and any(path.name in text for text in called)
+        str(path.relative_to(skills))
+        for path in skills.rglob("*")
+        if path.is_file()
+        and path.name != "SKILL.md"
+        and any(path.name in text for text in called)
     )
     return {"skill_loaded": loaded, "files_named": files}
 
 
-def _expected_value_seen(expected: dict, snapshot: dict, results: list[dict], shown: list[str]) -> list[dict]:
+def _expected_value_seen(
+    expected: dict, snapshot: dict, results: list[dict], shown: list[str]
+) -> list[dict]:
     seen = []
     for result in results:
         if result["passed"] or result["name"] not in expected:
@@ -97,10 +117,21 @@ def _expected_value_seen(expected: dict, snapshot: dict, results: list[dict], sh
             continue
         # Exact value, so 4.24.1 matches "v4.24.1" but neither 4.24.10 nor 14.24.1.
         pattern = re.compile(rf"(?<![\d.]){re.escape(value)}(?!\.?\d)")
-        seen.append({"check": result["name"], "expected": value,
-                     "seen": any(pattern.search(text) for text in shown)})
+        seen.append(
+            {
+                "check": result["name"],
+                "expected": value,
+                "seen": any(pattern.search(text) for text in shown),
+            }
+        )
     return seen
 
 
 def _deprecations(texts: list[str]) -> list[str]:
-    return sorted({match.group(0).strip()[:200] for text in texts for match in DEPRECATION.finditer(text)})
+    return sorted(
+        {
+            match.group(0).strip()[:200]
+            for text in texts
+            for match in DEPRECATION.finditer(text)
+        }
+    )

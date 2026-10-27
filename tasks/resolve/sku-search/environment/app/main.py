@@ -41,7 +41,12 @@ def search(
         grpc_port=int(os.environ["WEAVIATE_GRPC_PORT"]),
         grpc_secure=False,
     ) as client:
-        matches = client.collections.use(_COLLECTION).query.bm25(query=query, limit=limit)
+        matches = client.collections.use(_COLLECTION).query.bm25(
+            query=query, limit=limit
+        )
         return {
-            "items": [{field: obj.properties[field] for field in _FIELDS} for obj in matches.objects]
+            "items": [
+                {field: obj.properties[field] for field in _FIELDS}
+                for obj in matches.objects
+            ]
         }

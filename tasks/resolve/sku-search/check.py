@@ -13,13 +13,31 @@ CATALOG_SIZE = 31
 # tokenization ties it with ZXQ-9917; ZXQ 9917 and 9917 ZXQ differ only in
 # word order, so whitespace tokenization ties them. Only field tokenization
 # separates every pair.
-EXACT_SKUS = ("ZXQ-9917", "9917-ZXQ", "9917@ZXQ", "AQ1-9917", "ZXQ-4831",
-              "zxq-9917", "ZXQ 9917", "9917 ZXQ")
+EXACT_SKUS = (
+    "ZXQ-9917",
+    "9917-ZXQ",
+    "9917@ZXQ",
+    "AQ1-9917",
+    "ZXQ-4831",
+    "zxq-9917",
+    "ZXQ 9917",
+    "9917 ZXQ",
+)
 KEYWORD_SKU = "TRAIL-001"
-PROPERTY_TYPES = {"sku": "text", "name": "text", "description": "text",
-                  "category": "text", "price": "number"}
-ITEM_TYPES = {"sku": str, "name": str, "description": str, "category": str,
-              "price": (int, float)}
+PROPERTY_TYPES = {
+    "sku": "text",
+    "name": "text",
+    "description": "text",
+    "category": "text",
+    "price": "number",
+}
+ITEM_TYPES = {
+    "sku": str,
+    "name": str,
+    "description": str,
+    "category": str,
+    "price": (int, float),
+}
 
 
 def properties(snapshot: dict) -> dict[str, dict]:
@@ -33,7 +51,9 @@ def items(snapshot: dict, label: str) -> list[dict]:
     """Return a /search probe's items after enforcing the documented response contract."""
     probe = snapshot["probes"][label]
     params = probe["params"]
-    assert probe["status"] == 200, f"/search {params} returns HTTP 200, got {probe['status']}"
+    assert probe["status"] == 200, (
+        f"/search {params} returns HTTP 200, got {probe['status']}"
+    )
     body = probe["body"]
     assert isinstance(body, dict) and isinstance(body.get("items"), list), (
         f"/search {params} returns an object with an items list"
@@ -42,9 +62,14 @@ def items(snapshot: dict, label: str) -> list[dict]:
         f"/search {params} returns at most {params['limit']} items, got {len(body['items'])}"
     )
     for item in body["items"]:
-        bad = [k for k, t in ITEM_TYPES.items()
-               if not isinstance(item.get(k), t) or isinstance(item.get(k), bool)]
-        assert not bad, f"every result has the documented product fields; wrong or missing {bad}"
+        bad = [
+            k
+            for k, t in ITEM_TYPES.items()
+            if not isinstance(item.get(k), t) or isinstance(item.get(k), bool)
+        ]
+        assert not bad, (
+            f"every result has the documented product fields; wrong or missing {bad}"
+        )
     return body["items"]
 
 
@@ -83,9 +108,14 @@ def document_preservation(snapshot: dict) -> None:
     assert len(stored) == CATALOG_SIZE, (
         f"{COLLECTION} holds {CATALOG_SIZE} objects, one per catalog product; got {len(stored)}"
     )
-    unmatched = [p["sku"] for p in catalog
-                 if sum(p.items() <= o["properties"].items() for o in stored) != 1]
-    assert not unmatched, f"each catalog product is stored exactly once; not so for {unmatched}"
+    unmatched = [
+        p["sku"]
+        for p in catalog
+        if sum(p.items() <= o["properties"].items() for o in stored) != 1
+    ]
+    assert not unmatched, (
+        f"each catalog product is stored exactly once; not so for {unmatched}"
+    )
 
 
 def collection_definition(snapshot: dict) -> str:
@@ -115,10 +145,16 @@ def other_properties_word_tokenization(snapshot: dict) -> None:
     # the workspace says to leave the other properties alone. A property whose
     # data type changed is collection-definition's failure, not this check's.
     props = properties(snapshot)
-    changed = {name: props.get(name, {}).get("tokenization") for name, data_type in PROPERTY_TYPES.items()
-               if name != "sku" and data_type == "text"
-               and props.get(name, {}).get("tokenization") != "word"}
-    assert not changed, f"text properties other than sku keep word tokenization; changed: {changed}"
+    changed = {
+        name: props.get(name, {}).get("tokenization")
+        for name, data_type in PROPERTY_TYPES.items()
+        if name != "sku"
+        and data_type == "text"
+        and props.get(name, {}).get("tokenization") != "word"
+    }
+    assert not changed, (
+        f"text properties other than sku keep word tokenization; changed: {changed}"
+    )
 
 
 REQUIRED = [
