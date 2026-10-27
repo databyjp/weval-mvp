@@ -6,32 +6,19 @@ snapshot retained from a local Oracle Trial.
 """
 
 import copy
-import importlib.util
 import json
-from pathlib import Path
 
 import pytest
+from conftest import ROOT, failures, load_module
 
 from weval.verify import score
 
-ROOT = Path(__file__).parents[1]
 ORACLE = json.loads(
     (
         ROOT / "tests/fixtures/investigate-current-practices-oracle-snapshot.json"
     ).read_text()
 )
-
-_spec = importlib.util.spec_from_file_location(
-    "investigate_current_practices_check",
-    ROOT / "tasks/investigate/current-practices/check.py",
-)
-assert _spec and _spec.loader
-check = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(check)
-
-
-def failures(snapshot: dict) -> dict[str, str]:
-    return {r["name"]: r["notes"] for r in score(check, snapshot) if not r["passed"]}
+check = load_module(ROOT / "tasks/investigate/current-practices/check.py")
 
 
 def missing_file(s: dict) -> None:
@@ -112,13 +99,13 @@ def other_github_owner(s: dict) -> None:
 
 
 def test_oracle_passes_every_check():
-    assert failures(ORACLE) == {}
+    assert failures(check, ORACLE) == {}
 
 
 def test_versions_match_with_a_v_prefix_and_trailing_punctuation():
     snapshot = copy.deepcopy(ORACLE)
     snapshot["findings"]["parsed"]["weaviate_version"]["answer"] = "Use v1.40.2."
-    assert failures(snapshot) == {}
+    assert failures(check, snapshot) == {}
 
 
 def test_registry_and_github_api_sources_are_canonical():
@@ -130,13 +117,13 @@ def test_registry_and_github_api_sources_are_canonical():
         "https://repo1.maven.org/maven2/io/weaviate/client6/maven-metadata.xml",
         "https://proxy.golang.org/github.com/weaviate/weaviate-go-client/v5/@latest",
     ]
-    assert failures(snapshot) == {}
+    assert failures(check, snapshot) == {}
 
 
 def test_missing_file_fails_every_check():
     snapshot = copy.deepcopy(ORACLE)
     missing_file(snapshot)
-    assert set(failures(snapshot)) == {r["name"] for r in score(check, snapshot)}
+    assert set(failures(check, snapshot)) == {r["name"] for r in score(check, snapshot)}
 
 
 @pytest.mark.parametrize(
@@ -192,6 +179,6 @@ def test_missing_file_fails_every_check():
 def test_broken_variant_fails_only_its_checks(break_snapshot, failing_checks, reason):
     snapshot = copy.deepcopy(ORACLE)
     break_snapshot(snapshot)
-    failed = failures(snapshot)
+    failed = failures(check, snapshot)
     assert list(failed) == failing_checks
     assert reason in failed[failing_checks[0]]

@@ -3,16 +3,13 @@
 Task and prompt variant must then fail, with a note pointing to ``snapshot.json``.
 """
 
-import importlib.util
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 
 import pytest
+from conftest import ROOT, load_module
 
 from weval.verify import score
-
-ROOT = Path(__file__).parents[1]
-
 
 # The stages defined in AGENTS.md; each Task lives at tasks/<stage>/<scenario>/.
 STAGES = {"build", "deploy", "resolve", "investigate"}
@@ -26,23 +23,13 @@ def test_every_task_directory_is_under_a_known_stage():
     )
 
 
-def load_check(check_file: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        f"{check_file.parent.name}_check", check_file
-    )
-    assert spec and spec.loader
-    check = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(check)
-    return check
-
-
 def task_id(check_file: Path) -> str:
     return f"{check_file.parent.parent.name}/{check_file.parent.name}"
 
 
 @pytest.mark.parametrize("check_file", CHECK_FILES, ids=task_id)
 def test_failed_snapshot_fails_every_check(check_file):
-    check = load_check(check_file)
+    check = load_module(check_file)
 
     for prompt_variant in getattr(check, "PROMPT_VARIANT_REQUIRED", {"default": []}):
         results = score(
@@ -63,7 +50,7 @@ def test_failed_snapshot_fails_every_check(check_file):
 
 @pytest.mark.parametrize("check_file", CHECK_FILES, ids=task_id)
 def test_variant_check_lists_name_exactly_the_tasks_prompt_variants(check_file):
-    check = load_check(check_file)
+    check = load_module(check_file)
     prompts = {p.stem for p in (check_file.parent / "prompts").glob("*.md")}
     if not prompts:
         assert not hasattr(check, "PROMPT_VARIANT_REQUIRED") and not hasattr(

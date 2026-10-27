@@ -7,15 +7,14 @@ from pages to their own files:
   motivation and whose checks table matches its check.py.
 """
 
-import importlib.util
 import re
 import tomllib
 from pathlib import Path
 
 import pytest
 import yaml
+from conftest import ROOT, load_module
 
-ROOT = Path(__file__).parents[1]
 TASK_DIRS = sorted(p.parent for p in ROOT.glob("tasks/*/*/check.py"))
 # A checks-table row: | `check-id` | REQUIRED | ...
 CHECK_ROW = re.compile(r"^\| `([a-z0-9-]+)` \| (REQUIRED|PREFERRED) \|", re.MULTILINE)
@@ -35,12 +34,7 @@ def frontmatter(page: str) -> dict:
 
 def check_functions(task_dir: Path) -> dict[str, tuple[str, object]]:
     """Map each check ID to its tier and function."""
-    spec = importlib.util.spec_from_file_location(
-        f"{task_dir.name}_check", task_dir / "check.py"
-    )
-    assert spec and spec.loader
-    check = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(check)
+    check = load_module(task_dir / "check.py")
     return {
         function.__name__.replace("_", "-"): (tier, function)
         for tier, functions in (

@@ -2,28 +2,15 @@
 is recorded in the snapshot instead of raising, so the agent's submitted
 findings survive and the Trial is not reduced to the error sentinel."""
 
-import importlib.util
 import urllib.error
-from pathlib import Path
-from types import ModuleType
 
-SNAPSHOT_FILE = (
-    Path(__file__).parents[1] / "tasks/investigate/current-practices/snapshot.py"
-)
+from conftest import ROOT, load_module
 
-
-def load_snapshot_module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location(
-        "current_practices_snapshot", SNAPSHOT_FILE
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+SNAPSHOT_FILE = ROOT / "tasks/investigate/current-practices/snapshot.py"
 
 
 def test_snapshot_records_a_connection_failure_instead_of_raising(monkeypatch):
-    module = load_snapshot_module()
+    module = load_module(SNAPSHOT_FILE)
 
     def refuse(url, timeout=None):
         raise urllib.error.URLError("connection refused")
@@ -39,7 +26,7 @@ def test_snapshot_records_a_connection_failure_instead_of_raising(monkeypatch):
 
 
 def test_rate_limited_api_falls_back_to_the_releases_feed(monkeypatch):
-    module = load_snapshot_module()
+    module = load_module(SNAPSHOT_FILE)
     # Shape of the 403 retained Trials recorded, and of the feed's entry links.
     feed = "".join(
         f'<link rel="alternate" type="text/html" href="https://github.com/weaviate/weaviate/releases/tag/{tag}"/>'

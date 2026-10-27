@@ -7,32 +7,18 @@ weaviate-client 4.12.1.
 """
 
 import copy
-import importlib.util
 import json
 import uuid
-from pathlib import Path
 
 import pytest
+from conftest import ROOT, failures, load_module
 
-from weval.verify import score
-
-ROOT = Path(__file__).parents[1]
 ORACLE = json.loads(
     (
         ROOT / "tests/fixtures/deploy-document-search-upgrade-oracle-snapshot.json"
     ).read_text()
 )
-
-_spec = importlib.util.spec_from_file_location(
-    "deploy_document_search_upgrade_check",
-    ROOT / "tasks/deploy/document-search-upgrade/check.py",
-)
-check = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(check)
-
-
-def failures(snapshot: dict) -> dict[str, str]:
-    return {r["name"]: r["notes"] for r in score(check, snapshot) if not r["passed"]}
+check = load_module(ROOT / "tasks/deploy/document-search-upgrade/check.py")
 
 
 def server_not_upgraded(s: dict) -> None:
@@ -69,7 +55,7 @@ def inference_service_removed(s: dict) -> None:
 
 
 def test_oracle_passes_every_check():
-    assert failures(ORACLE) == {}
+    assert failures(check, ORACLE) == {}
 
 
 @pytest.mark.parametrize(
@@ -98,6 +84,6 @@ def test_oracle_passes_every_check():
 def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):
     snapshot = copy.deepcopy(ORACLE)
     break_snapshot(snapshot)
-    failed = failures(snapshot)
+    failed = failures(check, snapshot)
     assert list(failed) == [failing_check]
     assert reason in failed[failing_check]

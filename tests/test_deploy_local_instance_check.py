@@ -6,34 +6,21 @@ from a Modal Oracle Trial.
 """
 
 import copy
-import importlib.util
 import json
-from pathlib import Path
 
 import pytest
+from conftest import ROOT, failures, load_module
 
 from weval.verify import score
 
-ROOT = Path(__file__).parents[1]
 ORACLE = json.loads(
     (ROOT / "tests/fixtures/deploy-local-instance-oracle-snapshot.json").read_text()
 )
-
-_spec = importlib.util.spec_from_file_location(
-    "deploy_local_instance_check", ROOT / "tasks/deploy/local-instance/check.py"
-)
-check = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(check)
+check = load_module(ROOT / "tasks/deploy/local-instance/check.py")
 
 
 def results(snapshot: dict) -> dict[str, dict]:
     return {r["name"]: r for r in score(check, snapshot)}
-
-
-def failures(snapshot: dict) -> dict[str, str]:
-    return {
-        name: r["notes"] for name, r in results(snapshot).items() if not r["passed"]
-    }
 
 
 def not_ready(s: dict) -> None:
@@ -68,7 +55,7 @@ def no_data_mount(s: dict) -> None:
 
 
 def test_oracle_passes_every_check():
-    assert failures(ORACLE) == {}
+    assert failures(check, ORACLE) == {}
 
 
 @pytest.mark.parametrize(
@@ -89,7 +76,7 @@ def test_oracle_passes_every_check():
 def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):
     snapshot = copy.deepcopy(ORACLE)
     break_snapshot(snapshot)
-    failed = failures(snapshot)
+    failed = failures(check, snapshot)
     assert list(failed) == [failing_check]
     assert reason in failed[failing_check]
 

@@ -6,34 +6,15 @@ retained from a Modal Oracle Trial, which migrated Product behind an alias.
 """
 
 import copy
-import importlib.util
 import json
-from pathlib import Path
 
 import pytest
+from conftest import ROOT, failures, load_module
 
-from weval.verify import score
-
-ROOT = Path(__file__).parents[1]
 ORACLE = json.loads(
     (ROOT / "tests/fixtures/resolve-sku-search-oracle-snapshot.json").read_text()
 )
-
-_spec = importlib.util.spec_from_file_location(
-    "resolve_sku_search_check", ROOT / "tasks/resolve/sku-search/check.py"
-)
-check = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(check)
-
-
-def results(snapshot: dict) -> dict[str, dict]:
-    return {r["name"]: r for r in score(check, snapshot)}
-
-
-def failures(snapshot: dict) -> dict[str, str]:
-    return {
-        name: r["notes"] for name, r in results(snapshot).items() if not r["passed"]
-    }
+check = load_module(ROOT / "tasks/resolve/sku-search/check.py")
 
 
 def schema_property(s: dict, name: str) -> dict:
@@ -95,7 +76,7 @@ def app_side_workaround(s: dict) -> None:
 
 
 def test_oracle_passes_every_check():
-    assert failures(ORACLE) == {}
+    assert failures(check, ORACLE) == {}
 
 
 @pytest.mark.parametrize(
@@ -123,6 +104,6 @@ def test_oracle_passes_every_check():
 def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):
     snapshot = copy.deepcopy(ORACLE)
     break_snapshot(snapshot)
-    failed = failures(snapshot)
+    failed = failures(check, snapshot)
     assert list(failed) == [failing_check]
     assert reason in failed[failing_check]
