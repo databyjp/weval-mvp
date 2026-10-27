@@ -108,8 +108,11 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
 .chip.class-agent-gap { color: var(--warn-fg); background: var(--warn-bg); border-color: transparent; }
 .chip.class-scorer-bug, .chip.class-task-defect { color: var(--flag-fg); background: var(--flag-bg); border-color: transparent; }
 
-/* Waffle grids: one cell per Trial. */
-.waffle { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 8px; }
+/* Waffle grids: one cell per Trial, wrapping after ten so larger runs grow
+   in rows of ten rather than one long strip. */
+.waffle { display: inline-flex; flex-wrap: wrap; gap: 3px; max-width: calc(10 * 14px + 9 * 3px);
+  vertical-align: middle; margin-right: 8px; }
+.waffle.small { max-width: calc(10 * 10px + 9 * 3px); }
 .waffle a { width: 14px; height: 14px; border-radius: 3px; background: var(--cell-none);
   box-shadow: inset 0 0 0 1px rgba(19, 12, 73, 0.12); }
 .waffle a.status-passed { background: var(--cell-pass); }
@@ -140,7 +143,7 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
    label column. */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; margin: 8px 0;
   width: fit-content; max-width: 100%; box-sizing: border-box; }
-.card .panel dl.facts { grid-template-columns: calc(14em - 13px) max-content; margin: 2px 0; }
+.card .panel dl.facts { grid-template-columns: calc(14em - 13px) max-content; margin: 2px 0; align-items: center; }
 /* Inside a card, each judge's part opens with a pill and a rule above it. */
 .part { border-top: 1px solid var(--line-strong); margin-top: 12px; padding-top: 10px; }
 summary + .part { border-top: 0; padding-top: 4px; }

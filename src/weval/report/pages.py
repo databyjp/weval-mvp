@@ -133,17 +133,7 @@ def _finding(
     # Everything below the skeleton folds away, so a page of cards stays
     # scannable. Inside, the analyst's pattern covers the whole check, and
     # the per-Trial judges (the rule and Jev) share one table.
-    judges = [
-        name
-        for name, present in (
-            ("the analyst", group.patterns),
-            ("the rule", group.proposals),
-            ("Jev", group.sources),
-        )
-        if present
-    ]
-    note = f"from {_spoken_list(judges)}" if judges else "no saved opinions"
-    folded = [f'<summary>Why it failed <span class="note">{note}</span></summary>']
+    folded = ["<summary>Why it failed</summary>"]
     for pattern in group.patterns:
         folded.append(
             _judgment(
@@ -270,7 +260,7 @@ def _comparison(
             pass_change = _delta(f"{gained:+d}", gained) + " "
         pass_change += f'<span class="note">p = {p:.2g}</span>'
     rows = [
-        row("Trials", [_waffle(runs, links, trial_pages) for runs in arms]),
+        row("Trials", [_waffle(runs, links, trial_pages) for runs in arms], css="num"),
         row(
             "Passed",
             [
@@ -984,13 +974,6 @@ def _facts(rows: list[tuple[str, str]]) -> str:
         + "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in rows)
         + "</dl>"
     )
-
-
-def _spoken_list(items: list[str]) -> str:
-    """``["a", "b", "c"]`` as ``"a, b, and c"``."""
-    if len(items) < 3:
-        return " and ".join(items)
-    return f"{', '.join(items[:-1])}, and {items[-1]}"
 
 
 def _count(items: list) -> str:
