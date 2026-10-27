@@ -14,8 +14,8 @@ Produce the facts the 2026-10-27 analyses gathered by hand
    (`src/weval/diagnostics.py`): whether each failed check's `EXPECTED`
    value was shown to the agent, Treatment use, and Weaviate deprecation
    warnings. Only current-practices defines `EXPECTED` so far.
-3. Report: uncached input tokens on the Treatments tab, and an interval or
-   Fisher's exact test beside each pass-rate pair.
+3. Done: the Treatments tab shows uncached input tokens, a Wilson interval
+   for each pass rate, and Fisher's exact p-value for each pair.
 4. Typed labels from Jev (`typesafe/jev-router` on OpenRouter) for each
    failed check: `answer-source` (one of the pages the Trial read, or
    none), `verification` (verified, deferred to the user, guessed, not

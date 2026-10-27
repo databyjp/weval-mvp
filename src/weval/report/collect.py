@@ -8,6 +8,7 @@ check lists and docstrings.
 import importlib.util
 import inspect
 import json
+import math
 import tomllib
 import traceback
 from dataclasses import dataclass, field
@@ -37,7 +38,9 @@ class TrialSummary:
     has no ``weval.json``, in which case ``record`` is ``None``.
     ``preferred_passed`` is ``None`` when the Trial records no preferred
     checks. ``failed_required`` and ``failed_preferred`` list failed check
-    IDs. Usage fields are ``None`` when not reported.
+    IDs. Usage fields are ``None`` when not reported. ``uncached_input``
+    is input tokens not read from the prompt cache (Harbor's and Claude
+    Code's input counts include cache reads).
     """
 
     path: Path
@@ -48,6 +51,7 @@ class TrialSummary:
     failed_preferred: list[str] = field(default_factory=list)
     cost_usd: float | None = None
     tokens: int | None = None
+    uncached_input: int | None = None
     turns: int | None = None
     duration_s: float | None = None
     files: dict[str, Path] = field(default_factory=dict)
@@ -185,6 +189,31 @@ def mean_usage(trials: list[TrialSummary], attribute: str) -> float | None:
     return mean(values) if values else None
 
 
+def wilson_interval(passed: int, total: int, z: float = 1.96) -> tuple[float, float]:
+    """The Wilson score interval for a pass rate (95% by default), which
+    stays inside [0, 1] and is not empty at 0/n or n/n, unlike the normal
+    approximation at the small Trial counts runs have."""
+    rate = passed / total
+    centre = (rate + z * z / (2 * total)) / (1 + z * z / total)
+    half = z * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total)) / (1 + z * z / total)
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def fisher_exact(passed_a: int, total_a: int, passed_b: int, total_b: int) -> float:
+    """Two-sided Fisher's exact test p-value for two arms' pass counts: the
+    probability, with both arms' totals and the pooled pass count fixed, of
+    a split at most as likely as the one observed."""
+    passes, total = passed_a + passed_b, total_a + total_b
+
+    def probability(k: int) -> float:
+        return math.comb(total_a, k) * math.comb(total_b, passes - k) / math.comb(total, passes)
+
+    observed = probability(passed_a)
+    splits = range(max(0, passes - total_b), min(total_a, passes) + 1)
+    # The tolerance keeps ties that differ only by floating-point rounding.
+    return min(1.0, sum(p for k in splits if (p := probability(k)) <= observed * (1 + 1e-9)))
+
+
 def summarise_run(run_dir: Path) -> RunSummary:
     trial_dirs = sorted(path for path in (run_dir / "job").iterdir() if path.is_dir())
     records = [_read_json(path / "weval.json") for path in trial_dirs]
@@ -233,6 +262,8 @@ def summarise_trial(trial_dir: Path, record: dict | None) -> TrialSummary:
         failed_preferred=[c["name"] for c in checks if not c["required"] and not c["passed"]],
         cost_usd=usage.get("cost_usd"),
         tokens=sum(token_counts) if token_counts else None,
+        uncached_input=usage["n_input_tokens"] - (usage.get("n_cache_tokens") or 0)
+        if usage.get("n_input_tokens") is not None else None,
         # A turn is one agent message in Harbor's trajectory, with or without tool calls.
         turns=sum(step.get("source") == "agent" for step in trajectory["steps"]) if trajectory else None,
         duration_s=_duration_s(result.get("agent_execution")),

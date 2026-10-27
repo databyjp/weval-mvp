@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from weval.report import write_report
-from weval.report.collect import collect_runs, collect_tasks, compare_treatments
+from weval.report.collect import collect_runs, collect_tasks, compare_treatments, fisher_exact, wilson_interval
 
 RUN = "20261020-120000__build__ecommerce-search@terse__pi-glm-5.3-flash"
 
@@ -233,6 +233,9 @@ def test_treatment_runs_are_compared_not_shown_as_the_latest_result(tmp_path):
     assert '<td data-sort="1.0"' in treatments and '<td data-sort="0.0"' in treatments
     assert '0.300 <span class="note">-25%</span>' in treatments
     assert '<span class="note">unversioned</span>' in treatments
+    # 1/1 passed against 0/1: Wilson intervals, and Fisher's exact p on the Treatment row.
+    assert '1/1 <span class="note">21–100%</span>' in treatments
+    assert '0/1 <span class="note">0–79% · p 1</span>' in treatments
 
 
 def test_trial_page_shows_whether_the_agent_was_shown_a_failed_checks_expected_value(tmp_path):
@@ -248,3 +251,22 @@ def test_trial_page_shows_whether_the_agent_was_shown_a_failed_checks_expected_v
     assert "expected <code>1.40.2</code>, not seen in what the agent was shown" in trial_page
     assert "<dt>Deprecations shown to the agent</dt><dd><span class=\"muted\">none</span></dd>" in trial_page
     assert "Treatment skill" not in trial_page
+
+
+def test_pass_rate_statistics_match_hand_computed_values():
+    # 3/5 against 0/5: the observed split and its mirror each have probability 10/120.
+    assert round(fisher_exact(3, 5, 0, 5), 4) == round(20 / 120, 4)
+    # 5/5 against 0/7: the observed split is the only one as unlikely, C(12, 5) = 792.
+    assert round(fisher_exact(5, 5, 0, 7), 6) == round(1 / 792, 6)
+    assert round(fisher_exact(2, 4, 2, 4), 9) == 1.0
+    assert [round(v, 3) for v in wilson_interval(3, 5)] == [0.231, 0.882]
+    assert wilson_interval(0, 5)[0] == 0.0 and wilson_interval(5, 5)[1] == 1.0
+
+
+def test_uncached_input_leaves_out_cache_reads(tmp_path):
+    usage = {"n_input_tokens": 150_000, "n_cache_tokens": 120_000, "n_output_tokens": 3_000}
+    write_trial(tmp_path / RUN, "t1", {**record("passed", preferred_passed=True, cost=0.1), "usage": usage})
+
+    [run] = collect_runs(tmp_path)
+
+    assert run.trials[0].uncached_input == 30_000

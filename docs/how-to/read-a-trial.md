@@ -11,7 +11,11 @@ Then view `experiment-outputs/index.html` in a browser.
 To compare a [Treatment](../reference.md#treatments) with its baseline, open
 the Treatments tab. Each row pair holds one Task, prompt variant, and Agent:
 the baseline runs, then the Treatment runs, with required pass rate, failed
-checks, and mean usage per Trial. The Tasks tab shows baseline runs only.
+checks, and mean usage per Trial. Each pass rate has its 95% Wilson
+interval, and the Treatment row adds Fisher's exact p-value against the
+baseline; at 5 Trials per arm, only large differences reach a small
+p-value. Uncached input leaves out prompt-cache reads, which make up most
+of each Trial's input tokens. The Tasks tab shows baseline runs only.
 A row pair holds only runs with the same Task and check versions, and one
 Treatment version; the short [fingerprints](../reference.md#the-trial-directory)
 under the Task and Treatment names identify them. Runs recorded before

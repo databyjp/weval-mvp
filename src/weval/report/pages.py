@@ -19,7 +19,9 @@ from urllib.parse import quote
 
 from weval.diagnostics import diagnose
 from weval.report.assets import INDEX_SCRIPT, STYLE
-from weval.report.collect import Comparison, RunSummary, TaskDefinition, TrialSummary, compare_treatments, mean_usage
+from weval.report.collect import (
+    Comparison, RunSummary, TaskDefinition, TrialSummary, compare_treatments, fisher_exact, mean_usage, wilson_interval,
+)
 
 # Filter value and label for runs without a Treatment.
 BASELINE = "baseline"
@@ -405,13 +407,16 @@ def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
     columns = [
         ("Treatment", ""), ("Task", ""), ("Prompt variant", ""), ("Agent", ""), ("Arm", "group"),
         ("Runs", "num"), ("Required", "num group bar"), ("Failed required checks", "check-ids"),
-        ("Cost (USD)", "num group"), ("Tokens (k)", "num"), ("Turns", "num"), ("Duration", "num"),
+        ("Cost (USD)", "num group"), ("Tokens (k)", "num"), ("Uncached input (k)", "num"), ("Turns", "num"),
+        ("Duration", "num"),
     ]
     header = "".join(f'<th class="{css}">{name}</th>' for name, css in columns)
     bodies = []
     for comparison in comparisons:
         arms = [(BASELINE, comparison.baseline), (comparison.treatment, comparison.treated)]
         baseline_trials = [t for run in comparison.baseline for t in run.trials]
+        baseline_scored = [t for run in comparison.baseline for t in run.scored]
+        baseline_passed = sum(t.status == "passed" for t in baseline_scored)
         rows = []
         for i, (arm, arm_runs) in enumerate(arms):
             trials = [t for run in arm_runs for t in run.trials]
@@ -428,12 +433,20 @@ def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
                 escape(comparison.treatment) + _version_note(comparison.treatment_version),
                 escape(_task_name(comparison.task)) + _version_note(comparison.task_version, comparison.check_version),
                 escape(comparison.prompt_variant), escape(comparison.agent)))
+            required = _fraction(passed, len(scored), "--bar-required")
+            if scored:
+                low, high = wilson_interval(passed, len(scored))
+                note = f"{100 * low:.0f}–{100 * high:.0f}%"
+                if i and baseline_scored:
+                    note += f" · p {fisher_exact(passed, len(scored), baseline_passed, len(baseline_scored)):.2g}"
+                required = (required[0] + f' <span class="note">{note}</span>', *required[1:])
             cells = [
                 (escape(arm), ""), (runs_cell, len(arm_runs)),
-                _fraction(passed, len(scored), "--bar-required"),
+                required,
                 (_check_ids(failed, "failed-required"), ""),
                 _usage_mean(trials, reference, "cost_usd", _format_cost),
                 _usage_mean(trials, reference, "tokens", _format_tokens),
+                _usage_mean(trials, reference, "uncached_input", _format_tokens),
                 _usage_mean(trials, reference, "turns", lambda v: "" if v is None else f"{v:.0f}"),
                 _usage_mean(trials, reference, "duration_s", _format_duration),
             ]
@@ -443,8 +456,9 @@ def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
     return f"""
 <p class="intro">Each Treatment version's runs beside the baseline runs of the same Task, prompt variant, and Agent
 that ran the same Task and check versions (fingerprints in <code>weval.json</code>). Runs recorded without
-fingerprints are compared only with each other. Usage is the mean per Trial; the Treatment row notes its change
-from the baseline.</p>
+fingerprints are compared only with each other. Under each pass rate is its 95% Wilson interval; the Treatment
+row adds the two-sided Fisher's exact p-value against the baseline. Usage is the mean per Trial; uncached input
+leaves out prompt-cache reads. The Treatment row notes each mean's change from the baseline.</p>
 <div class="wrap"><table id="treatments-table" class="rows">
 <thead><tr>{header}</tr></thead>
 {"".join(bodies)}
