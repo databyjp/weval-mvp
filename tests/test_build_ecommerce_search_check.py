@@ -69,7 +69,7 @@ def test_oracle_passes_every_check():
         (legacy_vectorizer, "weaviate-managed-vectorization", "legacy collection-level vectorizer"),
         (missing_product, "catalog-ingestion", "holds 24 objects"),
         (word_tokenization, "sku-category-field-tokenization", "'sku': 'word'"),
-        (near_text_search, "hybrid-query", "query.hybrid"),
+        (near_text_search, "hybrid-query", "it calls .query.near_text(...)"),
         (default_page_size_10, "search-contract", "page_size=5"),
     ],
 )

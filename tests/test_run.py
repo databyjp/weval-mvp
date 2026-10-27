@@ -72,6 +72,8 @@ def test_finalize_records_usage_from_result_and_trajectory(tmp_path):
         ("bash", {"command": 'curl -s "https://api.github.com/repos/weaviate/weaviate/releases?per_page=15"'}),
         ("bash", {"command": "curl -s http://weaviate:8080/v1/meta && curl http://127.0.0.1:8000/search"}),
         ("fetch_content", {"url": "https://docs.weaviate.io/deploy/migration"}),
+        # Claude Code loading its web tools: not a search.
+        ("ToolSearch", {"query": "select:WebFetch,WebSearch", "max_results": 2}),
     ]
     (trial / "agent/trajectory.json").write_text(json.dumps({"steps": [
         {"tool_calls": [{"function_name": name, "arguments": arguments}]} for name, arguments in calls
@@ -82,7 +84,7 @@ def test_finalize_records_usage_from_result_and_trajectory(tmp_path):
     assert usage == {
         "n_input_tokens": 1080469, "n_cache_tokens": 1023424,
         "n_output_tokens": 33356, "cost_usd": 0.028,
-        "tool_calls": {"web_search": 1, "fetch_content": 2, "bash": 2},
+        "tool_calls": {"web_search": 1, "fetch_content": 2, "bash": 2, "ToolSearch": 1},
         "urls": [
             "https://docs.weaviate.io/deploy/migration",
             "https://api.github.com/repos/weaviate/weaviate/releases?per_page=15",

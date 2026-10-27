@@ -173,6 +173,7 @@ Before running agents on a new Task:
 ```sh
 uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>] [--treatment <treatment>]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
+uv run --env-file .env weval analyse experiment-outputs/<run>   # LLM analysis of its Treatment comparisons
 ```
 
 Real runs cost money (Modal, OpenRouter). This is not a problem, but confirm with the user.

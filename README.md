@@ -136,7 +136,9 @@ Create `.env` with `OPENROUTER_API_KEY`, `MODAL_TOKEN_ID`, and
 need `CLAUDE_CODE_OAUTH_TOKEN`, printed by `claude setup-token`. Labels for
 failed checks ([how to read a Trial](docs/how-to/read-a-trial.md#re-score))
 need `TYPESAFEAI_API_KEY` from the TypeSafe console; without it, runs and
-re-scores skip them. Git ignores `.env`, and after each run weval replaces any
+re-scores skip them. The analysis of each Treatment comparison
+([how to read a Trial](docs/how-to/read-a-trial.md)) uses
+`OPENROUTER_API_KEY`. Git ignores `.env`, and after each run weval replaces any
 of these values found in retained output with `<redacted:NAME>`.
 
 ## Use
@@ -150,6 +152,9 @@ uv run --env-file .env weval run tasks/build/ecommerce-search --agent pi-glm-5.3
 
 # Re-score a retained Trial with the Task's current check.py
 uv run weval check experiment-outputs/<run>/job/<trial>
+
+# Analyse the Treatment comparisons that include a retained run, with an LLM
+uv run --env-file .env weval analyse experiment-outputs/<run>
 
 # Write the Task catalog and every retained run to experiment-outputs/index.html
 uv run weval report

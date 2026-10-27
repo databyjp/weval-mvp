@@ -22,6 +22,38 @@ under the Task and Treatment names identify them. Runs recorded before
 fingerprints existed are marked unversioned and pooled with each other, so
 after a `check.py` change, re-score both arms with `weval check` (below).
 
+Under each row pair is its saved analysis. `weval run` writes it after
+labelling (below) when the run is part of a row pair, given
+`OPENROUTER_API_KEY`; to analyse retained runs, run:
+
+```sh
+uv run --env-file .env weval analyse experiment-outputs/<run>
+```
+
+An LLM analyst (`MODEL` in `src/weval/analysis.py`) reads the row pair's
+computed facts, never the transcripts: pass counts and intervals, the
+p-value, mean usage, and each failed check's failure message,
+[expected value](define-a-task.md#expected-values), and labels. It answers
+with a one-sentence result, failure patterns with their Trials, evidence,
+and a proposed [failure class](../../AGENTS.md#failed-checks-are-extremely-useful-findings),
+caveats, and open questions. weval rejects an answer that cites a Trial or
+check that did not fail, states a number missing from the facts, or leaves a
+failed required check out of every pattern. It asks again with the problems,
+up to three times, and shows a last rejection as rejected. A hand-coded rule
+proposes a class for each failed check from the same facts:
+
+- the expected value was shown to the agent: agent gap;
+- it was not, and the labelled source is a Weaviate page: Weaviate gap;
+- the snapshot failed (`error_stage` set) or gave no expected value: infrastructure failure;
+- otherwise unclassified.
+
+Where the rule and the analyst name different classes for the same failed
+check, the row lists the disagreement for you to decide. The analysis knows
+only the facts, so what a docs page says stays in its open questions.
+Analyses are saved in `experiment-outputs/_analysis/` and reused until the
+facts, prompt, or model change, such as after a new run joins the row pair;
+the report shows saved analyses only and never calls the analyst.
+
 For one Trial, start at `weval.json` in the Trial directory ([layout reference](../reference.md#the-trial-directory)).
 
 Then follow your question:

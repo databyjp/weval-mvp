@@ -1,4 +1,4 @@
-"""weval command line: ``weval run``, ``weval check``, and ``weval report``."""
+"""weval command line: ``weval run``, ``weval check``, ``weval analyse``, and ``weval report``."""
 
 import argparse
 from pathlib import Path
@@ -40,6 +40,10 @@ def main() -> None:
     check_parser = commands.add_parser("check", help="re-score a retained Trial's snapshot")
     check_parser.add_argument("trial", type=Path, help="Harbor Trial directory")
     check_parser.add_argument("--task", type=Path, help="Task directory (default: from weval.json)")
+    analyse_parser = commands.add_parser(
+        "analyse", help="analyse the Treatment comparisons that include a retained run, with an LLM"
+    )
+    analyse_parser.add_argument("run", type=Path, help="run directory under experiment-outputs/")
     report_parser = commands.add_parser("report", help="write the Task catalog and retained runs as HTML pages")
     report_parser.add_argument(
         "outputs", type=Path, nargs="?", default=Path("experiment-outputs"), help="directory of run directories"
@@ -54,9 +58,11 @@ def main() -> None:
 
     # Imported here so `weval --help` does not pay Harbor's import time.
     from weval.labels import label
-    from weval.run import check_versions, diagnose, rescore, run
+    from weval.run import analyse_run, check_versions, diagnose, rescore, run
 
-    if args.command == "run":
+    if args.command == "analyse":
+        analyse_run(args.run)
+    elif args.command == "run":
         print(run(
             args.task, args.agent, args.n,
             local=args.local, prompt_variant=args.prompt_variant, treatment=args.treatment,

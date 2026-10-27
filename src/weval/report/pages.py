@@ -17,6 +17,7 @@ from html import escape
 from pathlib import Path
 from urllib.parse import quote
 
+from weval import analysis
 from weval.diagnostics import diagnose
 from weval.labels import label
 from weval.report.assets import INDEX_SCRIPT, STYLE
@@ -65,7 +66,7 @@ the baseline runs of the same Task, prompt variant, and Agent.</p>
 </nav>
 <section class="tab" id="tasks">{_tasks_tab(tasks, runs, agents, agent_names, links)}</section>
 <section class="tab" id="results" hidden>{_results_tab(runs, agents, links, trial_pages)}</section>
-<section class="tab" id="treatments" hidden>{_treatments_tab(comparisons, links)}</section>
+<section class="tab" id="treatments" hidden>{_treatments_tab(comparisons, tasks, index_dir, links)}</section>
 <script>{INDEX_SCRIPT}</script>""",
     )
 
@@ -404,7 +405,9 @@ def _results_tab(
 # --- Treatments tab ----------------------------------------------------------
 
 
-def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
+def _treatments_tab(
+    comparisons: list[Comparison], tasks: list[TaskDefinition], outputs_dir: Path, links: "_Links",
+) -> str:
     if not comparisons:
         return '<p class="muted">No Treatment runs are retained.</p>'
     columns = [
@@ -414,6 +417,7 @@ def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
         ("Duration", "num"),
     ]
     header = "".join(f'<th class="{css}">{name}</th>' for name, css in columns)
+    expected = {task.path: task.expected for task in tasks}
     bodies = []
     for comparison in comparisons:
         arms = [(BASELINE, comparison.baseline), (comparison.treatment, comparison.treated)]
@@ -455,17 +459,55 @@ def _treatments_tab(comparisons: list[Comparison], links: "_Links") -> str:
             ]
             rows.append('<tr class="row">' + identity + "".join(
                 _cell(*cell, css=css) for cell, (_, css) in zip(cells, columns[4:])) + "</tr>")
+        # Saved analyses only: building the report never calls the analyst.
+        found = analysis.analyse(comparison, expected.get(comparison.task, {}), outputs_dir, call=False)
+        rows.append(f'<tr><td colspan="{len(columns)}" class="wrapping">{_analysis(found)}</td></tr>')
         bodies.append(f"<tbody>{''.join(rows)}</tbody>")
     return f"""
 <p class="intro">Each Treatment version's runs beside the baseline runs of the same Task, prompt variant, and Agent
 that ran the same Task and check versions (fingerprints in <code>weval.json</code>). Runs recorded without
 fingerprints are compared only with each other. Under each pass rate is its 95% Wilson interval; the Treatment
 row adds the two-sided Fisher's exact p-value against the baseline. Usage is the mean per Trial; uncached input
-leaves out prompt-cache reads. The Treatment row notes each mean's change from the baseline.</p>
+leaves out prompt-cache reads. The Treatment row notes each mean's change from the baseline. Under each pair is
+its saved LLM analysis (<code>weval analyse</code>), checked against the facts it was given, and where a hand-coded
+rule proposes another class for the same failed check.</p>
 <div class="wrap"><table id="treatments-table" class="rows">
 <thead><tr>{header}</tr></thead>
 {"".join(bodies)}
 </table></div>"""
+
+
+def _analysis(found: dict) -> str:
+    """A comparison's saved analysis from ``weval.analysis.analyse``, with
+    the rule's disagreements and proposals, folded under its result."""
+    answer = found["analysis"]
+    if answer:
+        summary = f'Analysis <span class="note">{escape(str(found["model"]))}</span> {escape(answer["result"])}'
+    elif found["problems"]:
+        summary = '<span class="muted">Analysis rejected:</span> ' + escape("; ".join(found["problems"]))
+    else:
+        summary = f'<span class="muted">{escape(found["note"] or "not analysed")}</span>'
+    parts = []
+    for pattern in (answer or {}).get("patterns", []):
+        parts.append(
+            f'<li><span class="chip">{escape(pattern["class"])}</span> {escape(pattern["summary"])}'
+            f'<br><span class="note">{", ".join(f"<code>{escape(c)}</code>" for c in pattern["checks"])} in '
+            f'{", ".join(f"<code>{escape(t)}</code>" for t in pattern["trials"])}</span>'
+            f'<br>{escape(pattern["evidence"])}<br><span class="muted">{escape(pattern["reason"])}</span></li>')
+    sections = [f"<h3>Failure patterns</h3><ul>{''.join(parts)}</ul>"] if parts else []
+    if found["disagreements"]:
+        sections.append("<h3>Rule disagreements</h3><ul>" + "".join(
+            f'<li><code>{escape(d["trial"])}</code> <code>{escape(d["check"])}</code>: analyst '
+            f'{escape(d["analyst"])}, rule {escape(d["class"])} ({escape(d["reason"])})</li>'
+            for d in found["disagreements"]) + "</ul>")
+    for title, key in (("Caveats", "caveats"), ("Open questions", "open_questions")):
+        if (answer or {}).get(key):
+            sections.append(f"<h3>{title}</h3><ul>" + "".join(f"<li>{escape(i)}</li>" for i in answer[key]) + "</ul>")
+    if found["rule"]:
+        sections.append("<h3>Rule proposals</h3><ul>" + "".join(
+            f'<li><code>{escape(r["trial"])}</code> <code>{escape(r["check"])}</code>: {escape(r["class"])} '
+            f'<span class="muted">({escape(r["reason"])})</span></li>' for r in found["rule"]) + "</ul>")
+    return f"<details><summary>{summary}</summary>{''.join(sections)}</details>"
 
 
 def _version_note(*versions: str | None) -> str:

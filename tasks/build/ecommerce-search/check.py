@@ -5,6 +5,8 @@ message names the constraint. The check ID is the function name with dashes;
 the docstring is its description. Reward requires every ``REQUIRED`` check.
 """
 
+import re
+
 COLLECTION = "Product"
 DEFAULT_PAGE_SIZE = 5
 EXACT_SKU = "ZXQ-9917"
@@ -159,7 +161,10 @@ def hybrid_query(snapshot: dict) -> None:
     # outside the /search route also passes.
     callers = [name for name, text in snapshot["files"].items()
                if name.endswith(".py") and ".query.hybrid(" in text]
-    assert callers, "submitted Python code calls .query.hybrid(...)"
+    called = sorted({method for name, text in snapshot["files"].items() if name.endswith(".py")
+                     for method in re.findall(r"\.query\.(\w+)\(", text)})
+    assert callers, ("submitted Python code calls .query.hybrid(...); it calls "
+                     + (", ".join(f".query.{method}(...)" for method in called) or "no .query method"))
 
 
 REQUIRED = [

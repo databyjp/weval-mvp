@@ -19,17 +19,23 @@ Produce the facts the 2026-10-27 analyses gathered by hand
 4. Done for `answer-source` and `verification` (`src/weval/labels.py`,
    TypeSafe's API directly: OpenRouter lists only `jev-router`, which
    routes to other models). Open: `api-recommended`, which belongs with the
-   judge (step 6); and crediting a multi-file `grep` result to the file
+   judge (below); and crediting a multi-file `grep` result to the file
    each line names, since today it credits every file the call named.
-5. A hand-coded rule that proposes a failure class from steps 1 to 4, with
-   its reason, tested on fixture Trials. No match is "unclassified" for a
-   person to review.
-6. An LLM judge against the canonical solution (below, under
-   investigate/current-practices), calibrated like checks.
+5. Done (`src/weval/analysis.py`, `weval analyse`): an LLM analysis of
+   each Treatment comparison from computed facts, checked mechanically
+   against them, with a hand-coded rule proposing a class for each failed
+   check and listing where the two disagree. Open: per-Task `FACTS` in
+   `check.py` (snapshot facts such as `weaviate_version`, which the
+   ecommerce-search analysis asked for in its open questions); and letting
+   the rule follow a Treatment file to the docs page its `Source:` line
+   names, so a Treatment Trial's docs-copy source counts as a Weaviate page.
 
-Derived outputs (steps 2, 4, 6) go in files beside, not inside, the
-retained logs. Steps 4 and 6 add a model dependency; agree on their shape
-before building them.
+The LLM judge against the canonical solution (below, under
+investigate/current-practices) is a separate, later item, calibrated like
+checks; `api-recommended` belongs with it.
+
+Derived outputs (diagnostics, labels, analyses) go in files beside, not
+inside, the retained logs.
 
 ## Re-score tooling
 

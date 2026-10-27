@@ -6,6 +6,7 @@ Output layout, one directory per invocation::
         task/                 Harbor task package built from tasks/<stage>/<scenario>/
         treatment/            copy of treatments/<treatment>/, when given
         labels/<trial>.json   saved Jev labels for the Trial's failed checks (weval.labels)
+    experiment-outputs/_analysis/<comparison>.json  saved analysis of each Treatment comparison (weval.analysis)
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
         job/<trial>/weval.json  Agent, status, missing logs, check results, fingerprints
 """
@@ -154,6 +155,7 @@ def run(
     finally:
         finalize_run(run_dir, task_path, agent, attempts, prompt_variant, treatment, versions)
         label_run(run_dir)
+        analyse_run(run_dir)
         redact(run_dir)
     return run_dir
 
@@ -284,6 +286,35 @@ def label_run(run_dir: Path) -> None:
             print(f"{record_file.parent}: {note}")
 
 
+def analyse_run(run_dir: Path) -> None:
+    """Refresh the analysis (``analysis.analyse``) of each Treatment
+    comparison among the retained runs beside ``run_dir`` that includes it,
+    and print each result. Like ``label_run``, a failure is printed, not
+    raised."""
+    # Imported here: the report's collect module is not needed to run Trials.
+    from weval import analysis
+    from weval.report.collect import collect_runs, compare_treatments
+
+    for comparison in compare_treatments(collect_runs(run_dir.parent)):
+        if run_dir.resolve() not in {run.path.resolve() for run in comparison.baseline + comparison.treated}:
+            continue
+        name = f"{comparison.treatment} on {comparison.task}@{comparison.prompt_variant} with {comparison.agent}"
+        try:
+            result = analysis.analyse(comparison, getattr(_load_check(ROOT / comparison.task), "EXPECTED", {}),
+                                      run_dir.parent)
+        except Exception as error:  # noqa: BLE001  Analysis must not break a finished run.
+            print(f"{name}: analysis failed: {error!r}")
+            continue
+        if result["analysis"]:
+            print(f"{name}: {result['analysis']['result']}")
+        if result["problems"]:
+            print(f"{name}: analysis rejected: {'; '.join(result['problems'])}")
+        for item in result["disagreements"]:
+            print(f"{name}: {item['trial']} {item['check']}: analyst {item['analyst']}, rule {item['class']}")
+        if result["note"]:
+            print(f"{name}: {result['note']}")
+
+
 def derive_status(result: dict, missing: list[str]) -> str:
     """Classify one Trial by whose outcome it records (statuses: docs/reference.md).
 
@@ -359,7 +390,7 @@ def usage(trial_dir: Path, result: dict) -> dict:
     by tool name. ``urls`` lists, in first-use order, every external URL in
     any tool call's arguments, including ``curl`` commands; a page read from
     search results without its own fetch is not listed. ``search_queries``
-    lists every ``query`` or ``queries`` argument. All three are empty
+    lists every ``query`` or ``queries`` argument except ``ToolSearch``'s. All three are empty
     without Harbor's ``agent/trajectory.json``.
     """
     agent_result = result.get("agent_result") or {}
@@ -374,7 +405,8 @@ def usage(trial_dir: Path, result: dict) -> dict:
             name, arguments = call["function_name"], call.get("arguments") or {}
             tool_calls[name] = tool_calls.get(name, 0) + 1
             urls.update(dict.fromkeys(diagnostics.URL.findall(json.dumps(arguments))))
-            query = arguments.get("queries") or arguments.get("query") or []
+            # Claude Code's ToolSearch query selects tools, not web pages.
+            query = [] if name == "ToolSearch" else arguments.get("queries") or arguments.get("query") or []
             queries.extend([query] if isinstance(query, str) else query)
     return {**record, "tool_calls": tool_calls, "urls": list(urls), "search_queries": queries}
 
