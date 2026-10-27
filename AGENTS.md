@@ -185,6 +185,10 @@ uv run weval report   # rebuild experiment-outputs/index.html and the Task and T
 
 Real runs cost money (Modal, OpenRouter). This is not a problem, but confirm with the user.
 
+Run 1 Trial per arm (the `-n` default) unless the user asks for more. Skip a
+separate smoke run unless each run has many Trials; then run one Trial per
+configuration first.
+
 Each Trial directory is Harbor's own output plus `weval.json`. Start there:
 
 - `weval.json`: status (`passed`, `failed`, `incomplete`, `timed-out`,

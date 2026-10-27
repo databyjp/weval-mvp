@@ -142,16 +142,11 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
 .waffle a:hover { outline: 2px solid var(--link); }
 .waffle.small a { width: 10px; height: 10px; border-radius: 2px; }
 
-/* Rate bars: the fill runs to the rate on a light track of the same hue, and
-   a light, dotted whisker across the bar spans the 95% interval. The count is
-   always written beside the bar, so colour is never the only cue. */
+/* Rate bars: the fill runs to the rate on a light track of the same hue. The
+   count is always written beside the bar, so colour is never the only cue. */
 .rate { position: relative; display: inline-block; width: 120px; height: 8px; border-radius: 4px;
   vertical-align: middle; margin-right: 10px; }
 .rate .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
-.rate .interval { position: absolute; top: -3px; bottom: -3px; min-width: 3px; box-sizing: border-box;
-  border-left: 1.5px solid var(--muted); border-right: 1.5px solid var(--muted);
-  background: repeating-linear-gradient(90deg, var(--muted) 0 2px, transparent 2px 4px) center / 100% 1.5px no-repeat;
-  opacity: 0.6; }
 .rate.passed { background: var(--pass-bg); }
 .rate.passed .fill { background: var(--cell-pass); }
 .rate.failed { background: var(--fail-bg); }

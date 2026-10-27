@@ -2,7 +2,7 @@
 
 Trials run on Modal unless you pass `--local`. Pi Agents use OpenRouter for inference; the Oracle uses no model.
 
-Run a trial by specifying an env file, task, agent definition, and the number of trials to run (e.g. for higher sample size). The env file must define the credentials listed in the [README](../../README.md#setup). The `-n` Trials run concurrently, each in its own Modal sandbox.
+Run a trial by specifying an env file, task, agent definition, and the number of trials to run (1 by default; pass `-n` for a higher sample size). The env file must define the credentials listed in the [README](../../README.md#setup). The `-n` Trials run concurrently, each in its own Modal sandbox.
 
 ```sh
 uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>] [--treatment <treatment>]

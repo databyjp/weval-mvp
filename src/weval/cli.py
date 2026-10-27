@@ -47,7 +47,9 @@ def main() -> None:
         "task", type=Path, help="Task directory, e.g. tasks/build/ecommerce-search"
     )
     run_parser.add_argument("--agent", required=True, help="name from agents.toml")
-    run_parser.add_argument("-n", type=int, default=1, help="number of Trials")
+    run_parser.add_argument(
+        "-n", type=int, default=1, help="number of Trials (default: 1)"
+    )
     run_parser.add_argument(
         "--local",
         action="store_true",

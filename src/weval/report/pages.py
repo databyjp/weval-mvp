@@ -22,7 +22,6 @@ from weval.collect import (
     TrialSummary,
     fisher_exact,
     mean_usage,
-    wilson_interval,
 )
 from weval.diagnostics import diagnose
 from weval.labels import label
@@ -94,8 +93,8 @@ def _findings_section(
 ) -> str:
     intro = (
         "Each card is one check that failed, with how often it failed in each arm: the bar fills to "
-        "the failure rate, and the whisker across it spans the 95% interval. The counts come "
-        "straight from the retained records. Everything else on a card is a saved opinion about why "
+        "the failure rate. The counts come straight from the retained records. Everything else "
+        "on a card is a saved opinion about why "
         "it failed, and each opinion names its judge: the LLM analyst, a hand-coded rule, or the Jev "
         "labeller. Open a failing Trial to see the evidence; the final call on a class is yours."
     )
@@ -218,8 +217,8 @@ def _comparisons_section(
 ) -> str:
     intro = (
         "Did the Treatment help? Each card compares one Treatment's Trials with baseline Trials of "
-        "the same Task, Agent, and versions, one column per arm. Each bar fills to the pass rate, "
-        "and the whisker across it spans the 95% interval; the p-value (Fisher's exact test) says how "
+        "the same Task, Agent, and versions, one column per arm. Each bar fills to the pass rate; "
+        "the p-value (Fisher's exact test) says how "
         "easily the difference in passes could be chance. Usage rows "
         "are means per Trial, and the last column gives the Treatment's change from the baseline. "
         "The analyst's text is the saved <code>weval analyse</code> answer; the report never calls "
@@ -257,13 +256,6 @@ def _comparison(
     def group(label: str) -> str:
         return f'<tr class="group"><th colspan="4">{label}</th></tr>'
 
-    intervals = []
-    for count, arm in zip(passed, scored):
-        if arm:
-            low, high = wilson_interval(count, len(arm))
-            intervals.append(f"{100 * low:.0f}&ndash;{100 * high:.0f}%")
-        else:
-            intervals.append("")
     pass_change = ""
     if all(scored):
         p = fisher_exact(passed[1], len(scored[1]), passed[0], len(scored[0]))
@@ -292,7 +284,6 @@ def _comparison(
             pass_change,
             "num",
         ),
-        row("95% interval", intervals, css="num"),
     ]
 
     failed = [Counter(c for t in arm for c in t.failed_required) for arm in scored]
@@ -453,36 +444,24 @@ def _reliability_row(row: TaskReliability, links: "_Links") -> str:
 
 
 def _rate_bar(count: int, total: int, outcome: str) -> str:
-    """``count`` of ``total`` Trials as a bar on a 0-100% track: the fill
-    runs to the rate and a capped whisker spans its 95% Wilson interval.
-    ``outcome`` (``passed`` or ``failed``) names what is counted and sets the
-    bar's colour; the tooltip states the figures in words."""
+    """``count`` of ``total`` Trials as a bar on a 0-100% track, filled to
+    the rate. ``outcome`` (``passed`` or ``failed``) names what is counted
+    and sets the bar's colour; the tooltip states the figures in words."""
     if not total:
         return ""
-    low, high = wilson_interval(count, total)
-    title = (
-        f"{count} of {total} {outcome} ({100 * count / total:.0f}%); "
-        f"95% interval {100 * low:.0f}-{100 * high:.0f}%"
-    )
+    title = f"{count} of {total} {outcome} ({100 * count / total:.0f}%)"
     return (
         f'<span class="rate {outcome}" title="{title}">'
         f'<span class="fill" style="width: {100 * count / total:.1f}%"></span>'
-        f'<span class="interval" style="left: {100 * low:.1f}%; width: {100 * (high - low):.1f}%"></span>'
         "</span>"
     )
 
 
-def _rate(count: int, total: int, outcome: str, *, name_interval: bool = False) -> str:
-    """A rate bar with its count and interval written out beside it;
-    ``name_interval`` labels the interval where no section note explains it."""
+def _rate(count: int, total: int, outcome: str) -> str:
+    """A rate bar with its count written out beside it."""
     if not total:
         return f"0/0 {outcome}"
-    low, high = wilson_interval(count, total)
-    label = ", 95% interval" if name_interval else ""
-    return (
-        f"{_rate_bar(count, total, outcome)}{count}/{total} {outcome} "
-        f'<span class="muted">({100 * low:.0f}&ndash;{100 * high:.0f}%{label})</span>'
-    )
+    return f"{_rate_bar(count, total, outcome)}{count}/{total} {outcome}"
 
 
 def _cells(
@@ -535,7 +514,7 @@ def render_task(
     trial_count = sum(len(run.trials) for run in row.runs)
 
     facts = [
-        ("Passed", _rate(row.passed, row.scored, "passed", name_interval=True)),
+        ("Passed", _rate(row.passed, row.scored, "passed")),
         ("Runs", f"{len(row.runs)} runs, {trial_count} Trials"),
         (
             "Definition",
@@ -636,7 +615,7 @@ def _task_checks(
     return (
         intro
         + '<div class="card"><table class="plain trials"><thead><tr><th>Check</th><th>Kind</th>'
-        '<th>Requires</th><th>Failed <span class="note">with 95% interval</span></th></tr></thead>'
+        "<th>Requires</th><th>Failed</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
 

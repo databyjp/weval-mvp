@@ -9,10 +9,30 @@ harness = "pi"
 version = "0.85.1"
 model = "openrouter/z-ai/glm-5.3-flash"
 
-["pi-kimi-k3.1-pro"]
+["pi-glm-5.3"]
 harness = "pi"
 version = "0.85.1"
-model = "openrouter/moonshotai/kimi-k3.1-pro"
+model = "openrouter/z-ai/glm-5.3"
+
+["pi-minimax-m3.1-flash"]
+harness = "pi"
+version = "0.85.1"
+model = "openrouter/minimax/minimax-m3.1-flash"
+
+["pi-deepseek-v4.1-flash-1017"]
+harness = "pi"
+version = "0.85.1"
+model = "openrouter/deepseek/deepseek-v4.1-flash-1017"
+
+["pi-gpt-6.1-terra"]
+harness = "pi"
+version = "0.85.1"
+model = "openrouter/openai/gpt-6.1-terra"
+
+["pi-claude-sonnet-5.5"]
+harness = "pi"
+version = "0.85.1"
+model = "openrouter/anthropic/claude-sonnet-5.5"
 
 ["claude-code-haiku-5.5"]
 harness = "claude-code"
