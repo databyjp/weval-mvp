@@ -2,12 +2,49 @@
 
 Remaining work, roughly in order. Delete items when done.
 
+## Scoring rubric
+
+Produce the facts the 2026-10-27 analyses gathered by hand
+(`analysis/2026-10-27-*.md`) the same way every time. Steps, in order:
+
+1. Version each Trial. Record fingerprints in `weval.json`: the Task (the
+   packaged Task without `check.py`, plus the Compose overlays), `check.py`,
+   and the Treatment. The report compares arms only with the same Task and
+   check fingerprints. The Trial date stays the way to correlate docs-site
+   and release changes, which can't be hashed.
+2. Computed diagnostics for each Trial, from its logs:
+   - `expected-value-seen`: for a failed check whose expected value the
+     snapshot holds (such as a latest release), whether that value appeared
+     in any tool result. It doesn't change the score.
+   - `treatment-used`: whether the skill loaded, and which Treatment files
+     the agent read.
+   - `deprecation-seen`: deprecation warnings (`Dep0\d\d`) in the
+     transcript and `application.log`.
+3. Report: uncached input tokens on the Treatments tab, and an interval or
+   Fisher's exact test beside each pass-rate pair.
+4. Typed labels from Jev (`typesafe/jev-router` on OpenRouter) for each
+   failed check: `answer-source` (one of the pages the Trial read, or
+   none), `verification` (verified, deferred to the user, guessed, not
+   attempted), and `api-recommended` (current, legacy, both, none). Record
+   the model, prompt version, and confidence; below a threshold, a person
+   reviews.
+5. A hand-coded rule that proposes a failure class from steps 1 to 4, with
+   its reason, tested on fixture Trials. No match is "unclassified" for a
+   person to review.
+6. An LLM judge against the canonical solution (below, under
+   investigate/current-practices), calibrated like checks.
+
+Derived outputs (steps 2, 4, 6) go in files beside, not inside, the
+retained logs. Steps 4 and 6 add a model dependency; agree on their shape
+before building them.
+
 ## Re-score tooling
 
 - `weval check` only prints, so re-score results live in analysis files that
   record the date and commit (`analysis/2026-10-27-rescore.md`). If
-  re-scoring becomes routine, consider having `weval check` print the commit
-  and date itself, or write a file the report can read.
+  re-scoring becomes routine, consider having `weval check` print the
+  check fingerprint (Scoring rubric, step 1) and date itself, or write a
+  file the report can read.
 - The four `investigate/stack-recommendation` Trials record a Task path that
   no longer exists; re-score them with
   `--task tasks/investigate/db-recommendation`.
