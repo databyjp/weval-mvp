@@ -79,7 +79,8 @@ def main() -> None:
 
     # Imported here so `weval --help` does not pay Harbor's import time.
     from weval.labels import label
-    from weval.run import analyse_run, check_versions, diagnose, rescore, run
+    from weval.rescore import check_versions, diagnose, rescore
+    from weval.run import analyse_run, run
 
     if args.command == "analyse":
         analyse_run(args.run)

@@ -11,19 +11,18 @@ from pathlib import Path
 import pytest
 
 from weval.harnesses import claude_code
+from weval.rescore import check_versions, rescore
 from weval.run import (
     ROOT,
     SHARED_COMPOSE,
     WEAVIATE_COMPOSE,
     check_fingerprint,
-    check_versions,
     compose_overlays,
     derive_status,
     finalize,
     finalize_run,
     fingerprints,
     package_task,
-    rescore,
     treatment_skills,
 )
 

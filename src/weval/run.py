@@ -13,7 +13,6 @@ Output layout, one directory per invocation::
 
 import asyncio
 import hashlib
-import importlib.util
 import json
 import os
 import shutil
@@ -332,9 +331,11 @@ def analyse_run(run_dir: Path) -> None:
     comparison among the retained runs beside ``run_dir`` that includes it,
     and print each result. Like ``label_run``, a failure is printed, not
     raised."""
-    # Imported here: analysis and its SDK are not needed to run Trials.
+    # Imported here: analysis and its SDK are not needed to run Trials, and
+    # importing rescore at the top would be circular (it imports weval.run).
     from weval import analysis
     from weval.collect import collect_runs, compare_treatments
+    from weval.rescore import load_check
 
     for comparison in compare_treatments(collect_runs(run_dir.parent)):
         if run_dir.resolve() not in {
@@ -345,7 +346,7 @@ def analyse_run(run_dir: Path) -> None:
         try:
             result = analysis.analyse(
                 comparison,
-                getattr(_load_check(ROOT / comparison.task), "EXPECTED", {}),
+                getattr(load_check(ROOT / comparison.task), "EXPECTED", {}),
                 run_dir.parent,
             )
         except Exception as error:  # noqa: BLE001  Analysis must not break a finished run.
@@ -496,50 +497,3 @@ def redact(run_dir: Path) -> None:
         if found:
             path.write_bytes(data)
             print(f"WARNING: redacted {', '.join(found)} from {path}")
-
-
-def rescore(trial_dir: Path, task_dir: Path | None = None) -> list[dict]:
-    """Re-score a retained ``snapshot.json`` with a Task's current ``check.py``.
-
-    ``task_dir`` defaults to the Task recorded in the Trial's ``weval.json``,
-    resolved against the repository root. Retained files are not modified.
-    """
-    check = _load_check(task_dir or _recorded_task(trial_dir))
-    snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
-    return verify.score(check, snapshot)
-
-
-def diagnose(
-    trial_dir: Path, results: list[dict], task_dir: Path | None = None
-) -> dict:
-    """``diagnostics.diagnose`` for a retained Trial and its ``rescore``
-    ``results``, with the same ``check.py``. ``task_dir`` defaults as in
-    ``rescore``."""
-    check = _load_check(task_dir or _recorded_task(trial_dir))
-    snapshot = json.loads((trial_dir / "verifier/snapshot.json").read_text())
-    return diagnostics.diagnose(
-        trial_dir, getattr(check, "EXPECTED", {}), snapshot, results
-    )
-
-
-def _load_check(task_dir: Path) -> ModuleType:
-    spec = importlib.util.spec_from_file_location("check", task_dir / "check.py")
-    assert spec and spec.loader
-    check = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(check)
-    return check
-
-
-def check_versions(
-    trial_dir: Path, task_dir: Path | None = None
-) -> tuple[str, str | None]:
-    """The ``check`` fingerprint ``rescore`` scores with, and the one the
-    Trial recorded (``None`` for a Trial recorded without fingerprints).
-    ``task_dir`` defaults as in ``rescore``."""
-    record = json.loads((trial_dir / "weval.json").read_text())
-    current = check_fingerprint((task_dir or _recorded_task(trial_dir)) / "check.py")
-    return current, (record.get("fingerprints") or {}).get("check")
-
-
-def _recorded_task(trial_dir: Path) -> Path:
-    return ROOT / json.loads((trial_dir / "weval.json").read_text())["task"]

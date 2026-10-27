@@ -18,6 +18,8 @@ If subagents are available, use them to run tests or searches unless there is a 
 - `src/weval/run.py`: builds the Harbor package, runs it on Modal, writes `weval.json`.
 - `src/weval/collect.py`: reads retained runs into summaries and Treatment
   comparisons for `weval analyse`.
+- `src/weval/rescore.py`: re-scores retained Trials offline against a Task's
+  current `check.py` (`weval check`).
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
 - `src/weval/shared-instructions.md`: Trial-environment notes appended to every
   Task's prompt when it is packaged.
