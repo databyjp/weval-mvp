@@ -6,10 +6,11 @@ Output layout, one directory per invocation::
         task/                 Harbor task package built from tasks/<stage>/<scenario>/
         treatment/            copy of treatments/<treatment>/, when given
         job/<trial>/          Harbor's Trial directory, kept as Harbor wrote it
-        job/<trial>/weval.json  Agent, status, missing logs, check results
+        job/<trial>/weval.json  Agent, status, missing logs, check results, fingerprints
 """
 
 import asyncio
+import hashlib
 import importlib.util
 import json
 import os
@@ -140,6 +141,8 @@ def run(
         # Harbor installs the retained copy, so the run keeps the skills its Trials had.
         shutil.copytree(skills.parent, run_dir / "treatment", ignore=shutil.ignore_patterns(".*"))
         agent_config.skills = [str(run_dir / "treatment/skills")]
+    # Before the Trials run, so the fingerprints cover exactly what they were given.
+    versions = fingerprints(run_dir, compose_overlays(task_dir))
     config = JobConfig(
         job_name="job",
         jobs_dir=run_dir,
@@ -152,7 +155,7 @@ def run(
     try:
         asyncio.run(_run_job(config))
     finally:
-        finalize_run(run_dir, task_path, agent, attempts, prompt_variant, treatment)
+        finalize_run(run_dir, task_path, agent, attempts, prompt_variant, treatment, versions)
         redact(run_dir)
     return run_dir
 
@@ -166,6 +169,50 @@ def treatment_skills(treatment: str) -> Path:
     if not skills.is_dir():
         raise FileNotFoundError(f"no skills for Treatment {treatment!r}: {skills}")
     return skills
+
+
+def fingerprints(run_dir: Path, overlays: list[Path]) -> dict[str, str | None]:
+    """Content hashes that version what a run's Trials were given, for
+    ``weval.json``'s ``fingerprints``.
+
+    - ``task``: the packaged Task in ``run_dir/task`` (the prompt with the
+      shared instructions, the environment, ``snapshot.py``, and the
+      verifier) without ``check.py``, plus the Compose ``overlays``. A
+      change here needs new Trials.
+    - ``check``: the packaged ``check.py``. A change here needs only a
+      re-score (``weval check``).
+    - ``treatment``: the run's ``treatment/`` copy, or ``None`` for a baseline.
+
+    Each is 12 hex digits of a SHA-256 over file paths and contents, so it is
+    independent of timestamps and directory order.
+    """
+    package = run_dir / "task"
+    check = package / "tests/check.py"
+    task_files = {str(path.relative_to(package)): path for path in _tree(package) if path != check}
+    task_files |= {f"overlays/{path.name}": path for path in overlays}
+    treatment = run_dir / "treatment"
+    return {
+        "task": _digest(task_files),
+        "check": _digest({"check.py": check}),
+        "treatment": _digest({str(path.relative_to(treatment)): path for path in _tree(treatment)})
+        if treatment.exists() else None,
+    }
+
+
+def _tree(root: Path) -> list[Path]:
+    # Bytecode and dotfiles (.gitkeep, .DS_Store) don't change what a Trial is given.
+    return [
+        path for path in root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+        and not any(part.startswith(".") for part in path.relative_to(root).parts)
+    ]
+
+
+def _digest(files: dict[str, Path]) -> str:
+    sha = hashlib.sha256()
+    for name in sorted(files):
+        sha.update(name.encode() + b"\0" + files[name].read_bytes() + b"\0")
+    return sha.hexdigest()[:12]
 
 
 def compose_overlays(task_dir: Path) -> list[Path]:
@@ -189,8 +236,10 @@ def finalize_run(
     attempts: int,
     prompt_variant: str = "default",
     treatment: str | None = None,
+    versions: dict[str, str | None] | None = None,
 ) -> None:
     """Record every Trial directory under ``run_dir/job`` and print its status.
+    ``versions`` is the run's ``fingerprints()``, recorded in every Trial.
 
     A Trial without ``result.json`` (Harbor stops the environment before
     writing it, so a stop failure or kill can leave none) gets a
@@ -200,13 +249,14 @@ def finalize_run(
     trial_dirs = sorted(path for path in (run_dir / "job").glob("*") if path.is_dir())
     for trial_dir in trial_dirs:
         if (trial_dir / "result.json").exists():
-            record = finalize(trial_dir, task_path, agent, prompt_variant, treatment)
+            record = finalize(trial_dir, task_path, agent, prompt_variant, treatment, versions)
         else:
             record = {
                 "status": "non-result",
                 "task": str(task_path),
                 "prompt_variant": prompt_variant,
                 "treatment": treatment,
+                "fingerprints": versions,
                 "agent": HARNESSES[agent["harness"]].agent_record(agent),
                 "reward": None,
                 "exception": "result.json never written",
@@ -241,11 +291,14 @@ def finalize(
     agent: dict,
     prompt_variant: str = "default",
     treatment: str | None = None,
+    versions: dict[str, str | None] | None = None,
 ) -> dict:
     """Write and return ``weval.json`` for one Harbor Trial directory.
 
     ``task_path`` is recorded as given; ``run()`` passes it relative to the
     repository root. ``treatment`` is ``None`` for a baseline Trial.
+    ``versions`` is the run's ``fingerprints()``; ``None`` records the Trial
+    as unversioned.
 
     Status comes from ``derive_status`` over Harbor's ``result.json`` and the
     missing-log list.
@@ -263,6 +316,7 @@ def finalize(
         "task": str(task_path),
         "prompt_variant": prompt_variant,
         "treatment": treatment,
+        "fingerprints": versions,
         "agent": harness.agent_record(agent),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),

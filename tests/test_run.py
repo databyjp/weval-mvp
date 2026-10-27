@@ -16,6 +16,7 @@ from weval.run import (
     derive_status,
     finalize,
     finalize_run,
+    fingerprints,
     package_task,
     rescore,
     treatment_skills,
@@ -161,6 +162,54 @@ def test_finalize_records_the_treatment(tmp_path):
     assert finalize(trial, TASK_PATH, oracle, treatment="weaviate-docs")["treatment"] == "weaviate-docs"
 
 
+def packaged_run(run_dir: Path, treatment: bool = False) -> Path:
+    package_task(PROMPT_VARIANT_TASK, run_dir / "task")
+    if treatment:
+        shutil.copytree(ROOT / "treatments/weaviate-docs", run_dir / "treatment")
+    return run_dir
+
+
+def test_fingerprints_version_the_task_and_check_separately(tmp_path):
+    run_dir = packaged_run(tmp_path / "run")
+    overlays = compose_overlays(PROMPT_VARIANT_TASK)
+    before = fingerprints(run_dir, overlays)
+
+    assert before == fingerprints(packaged_run(tmp_path / "again"), overlays)
+    assert before["treatment"] is None
+
+    (run_dir / "task/tests/check.py").write_text("REQUIRED = []\n")
+    after_check = fingerprints(run_dir, overlays)
+    assert after_check["task"] == before["task"]
+    assert after_check["check"] != before["check"]
+
+    with (run_dir / "task/instruction.md").open("a") as prompt:
+        prompt.write("One more sentence.\n")
+    after_prompt = fingerprints(run_dir, overlays)
+    assert after_prompt["task"] != before["task"]
+    assert after_prompt["check"] == after_check["check"]
+
+
+def test_fingerprints_cover_the_overlays_and_the_treatment(tmp_path):
+    run_dir = packaged_run(tmp_path / "run", treatment=True)
+    versions = fingerprints(run_dir, [SHARED_COMPOSE, WEAVIATE_COMPOSE])
+
+    assert versions["task"] != fingerprints(run_dir, [SHARED_COMPOSE])["task"]
+    assert versions["treatment"] is not None
+    (run_dir / "treatment/skills/weaviate-docs/SKILL.md").write_text("changed\n")
+    assert fingerprints(run_dir, [SHARED_COMPOSE, WEAVIATE_COMPOSE])["treatment"] != versions["treatment"]
+
+
+def test_finalize_records_the_fingerprints(tmp_path):
+    trial = tmp_path / "trial"
+    trial.mkdir()
+    (trial / "result.json").write_text(json.dumps({"verifier_result": {"rewards": {"reward": 1}}}))
+    oracle = {"name": "oracle", "harness": "oracle"}
+    versions = {"task": "3f9a1c0e2b7d", "check": "a41b07c2d9e3", "treatment": None}
+
+    assert finalize(trial, TASK_PATH, oracle, versions=versions)["fingerprints"] == versions
+    assert finalize(trial, TASK_PATH, oracle)["fingerprints"] is None
+
+
 def harbor_result(reward: int | None = None, exception: bool = False) -> dict:
     result: dict = {}
     if reward is not None:
@@ -218,12 +267,14 @@ def test_finalize_run_records_a_trial_without_result_json(tmp_path, capsys):
     shutil.copy(ORACLE_SNAPSHOT, graded / "verifier/snapshot.json")
     (job / "trial-1").mkdir()
 
-    finalize_run(tmp_path, TASK_PATH, {"name": "oracle", "harness": "oracle"}, attempts=3)
+    versions = {"task": "3f9a1c0e2b7d", "check": "a41b07c2d9e3", "treatment": None}
+    finalize_run(tmp_path, TASK_PATH, {"name": "oracle", "harness": "oracle"}, attempts=3, versions=versions)
 
-    assert (graded / "weval.json").exists()
+    assert json.loads((graded / "weval.json").read_text())["fingerprints"] == versions
     stub = json.loads((job / "trial-1/weval.json").read_text())
     assert stub["status"] == "non-result"
     assert stub["exception"] == "result.json never written"
+    assert stub["fingerprints"] == versions
     out = capsys.readouterr().out
     assert "trial-0" in out and "trial-1" in out
     assert "3 Trials requested, 2 found" in out

@@ -123,7 +123,7 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, the Treatment, missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, the Treatment, `fingerprints` (below), missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
 | `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |
@@ -136,5 +136,19 @@ the submission; the reward is recorded and does not count as `passed`.
 at any `error_stage`: `stack` and `app` are the agent's submission failing to
 start, and `snapshot` is `snapshot.py` raising, usually on a stack the agent
 left broken.
+
+`fingerprints` versions what the run's Trials were given. Each value is 12
+hex digits of a SHA-256 over file paths and contents:
+
+| Key | Covers | A change means |
+|---|---|---|
+| `task` | The packaged Task in the run's `task/` (prompt with the shared instructions, `environment/`, `snapshot.py`, `verify.py`) without `check.py`, plus the Compose overlays | the Trials must be re-run |
+| `check` | The packaged `check.py` | the Trials can be re-scored with `weval check` |
+| `treatment` | The run's `treatment/` copy; `null` for a baseline | a different Treatment version |
+
+Trials recorded before fingerprints existed have `fingerprints` missing or
+`null`. The docs site and the latest releases change too and can't be
+hashed; the run directory's timestamp dates them.
+
 Retained logs are evidence: write analysis to separate files rather than
 editing or summarising a log in place.
