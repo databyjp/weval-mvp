@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from weval.harnesses import claude_code
+from weval.harnesses import claude_code, pi
 from weval.rescore import check_versions, rescore
 from weval.run import (
     ROOT,
@@ -292,13 +292,13 @@ def test_fingerprints_version_the_task_and_check_separately(tmp_path):
 
 def test_treatment_fingerprint_covers_the_skills_only(tmp_path):
     treatment = tmp_path / "treatment"
-    shutil.copytree(ROOT / "treatments/weaviate-docs", treatment)
+    shutil.copytree(ROOT / "treatments/weaviate-best-practices", treatment)
     versions = fingerprints(PROMPT_VARIANT_TASK, treatment / "skills")
 
     (treatment / "README.md").write_text("A different question.\n")
     assert fingerprints(PROMPT_VARIANT_TASK, treatment / "skills") == versions
 
-    (treatment / "skills/weaviate-docs/SKILL.md").write_text("changed\n")
+    (treatment / "skills/weaviate-best-practices/SKILL.md").write_text("changed\n")
     assert (
         fingerprints(PROMPT_VARIANT_TASK, treatment / "skills")["treatment"]
         != versions["treatment"]
@@ -347,6 +347,81 @@ def harbor_result(reward: int | None = None, exception: bool = False) -> dict:
 )
 def test_derive_status_truth_table(result, missing, expected):
     assert derive_status(result, missing) == expected
+
+
+def test_a_session_ended_by_a_model_error_is_a_non_result_even_when_graded():
+    for reward in (0, 1):
+        assert derive_status(harbor_result(reward=reward), [], "429") == "non-result"
+
+
+def pi_agent_end(stop_reason: str, error: str | None = None) -> str:
+    message = {"role": "assistant", "content": [], "stopReason": stop_reason}
+    if error:
+        message["errorMessage"] = error
+    return json.dumps({"type": "agent_end", "messages": [message]})
+
+
+def test_finalize_records_the_model_error_that_ended_a_pi_session(tmp_path):
+    # Shape from a pi-kimi-k3.1-pro Trial on 2026-10-27: OpenRouter's
+    # new-account rate limit failed every attempt, Pi retried and gave up,
+    # and the verifier then graded the empty /app as failed.
+    trial = tmp_path / "trial"
+    (trial / "agent").mkdir(parents=True)
+    (trial / "result.json").write_text(json.dumps(harbor_result(reward=0)))
+    error = "429: Rate limit exceeded: new-account-rpm/moonshotai/kimi-k3.1-pro"
+    (trial / "agent/pi.txt").write_text(
+        "\n".join(
+            [
+                '{"type":"agent_start"}',
+                pi_agent_end("error", error),
+                '{"type":"auto_retry_start","attempt":3}',
+                pi_agent_end("error", error),
+                '{"type":"auto_retry_end","success":false}',
+                '{"type":"agent_settled"}',
+            ]
+        )
+    )
+    agent = {"name": "pi-kimi-k3.1-pro", "harness": "pi", "version": "0.85.1"}
+
+    record = finalize(trial, TASK_PATH, agent)
+
+    assert record["status"] == "non-result"
+    assert record["model_error"] == error
+
+
+def test_a_pi_session_that_recovered_from_a_failed_request_has_no_model_error(
+    tmp_path,
+):
+    trial = tmp_path / "trial"
+    (trial / "agent").mkdir(parents=True)
+    (trial / "agent/pi.txt").write_text(
+        f"{pi_agent_end('error', '429')}\n{pi_agent_end('stop')}\n"
+    )
+    assert pi.model_error(trial) is None
+
+
+@pytest.mark.parametrize(
+    "event, expected",
+    [
+        # An API error or usage limit ends the session with subtype success.
+        (
+            {"subtype": "success", "is_error": True, "result": "API Error: 429"},
+            "API Error: 429",
+        ),
+        # The agent used up its turns: its own outcome.
+        ({"subtype": "error_max_turns", "is_error": True}, None),
+        ({"subtype": "success", "is_error": False, "result": "Done."}, None),
+    ],
+)
+def test_claude_code_model_error_reads_the_final_result_event(
+    tmp_path, event, expected
+):
+    trial = tmp_path / "trial"
+    (trial / "agent").mkdir(parents=True)
+    (trial / "agent/claude-code.txt").write_text(
+        json.dumps({"type": "result", **event}) + "\n"
+    )
+    assert claude_code.model_error(trial) == expected
 
 
 @pytest.mark.parametrize("stage", ["stack", "app", "snapshot"])

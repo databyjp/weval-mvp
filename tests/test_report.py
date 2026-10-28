@@ -11,7 +11,7 @@ from pathlib import Path
 from weval.collect import Comparison, RunSummary, TrialSummary
 from weval.report import write_report
 from weval.report.findings import failure_groups, task_reliability
-from weval.report.pages import _block_markdown, _cells, _Links
+from weval.report.pages import _block_markdown, _cells, _comparison, _Links
 
 TASK = "tasks/build/x"
 
@@ -67,16 +67,10 @@ def test_failure_groups_count_every_arm_even_at_zero_failures(tmp_path):
     )
     groups = {g.check: g for g in failure_groups([baseline, treated], [])}
 
-    assert groups["vector-config"].arms == {
-        ("agent", "baseline"): (2, 2),
-        ("agent", "skills"): (0, 2),
-    }
-    assert groups["other-check"].arms == {
-        ("agent", "baseline"): (0, 2),
-        ("agent", "skills"): (1, 2),
-    }
+    assert groups["vector-config"].arms == {"baseline": (2, 2), "skills": (0, 2)}
+    assert groups["other-check"].arms == {"baseline": (0, 2), "skills": (1, 2)}
     # The non-result Trial is not scored, so it is in no count and no arm.
-    skills = groups["vector-config"].arm_trials["agent", "skills"]
+    skills = groups["vector-config"].arm_trials["skills"]
     assert [t.path.name for _, t in skills] == [
         "t3",
         "t4",
@@ -104,7 +98,9 @@ def analysed(comparison: Comparison, patterns: list[dict], rule: list[dict]) -> 
     )
 
 
-def test_failure_groups_count_each_agent_separately(tmp_path):
+def test_failure_groups_count_each_arm_across_agents_and_name_the_failing_ones(
+    tmp_path,
+):
     claude = make_run(
         tmp_path,
         "20260101-000001__build__x__claude",
@@ -121,11 +117,11 @@ def test_failure_groups_count_each_agent_separately(tmp_path):
     )
     (group,) = failure_groups([pi, claude], [])
 
-    # Pooled, the baseline would read 1 of 5; each Agent keeps its own count.
-    assert group.arms == {("claude", "baseline"): (1, 2), ("pi", "baseline"): (0, 3)}
+    assert group.arms == {"baseline": (1, 5)}
+    assert group.failing_agents == {"baseline": ["claude"]}
 
 
-def test_saved_judgments_attach_and_order_the_groups(tmp_path):
+def test_saved_judgments_attach_to_the_groups(tmp_path):
     baseline = make_run(
         tmp_path,
         "20260101-000001__build__x__agent",
@@ -139,7 +135,12 @@ def test_saved_judgments_attach_and_order_the_groups(tmp_path):
         [("t3", "passed")],
     )
     comparison = Comparison(
-        TASK, "default", "agent", "skills", baseline=[baseline], treated=[treated]
+        TASK,
+        "default",
+        "skills",
+        baseline=[baseline],
+        treated=[treated],
+        agents=["agent"],
     )
     pattern = {
         "summary": "agents use the legacy vectorizer",
@@ -158,17 +159,56 @@ def test_saved_judgments_attach_and_order_the_groups(tmp_path):
         },
         {"trial": "t2", "check": "other-check", "class": "agent gap", "reason": "y"},
     ]
-    groups = failure_groups(
-        [baseline, treated], [analysed(comparison, [pattern], rule)]
-    )
+    groups = {
+        g.check: g
+        for g in failure_groups(
+            [baseline, treated], [analysed(comparison, [pattern], rule)]
+        )
+    }
 
-    # Weaviate gap (the analyst's class) orders before agent gap (the rule's).
-    assert [g.check for g in groups] == ["vector-config", "other-check"]
-    assert groups[0].proposed_class == "Weaviate gap"
-    assert groups[0].patterns[0]["model"] == "analyst-model"
+    assert groups["vector-config"].proposed_class == "Weaviate gap"
+    assert groups["vector-config"].patterns[0]["model"] == "analyst-model"
     # No analyst pattern covers other-check: the rule's agreed class stands in.
-    assert groups[1].proposed_class == "agent gap"
-    assert groups[1].proposals == [rule[1]]
+    assert groups["other-check"].proposed_class == "agent gap"
+    assert groups["other-check"].proposals == [rule[1]]
+
+
+def test_findings_order_by_tier_then_baseline_rate_then_count(tmp_path):
+    def run(name: str, treatment: str, failures: list[list[str]]) -> RunSummary:
+        trials = [
+            (f"{name}-{i}", "failed", failed) for i, failed in enumerate(failures)
+        ]
+        return make_run(tmp_path, name, treatment, trials)
+
+    # Baseline rates: half-of-four 2/4, half-of-two 1/2, rare 1/4; style is a
+    # preferred check failing 4/4. treated-only fails 1/1, but only with the
+    # Treatment.
+    baseline = run(
+        "b",
+        "",
+        [["half-of-four", "rare"], ["half-of-four"], [], []],
+    )
+    other_task = make_run(
+        tmp_path,
+        "b2",
+        "",
+        [("b2-0", "failed", ["half-of-two"]), ("b2-1", "passed")],
+    )
+    other_task.task = "tasks/build/y"
+    treated = run("t", "skills", [["treated-only"]])
+    for trial in baseline.trials:
+        trial.failed_preferred = ["style"]
+
+    groups = failure_groups([baseline, other_task, treated], [])
+
+    assert [g.check for g in groups] == [
+        "half-of-four",  # 50%, 2 failing: the count breaks the tie
+        "half-of-two",  # 50%, 1 failing
+        "rare",  # 25%
+        "treated-only",  # 100%, but only with the Treatment
+        "style",  # preferred, after every required check
+    ]
+    assert groups[3].headline() == ("skills", 1, 1)
 
 
 def test_disagreeing_judges_leave_a_group_unclassified(tmp_path):
@@ -179,7 +219,7 @@ def test_disagreeing_judges_leave_a_group_unclassified(tmp_path):
         [("t1", "failed", ["vector-config"])],
     )
     comparison = Comparison(
-        TASK, "default", "agent", "skills", baseline=[run], treated=[]
+        TASK, "default", "skills", baseline=[run], treated=[], agents=["agent"]
     )
     rule = [
         {"trial": "t1", "check": "vector-config", "class": "agent gap", "reason": "x"},
@@ -192,6 +232,84 @@ def test_disagreeing_judges_leave_a_group_unclassified(tmp_path):
     ]
     (group,) = failure_groups([run], [analysed(comparison, [], rule)])
     assert group.proposed_class == "unclassified"
+
+
+def test_a_comparison_card_shows_each_agent_and_what_the_treatment_did_to_it(
+    tmp_path,
+):
+    def run(name: str, treatment: str, agent: str, status: str) -> RunSummary:
+        failed = ["vector-config"] if status == "failed" else []
+        return make_run(tmp_path, name, treatment, [(name, status, failed)], agent)
+
+    runs = {
+        ("claude", ""): run("b-claude", "", "claude", "failed"),
+        ("claude", "skills"): run("t-claude", "skills", "claude", "passed"),
+        ("pi", ""): run("b-pi", "", "pi", "passed"),
+        ("pi", "skills"): run("t-pi", "skills", "pi", "failed"),
+    }
+    comparison = Comparison(
+        TASK,
+        "default",
+        "skills",
+        baseline=[runs["claude", ""], runs["pi", ""]],
+        treated=[runs["claude", "skills"], runs["pi", "skills"]],
+        agents=["claude", "pi"],
+        unpaired=["gpt"],
+    )
+    pages = {
+        t.path: tmp_path / f"{t.path.name}.html"
+        for r in runs.values()
+        for t in r.trials
+    }
+    found = {"analysis": None, "problems": [], "note": "not analysed"}
+
+    html = _comparison(comparison, found, _Links(tmp_path), pages)
+
+    assert "2 agents: 1 helped, 1 hurt" in html
+    by_agent = html.split('class="plain arms by-agent"')[1].split("<tbody>")[1]
+    rows = re.findall(r"<tr><th>(\w+)</th>", by_agent)
+    assert rows == ["claude", "pi"]
+    assert '<span class="delta better">helped</span>' in html
+    assert '<span class="delta worse">hurt</span>' in html
+    assert "Left out, with runs in one arm only: gpt" in html
+
+
+def test_a_usage_row_shows_the_mean_and_median_change_and_which_way_agents_went(
+    tmp_path,
+):
+    # One heavy Agent halves its cost while two light ones double theirs: the
+    # mean falls, but most Agents went up.
+    costs = {"heavy": (10.0, 5.0), "light-1": (1.0, 2.0), "light-2": (1.0, 2.0)}
+    arms = {"": [], "skills": []}
+    for agent, (baseline, treated) in costs.items():
+        for treatment, cost in (("", baseline), ("skills", treated)):
+            run = make_run(
+                tmp_path, f"{agent}{treatment}", treatment, [(agent, "passed")], agent
+            )
+            run.trials[0].cost_usd = cost
+            arms[treatment].append(run)
+    comparison = Comparison(
+        TASK,
+        "default",
+        "skills",
+        baseline=arms[""],
+        treated=arms["skills"],
+        agents=list(costs),
+    )
+    pages = {
+        t.path: tmp_path / f"{t.path.name}.html"
+        for runs in arms.values()
+        for r in runs
+        for t in r.trials
+    }
+    found = {"analysis": None, "problems": [], "note": "not analysed"}
+
+    html = _comparison(comparison, found, _Links(tmp_path), pages)
+
+    cost = html.split("<th>Cost (USD)</th>")[1].split("</tr>")[0]
+    assert "mean -25%" in cost
+    assert "median +100%" in cost
+    assert '<span class="delta worse">2 of 3 up</span>' in cost
 
 
 def test_task_reliability_counts_what_erodes_trust_per_arm(tmp_path):
@@ -211,7 +329,7 @@ def test_task_reliability_counts_what_erodes_trust_per_arm(tmp_path):
         [("t4", "passed"), ("t5", "passed")],
     )
     comparison = Comparison(
-        TASK, "default", "agent", "skills", baseline=[mixed], treated=[treated]
+        TASK, "default", "skills", baseline=[mixed], treated=[treated], agents=["agent"]
     )
     rule = [
         {"trial": "t2", "check": "vector-config", "class": "scorer bug", "reason": "x"}

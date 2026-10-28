@@ -5,11 +5,10 @@ Everything here only reads files; retained runs are never modified.
 """
 
 import json
-import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from statistics import mean
+from statistics import mean, median
 
 # Statuses whose reward the verifier recorded; see docs/reference.md.
 SCORED = ("passed", "failed", "timed-out")
@@ -71,26 +70,69 @@ class RunSummary:
 
 
 @dataclass
-class Comparison:
-    """One Treatment against its baseline for one Task, prompt variant, and Agent.
+class AgentChange:
+    """One Agent's Trials in both arms of a ``Comparison``.
 
-    Both arms ran the same ``task_version`` and ``check_version``, and every
-    ``treated`` run had the same ``treatment_version``; each is a fingerprint
-    (docs/reference.md), or ``None`` for runs recorded without one, which are
-    compared only with each other. ``baseline`` holds that combination's runs
-    without a Treatment and ``treated`` its runs with ``treatment``, each
-    newest first; ``baseline`` is empty when no such baseline run is retained.
+    ``change`` compares the Agent's pass rates over scored Trials:
+    ``helped`` or ``hurt`` when the Treatment arm's is higher or lower,
+    ``unchanged`` when they are equal, and ``None`` when either arm has no
+    scored Trial.
+    """
+
+    agent: str
+    baseline: list[TrialSummary]
+    treated: list[TrialSummary]
+
+    @property
+    def change(self) -> str | None:
+        rates = []
+        for trials in (self.baseline, self.treated):
+            scored = [t for t in trials if t.status in SCORED]
+            if not scored:
+                return None
+            rates.append(sum(t.status == "passed" for t in scored) / len(scored))
+        if rates[1] == rates[0]:
+            return "unchanged"
+        return "helped" if rates[1] > rates[0] else "hurt"
+
+
+@dataclass
+class Comparison:
+    """One Treatment against its baseline for one Task and prompt variant,
+    across Agents.
+
+    ``agents`` names, sorted, the Agents with runs in both arms, and
+    ``baseline`` and ``treated`` hold only their runs, so both arms cover the
+    same models; ``unpaired`` names the Agents with runs in one arm only.
+    When no Agent ran both arms, ``agents`` and ``baseline`` are empty and
+    ``treated`` holds every Treatment run. Both arms ran the same
+    ``task_version`` and ``check_version``, and every ``treated`` run had the
+    same ``treatment_version``; each is a fingerprint (docs/reference.md), or
+    ``None`` for runs recorded without one, which are compared only with each
+    other. Runs are newest first.
     """
 
     task: str
     prompt_variant: str
-    agent: str
     treatment: str
     baseline: list[RunSummary]
     treated: list[RunSummary]
+    agents: list[str] = field(default_factory=list)
+    unpaired: list[str] = field(default_factory=list)
     task_version: str | None = None
     check_version: str | None = None
     treatment_version: str | None = None
+
+    def by_agent(self) -> list[AgentChange]:
+        """Each compared Agent's Trials, in ``agents`` order."""
+        return [
+            AgentChange(
+                agent,
+                [t for run in self.baseline if run.agent == agent for t in run.trials],
+                [t for run in self.treated if run.agent == agent for t in run.trials],
+            )
+            for agent in self.agents
+        ]
 
 
 def collect_runs(outputs_dir: Path) -> list[RunSummary]:
@@ -100,8 +142,8 @@ def collect_runs(outputs_dir: Path) -> list[RunSummary]:
 
 
 def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
-    """One ``Comparison`` per Treatment version, Task, prompt variant, Agent,
-    and Task and check versions with a Treatment run, sorted by those fields."""
+    """One ``Comparison`` per Treatment version, Task, prompt variant, and
+    Task and check versions with a Treatment run, sorted by those fields."""
     groups: dict[tuple, list[RunSummary]] = {}
     for run in runs:
         versions = run.fingerprints or {}
@@ -110,7 +152,6 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
             versions.get("treatment"),
             run.task,
             run.prompt_variant,
-            run.agent,
             versions.get("task"),
             versions.get("check"),
         )
@@ -122,23 +163,31 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
             treatment_version,
             task,
             prompt_variant,
-            agent,
             task_version,
             check_version,
         ) = key
         if not treatment:
             continue
         baseline = groups.get(
-            ("", None, task, prompt_variant, agent, task_version, check_version), []
+            ("", None, task, prompt_variant, task_version, check_version), []
         )
+        treated_agents = {run.agent for run in treated}
+        baseline_agents = {run.agent for run in baseline}
+        agents = sorted(treated_agents & baseline_agents)
+        if agents:
+            baseline = [run for run in baseline if run.agent in agents]
+            treated = [run for run in treated if run.agent in agents]
+        else:
+            baseline = []
         comparisons.append(
             Comparison(
                 task,
                 prompt_variant,
-                agent,
                 treatment,
                 baseline=baseline,
                 treated=treated,
+                agents=agents,
+                unpaired=sorted(treated_agents ^ baseline_agents),
                 task_version=task_version,
                 check_version=check_version,
                 treatment_version=treatment_version,
@@ -153,7 +202,6 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
                 c.treatment,
                 c.task,
                 c.prompt_variant,
-                c.agent,
                 c.task_version,
                 c.check_version,
                 c.treatment_version,
@@ -170,39 +218,28 @@ def mean_usage(trials: list[TrialSummary], attribute: str) -> float | None:
     return mean(values) if values else None
 
 
-def wilson_interval(passed: int, total: int, z: float = 1.96) -> tuple[float, float]:
-    """The Wilson score interval for a pass rate (95% by default), which
-    stays inside [0, 1] and is not empty at 0/n or n/n, unlike the normal
-    approximation at the small Trial counts runs have."""
-    rate = passed / total
-    centre = (rate + z * z / (2 * total)) / (1 + z * z / total)
-    half = (
-        z
-        * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total))
-        / (1 + z * z / total)
-    )
-    return max(0.0, centre - half), min(1.0, centre + half)
+def median_change(by_agent: list[AgentChange], attribute: str) -> float | None:
+    """The median of ``agent_usage_changes``; ``None`` when no Agent gives a
+    change. Agents are compared with themselves first, so one costly model
+    does not set the result."""
+    changes = agent_usage_changes(by_agent, attribute)
+    return median(changes) if changes else None
 
 
-def fisher_exact(passed_a: int, total_a: int, passed_b: int, total_b: int) -> float:
-    """Two-sided Fisher's exact test p-value for two arms' pass counts: the
-    probability, with both arms' totals and the pooled pass count fixed, of
-    a split at most as likely as the one observed."""
-    passes, total = passed_a + passed_b, total_a + total_b
-
-    def probability(k: int) -> float:
-        return (
-            math.comb(total_a, k)
-            * math.comb(total_b, passes - k)
-            / math.comb(total, passes)
+def agent_usage_changes(by_agent: list[AgentChange], attribute: str) -> list[float]:
+    """Each Agent's change in a usage field's mean, Treatment against
+    baseline, as a fraction of the baseline mean. An Agent without figures in
+    either arm, or with a zero baseline mean, gives no change. Only scored
+    Trials count: a non-result's usage stops wherever its failure did."""
+    changes = []
+    for row in by_agent:
+        treated = mean_usage([t for t in row.treated if t.status in SCORED], attribute)
+        baseline = mean_usage(
+            [t for t in row.baseline if t.status in SCORED], attribute
         )
-
-    observed = probability(passed_a)
-    splits = range(max(0, passes - total_b), min(total_a, passes) + 1)
-    # The tolerance keeps ties that differ only by floating-point rounding.
-    return min(
-        1.0, sum(p for k in splits if (p := probability(k)) <= observed * (1 + 1e-9))
-    )
+        if treated is not None and baseline:
+            changes.append((treated - baseline) / baseline)
+    return changes
 
 
 def summarise_run(run_dir: Path) -> RunSummary:

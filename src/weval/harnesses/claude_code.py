@@ -300,6 +300,24 @@ def token_usage(trial_dir: Path) -> dict:
     }
 
 
+def model_error(trial_dir: Path) -> str | None:
+    """The error that ended Claude Code's session, when a model request failed.
+
+    Claude Code reports an API error or a reached usage limit as a final
+    ``result`` event with ``is_error`` set and the message as its
+    ``result``. Other errors carry their own ``subtype``, such as
+    ``error_max_turns`` when the agent used up its turns, and are the agent's
+    outcome, not the provider's.
+    """
+    log = trial_dir / "agent/claude-code.txt"
+    lines = log.read_text().splitlines() if log.exists() else []
+    events = [json.loads(line) for line in lines if line.startswith("{")]
+    result = next((e for e in reversed(events) if e.get("type") == "result"), None)
+    if not result or not result.get("is_error") or result.get("subtype") != "success":
+        return None
+    return result.get("result") or "model request failed"
+
+
 def cost_usd(model_usage: dict) -> float | None:
     """Estimate the OpenRouter cost of one Trial's ``modelUsage`` from
     ``PRICES``; ``None`` when any model has no entry. Haiku 5.5's higher

@@ -4,8 +4,9 @@ Remaining work, roughly in order. Delete items when done.
 
 ## Scoring rubric
 
-Produce the facts the 2026-10-27 analyses gathered by hand
-(`analysis/2026-10-27-*.md`) the same way every time. Steps, in order:
+Produce the facts the 2026-10-27 analyses gathered by hand (deleted
+`analysis/2026-10-27-*.md`; last present in `9db6c85`) the same way every
+time. Steps, in order:
 
 1. Done: `weval.json` records `fingerprints`, the report compares arms
    only within one Task and check version, and `weval check` prints both
@@ -112,8 +113,10 @@ Observed in the first three local Pi Trials
   answer against the docs, including `llms.txt`; where pages disagree, that
   is a possible Weaviate gap.
 
-The `weaviate-docs` Treatment measures token use here, with the REQUIRED
-answer checks as a correctness guard.
+A Treatment pointing the agent at a staging docs site that serves Markdown
+is next; it measures token use here, with the REQUIRED answer checks as a
+correctness guard. Run its baseline in the same batch: the Task reads the
+live web, and `snapshot.py` fetches the latest releases when it scores.
 
 ## Claude Code binary on GitHub Actions runners
 
@@ -133,6 +136,25 @@ workflow runs instead, so runners do not download from `downloads.claude.ai`:
 
 An Experiment runner, when one exists, should call the same preparation once
 before it starts its runs.
+
+## See and abort queued runs
+
+The 2026-10-28 matrix (72 runs, one Trial each) ran as a shell script that
+starts `weval run` processes with `xargs -P`. Nothing showed which runs were
+queued, running, or finished, and Ctrl-C was the only way to stop: it cancels
+every running Trial (recorded as `non-result` with `CancelledError`) and drops
+every queued run, including ones meant to be kept. The Treatment runs were
+queued last, so stopping the baselines early would have dropped them too.
+
+- Add an Experiment runner that takes the batch's list of runs (Task, Agent,
+  Treatment, prompt variant, Trial count) and the number to run at once.
+- Show each run's state: queued, running, or finished with its Trials'
+  statuses.
+- Drop queued runs, or abort one running run, without touching the others.
+- Write the batch's list and progress to a file, so another shell or session
+  can read it.
+- Decide whether an aborted run keeps its run directory. Its cancelled
+  Trials are non-results today, so they still appear in the report.
 
 ## Compare docs-site versions
 

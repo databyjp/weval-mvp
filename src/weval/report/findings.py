@@ -16,18 +16,6 @@ from pathlib import Path
 from weval import labels
 from weval.collect import Comparison, RunSummary, TrialSummary
 
-# Findings reading order: who must act. Weaviate gaps go to the product and
-# docs owners, agent gaps to Treatment authors, Task defects and scorer bugs
-# to weval itself; unclassified failures need a person, and infrastructure
-# failures are non-findings listed last.
-CLASS_ORDER = (
-    "Weaviate gap",
-    "agent gap",
-    "Task defect",
-    "scorer bug",
-    "unclassified",
-    "infrastructure failure",
-)
 BASELINE = "baseline"
 # Classes that blame weval rather than the agent or Weaviate.
 SCORER_CLASSES = ("scorer bug", "Task defect")
@@ -37,12 +25,12 @@ SCORER_CLASSES = ("scorer bug", "Task defect")
 class FailureGroup:
     """One failed check of one Task and prompt variant, across every arm.
 
-    ``arms`` maps each ``(agent, arm)`` pair, where the arm is ``baseline``
-    or the Treatment name, to ``(failing, scored)`` Trial counts, so no count
-    pools different Agents; ``arm_trials`` maps the same pairs to their
-    scored Trials with their runs. Both are ordered by Agent, baseline first
-    within each. ``failing`` lists the scored
-    Trials that failed the check, with their runs, newest first.
+    ``arms`` maps each arm, ``baseline`` or the Treatment name, to
+    ``(failing, scored)`` Trial counts across every Agent that ran it;
+    ``arm_trials`` maps the same arms to their scored Trials with their runs,
+    and ``failing_agents`` to the Agents with a failing Trial there, sorted.
+    All three list the baseline first. ``failing`` lists the scored Trials
+    that failed the check, with their runs, newest first.
     ``patterns`` holds the analyst patterns covering the check (each with its
     ``model`` and ``treatment`` added), ``proposals`` the rule's per-Trial
     classifications, ``disputed`` the (trial, analyst class, rule class)
@@ -55,10 +43,11 @@ class FailureGroup:
     check: str
     required: bool
     description: str = ""
-    arms: dict[tuple[str, str], tuple[int, int]] = field(default_factory=dict)
-    arm_trials: dict[tuple[str, str], list[tuple[RunSummary, TrialSummary]]] = field(
+    arms: dict[str, tuple[int, int]] = field(default_factory=dict)
+    arm_trials: dict[str, list[tuple[RunSummary, TrialSummary]]] = field(
         default_factory=dict
     )
+    failing_agents: dict[str, list[str]] = field(default_factory=dict)
     failing: list[tuple[RunSummary, TrialSummary]] = field(default_factory=list)
     patterns: list[dict] = field(default_factory=list)
     proposals: list[dict] = field(default_factory=list)
@@ -77,6 +66,19 @@ class FailureGroup:
         if not analyst and len(rule) == 1:
             return next(iter(rule))
         return "unclassified"
+
+    def headline(self) -> tuple[str, int, int]:
+        """The arm whose failure rate leads the finding, with its
+        ``(failing, scored)`` counts: the baseline when the check failed
+        there, since a Treatment is an intervention, else the Treatment arm
+        that failed it at the highest rate."""
+        failed, scored = self.arms.get(BASELINE, (0, 0))
+        if failed:
+            return BASELINE, failed, scored
+        return max(
+            ((arm, f, s) for arm, (f, s) in self.arms.items() if f),
+            key=lambda item: (item[1] / item[2], item[1]),
+        )
 
 
 @dataclass
@@ -125,19 +127,19 @@ def failure_groups(
 ) -> list[FailureGroup]:
     """Every failed check across ``runs``, grouped and annotated from
     ``analyses`` (each Comparison with its saved ``analysis.analyse`` result),
-    ordered by proposed class (``CLASS_ORDER``), required first, most failing
-    Trials first."""
-    # Keyed by (task, prompt variant, agent, arm).
-    scored_by_arm: dict[tuple[str, str, str, str], list] = {}
+    required first, then by the failure rate of each group's ``headline`` arm,
+    baseline failures before Treatment-only ones, then by failing count."""
+    # Keyed by (task, prompt variant, arm).
+    scored_by_arm: dict[tuple[str, str, str], list] = {}
     for run in runs:
         arm = run.treatment or BASELINE
-        key = (run.task, run.prompt_variant, run.agent, arm)
+        key = (run.task, run.prompt_variant, arm)
         scored_by_arm.setdefault(key, []).extend((run, trial) for trial in run.scored)
 
     groups: dict[tuple[str, str, str], FailureGroup] = {}
     fail_counts: dict[tuple[str, str, str], Counter] = {}
     label_cache: dict[Path, dict] = {}
-    for (task, prompt_variant, agent, arm), pairs in scored_by_arm.items():
+    for (task, prompt_variant, arm), pairs in scored_by_arm.items():
         for run, trial in pairs:
             for check, required in [(c, True) for c in trial.failed_required] + [
                 (c, False) for c in trial.failed_preferred
@@ -153,24 +155,29 @@ def failure_groups(
                         description=_description(trial, check),
                     ),
                 )
-                fail_counts.setdefault(key, Counter())[agent, arm] += 1
+                fail_counts.setdefault(key, Counter())[arm] += 1
+                group.failing_agents.setdefault(arm, []).append(run.agent)
                 group.failing.append((run, trial))
                 source = _answer_source(trial, check, label_cache)
                 if source:
                     group.sources[trial.path.name] = source
-    # Every Agent and arm of the group's Task and prompt variant gets a
-    # count, so a check failing in one arm still shows the others' 0 of N.
+    # Every arm of the group's Task and prompt variant gets a count, so a
+    # check failing in one arm still shows the others' 0 of N.
     for key, group in groups.items():
         group.arm_trials = _baseline_first(
             {
-                (agent, arm): pairs
-                for (task, variant, agent, arm), pairs in scored_by_arm.items()
+                arm: pairs
+                for (task, variant, arm), pairs in scored_by_arm.items()
                 if (task, variant) == key[:2]
             }
         )
         group.arms = {
-            agent_arm: (fail_counts[key][agent_arm], len(pairs))
-            for agent_arm, pairs in group.arm_trials.items()
+            arm: (fail_counts[key][arm], len(pairs))
+            for arm, pairs in group.arm_trials.items()
+        }
+        group.failing_agents = {
+            arm: sorted(set(group.failing_agents.get(arm, [])))
+            for arm in group.arm_trials
         }
 
     for comparison, found in analyses:
@@ -197,10 +204,12 @@ def failure_groups(
                     getattr(group, name).append(row)
 
     def order(group: FailureGroup) -> tuple:
+        arm, failed, scored = group.headline()
         return (
-            CLASS_ORDER.index(group.proposed_class),
             not group.required,
-            -max((failed for failed, _ in group.arms.values()), default=0),
+            arm != BASELINE,
+            -failed / scored,
+            -failed,
             group.task,
             group.check,
         )
@@ -287,13 +296,9 @@ def task_reliability(
     return rows
 
 
-def _baseline_first[V](arms: dict[tuple[str, str], V]) -> dict[tuple[str, str], V]:
-    """``arms`` keyed by ``(agent, arm)``, ordered by Agent with the baseline
-    first within each."""
-    ordered = sorted(
-        arms.items(), key=lambda item: (item[0][0], item[0][1] != BASELINE, item[0][1])
-    )
-    return dict(ordered)
+def _baseline_first[V](arms: dict[str, V]) -> dict[str, V]:
+    """``arms`` with the baseline first, then Treatments by name."""
+    return dict(sorted(arms.items(), key=lambda item: (item[0] != BASELINE, item[0])))
 
 
 def _description(trial: TrialSummary, check: str) -> str:

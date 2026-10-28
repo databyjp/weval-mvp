@@ -16,4 +16,7 @@ And may provide:
   runs.
 - ``token_usage(trial_dir) -> dict``: usage fields that replace Harbor's
   ``result.json`` figures when the harness records better ones.
+- ``model_error(trial_dir) -> str | None``: the provider's error message when
+  the agent's session ended because its last model request failed (after the
+  harness's own retries), else ``None``. Such a Trial is a ``non-result``.
 """

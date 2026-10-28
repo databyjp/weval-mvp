@@ -4,10 +4,10 @@ import json
 from pathlib import Path
 
 from weval.collect import (
+    AgentChange,
+    TrialSummary,
     collect_runs,
     compare_treatments,
-    fisher_exact,
-    wilson_interval,
 )
 
 RUN = "20261020-120000__build__ecommerce-search@terse__pi-glm-5.3-flash"
@@ -108,14 +108,18 @@ def test_treatment_run_without_records_is_listed_from_its_name(tmp_path):
     assert (run.agent, run.treatment) == ("pi-glm-5.3-flash", "weaviate-docs")
 
 
-def test_treatment_runs_are_paired_with_baseline_runs_of_the_same_agent(tmp_path):
-    other_agent = RUN.replace("pi-glm-5.3-flash", "claude-code-opus-5.5")
+def test_a_comparison_spans_the_agents_that_ran_both_arms(tmp_path):
+    opus = RUN.replace("pi-glm-5.3-flash", "claude-code-opus-5.5")
+    haiku = RUN.replace("pi-glm-5.3-flash", "claude-code-haiku-5.5")
+    gpt = RUN.replace("pi-glm-5.3-flash", "pi-gpt-6.1-terra")
     for name in (
         RUN,
         RUN.replace("20261020-120000", "20261021-120000"),
-        other_agent,
+        opus,
+        haiku,  # baseline only
         f"{RUN}+weaviate-docs",
-        f"{other_agent}+weaviate-docs",
+        f"{opus}+weaviate-docs",
+        f"{gpt}+weaviate-docs",  # Treatment only
         f"{RUN}+other",
     ):
         write_trial(tmp_path / name, "t1", None)
@@ -125,7 +129,8 @@ def test_treatment_runs_are_paired_with_baseline_runs_of_the_same_agent(tmp_path
     assert [
         (
             c.treatment,
-            c.agent,
+            c.agents,
+            c.unpaired,
             [r.path.name for r in c.baseline],
             [r.path.name for r in c.treated],
         )
@@ -133,23 +138,40 @@ def test_treatment_runs_are_paired_with_baseline_runs_of_the_same_agent(tmp_path
     ] == [
         (
             "other",
-            "pi-glm-5.3-flash",
+            ["pi-glm-5.3-flash"],
+            ["claude-code-haiku-5.5", "claude-code-opus-5.5"],
             [RUN.replace("20261020-120000", "20261021-120000"), RUN],
             [f"{RUN}+other"],
         ),
+        # Haiku has no Treatment run and GPT no baseline run: neither arm
+        # gets a model the other lacks.
         (
             "weaviate-docs",
-            "claude-code-opus-5.5",
-            [other_agent],
-            [f"{other_agent}+weaviate-docs"],
-        ),
-        (
-            "weaviate-docs",
-            "pi-glm-5.3-flash",
-            [RUN.replace("20261020-120000", "20261021-120000"), RUN],
-            [f"{RUN}+weaviate-docs"],
+            ["claude-code-opus-5.5", "pi-glm-5.3-flash"],
+            ["claude-code-haiku-5.5", "pi-gpt-6.1-terra"],
+            sorted(
+                [RUN, RUN.replace("20261020-120000", "20261021-120000"), opus],
+                reverse=True,
+            ),
+            sorted([f"{RUN}+weaviate-docs", f"{opus}+weaviate-docs"], reverse=True),
         ),
     ]
+
+
+def test_an_agent_change_compares_its_pass_rates_in_the_two_arms():
+    def trials(*statuses: str) -> list[TrialSummary]:
+        return [
+            TrialSummary(Path(f"t{i}"), status) for i, status in enumerate(statuses)
+        ]
+
+    def change(baseline: list, treated: list) -> str | None:
+        return AgentChange("agent", baseline, treated).change
+
+    assert change(trials("failed"), trials("passed")) == "helped"
+    assert change(trials("passed"), trials("timed-out")) == "hurt"
+    # A non-result is not scored: the rates are 1/1 and 1/1.
+    assert change(trials("passed"), trials("passed", "non-result")) == "unchanged"
+    assert change(trials("passed"), trials("non-result")) is None
 
 
 def test_treatment_without_a_baseline_run_has_an_empty_baseline(tmp_path):
@@ -158,6 +180,8 @@ def test_treatment_without_a_baseline_run_has_an_empty_baseline(tmp_path):
     [comparison] = compare_treatments(collect_runs(tmp_path))
 
     assert comparison.baseline == []
+    assert comparison.agents == []
+    assert [r.path.name for r in comparison.treated] == [f"{RUN}+weaviate-docs"]
 
 
 def test_treatment_runs_are_paired_only_with_baselines_of_the_same_task_and_check_versions(
@@ -213,16 +237,6 @@ def test_treatment_runs_are_paired_only_with_baselines_of_the_same_task_and_chec
         ("docs-v1", "task-v1", "check-v1", ["20261020"], ["20261023"]),
         ("docs-v2", "task-v1", "check-v1", ["20261020"], ["20261024"]),
     ]
-
-
-def test_pass_rate_statistics_match_hand_computed_values():
-    # 3/5 against 0/5: the observed split and its mirror each have probability 10/120.
-    assert round(fisher_exact(3, 5, 0, 5), 4) == round(20 / 120, 4)
-    # 5/5 against 0/7: the observed split is the only one as unlikely, C(12, 5) = 792.
-    assert round(fisher_exact(5, 5, 0, 7), 6) == round(1 / 792, 6)
-    assert round(fisher_exact(2, 4, 2, 4), 9) == 1.0
-    assert [round(v, 3) for v in wilson_interval(3, 5)] == [0.231, 0.882]
-    assert wilson_interval(0, 5)[0] == 0.0 and wilson_interval(5, 5)[1] == 1.0
 
 
 def test_uncached_input_leaves_out_cache_reads(tmp_path):

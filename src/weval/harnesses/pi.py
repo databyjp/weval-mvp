@@ -54,6 +54,23 @@ def agent_config(agent: dict) -> AgentConfig:
     )
 
 
+def model_error(trial_dir: Path) -> str | None:
+    """The error of Pi's last model request, when the session ended on it.
+
+    Pi retries a failed request itself; once it gives up, the final
+    ``agent_end`` event in ``agent/pi.txt`` ends on a message with
+    ``stopReason`` ``error``, as when OpenRouter rate-limited every attempt.
+    """
+    log = trial_dir / "agent/pi.txt"
+    lines = log.read_text().splitlines() if log.exists() else []
+    events = [json.loads(line) for line in lines if line.startswith("{")]
+    end = next((e for e in reversed(events) if e.get("type") == "agent_end"), None)
+    last = ((end or {}).get("messages") or [{}])[-1]
+    if last.get("stopReason") != "error":
+        return None
+    return last.get("errorMessage") or "model request failed"
+
+
 def agent_record(agent: dict) -> dict:
     """Return the Agent plus the web tooling it ran with, for ``weval.json``."""
     return {**agent, "web_access": json.loads((ASSETS / "provenance.json").read_text())}

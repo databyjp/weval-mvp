@@ -115,7 +115,7 @@ def answer(**changes) -> dict:
         },
     ]
     return {
-        "result": "The Treatment passed 1 of 2 against 0 of 2 (p 1).",
+        "result": "The Treatment passed 1 of 2 against 0 of 2, helping 1 agent.",
         "patterns": patterns,
         "caveats": ["2 Trials per arm."],
         "open_questions": [],
@@ -158,11 +158,19 @@ def test_facts_give_each_arm_its_statistics_and_each_failure_its_evidence(compar
         1,
         2,
     )
-    assert treated["pass_interval_95_percent"] == [9, 91]
-    assert given["fisher_p"] == 1.0
+    assert given["agents"] == [
+        {
+            "agent": "claude-code-sonnet-5.5",
+            "baseline": {"scored": 2, "passed": 0},
+            "treatment": {"scored": 2, "passed": 1},
+            "change": "helped",
+        }
+    ]
+    assert given["agent_changes"] == {"helped": 1}
+    assert {t["agent"] for t in treated["trials"]} == {"claude-code-sonnet-5.5"}
     assert base["mean_uncached_input_tokens"] == 600
     # Both arms record identical usage, so every change is zero percent.
-    assert given["usage_change_percent"] == {
+    assert given["median_usage_change_percent"] == {
         "cost_usd": 0,
         "uncached_input": 0,
         "turns": 0,

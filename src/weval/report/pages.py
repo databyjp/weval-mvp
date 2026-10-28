@@ -15,12 +15,13 @@ from collections import Counter
 from datetime import datetime
 from html import escape
 from pathlib import Path
+from statistics import median
 
 from weval.collect import (
     Comparison,
     RunSummary,
     TrialSummary,
-    fisher_exact,
+    agent_usage_changes,
     mean_usage,
 )
 from weval.diagnostics import diagnose
@@ -92,59 +93,62 @@ def _findings_section(
     groups: list[FailureGroup], links: "_Links", trial_pages: dict[Path, Path]
 ) -> str:
     intro = (
-        "Each card is one check that failed, with how often it failed in each arm: the bar fills to "
-        "the failure rate. The counts come straight from the retained records. Everything else "
-        "on a card is a saved opinion about why "
-        "it failed, and each opinion names its judge: the LLM analyst, a hand-coded rule, or the Jev "
+        "Each row is one check that failed, with its failure rate in the baseline: the bar fills "
+        "to the rate. A check that failed only with a Treatment shows that arm's rate instead, "
+        "after the baseline failures. Open a row for the rate in every arm, the agents that "
+        "failed, and the saved opinions about why. The counts come straight from the retained "
+        "records; each opinion names its judge: the LLM analyst, a hand-coded rule, or the Jev "
         "labeller. Open a failing Trial to see the evidence; the final call on a class is yours."
     )
-    blocks = "".join(_finding(group, links, trial_pages) for group in groups)
-    if not blocks:
-        blocks = '<p class="muted">No failed checks are retained.</p>'
-    return f'<h2 id="findings">Findings{_count(groups)}</h2>{_intro(intro)}{blocks}'
+    heading = f'<h2 id="findings">Findings{_count(groups)}</h2>{_intro(intro)}'
+    if not groups:
+        return f'{heading}<p class="muted">No failed checks are retained.</p>'
+    lists = []
+    for required, title in ((True, "Required checks"), (False, "Preferred checks")):
+        tier = [group for group in groups if group.required == required]
+        if not tier:
+            continue
+        rows = "".join(_finding(group, links, trial_pages) for group in tier)
+        lists.append(
+            f"<h3>{title}{_count(tier)}</h3>"
+            + _fold_list(
+                "findings", ["Check", "Task", "Failure rate", "Proposed cause"], rows
+            )
+        )
+    return heading + "".join(lists)
 
 
 def _finding(
     group: FailureGroup, links: "_Links", trial_pages: dict[Path, Path]
 ) -> str:
-    # The skeleton stays scannable: one line per arm, the fail counts as a
-    # waffle (red = failed this check) rather than a sentence to parse.
-    requires = []
-    if group.description:
-        requires.append(("Requires", _inline_markdown(group.description)))
-    # One block of arm rows per Agent: a failure rate pooled across Agents
-    # would describe none of them.
-    by_agent: dict[str, list[tuple[str, str]]] = {}
-    for (agent, arm), (failed, scored) in group.arms.items():
-        label = escape(arm) if arm == BASELINE else f"+ {escape(arm)}"
-        by_agent.setdefault(agent, []).append((label, _rate(failed, scored, "failed")))
-    panel = "".join(
-        f'<div class="agent">{escape(agent)}</div>{_facts(rows)}'
-        for agent, rows in by_agent.items()
-    )
-    failing = (
-        f"{len(group.failing)} failing Trial{'' if len(group.failing) == 1 else 's'}"
-    )
-    parts = [
-        _card_head(
-            escape(group.check),
-            f'<span class="muted">proposed cause</span> {_class_chip(group.proposed_class)}',
-            [
-                links.task(group.task, group.prompt_variant),
-                f"{'required' if group.required else 'preferred'} check",
-                failing,
-            ],
-        ),
-        _facts(requires),
-        f'<div class="panel">{panel}</div>',
+    # The summary row is the whole finding at a glance; opening it shows the
+    # detail at once, with no second fold to open.
+    arm, failed, scored = group.headline()
+    arm_note = "" if arm == BASELINE else f' <span class="muted">+ {escape(arm)}</span>'
+    summary = [
+        f'<span class="name mono">{escape(group.check)}</span>',
+        f"<span>{escape(_task_name(group.task))}{_variant_note(group.prompt_variant)}</span>",
+        f'<span class="nowrap">{_rate(failed, scored, "failed")}{arm_note}</span>',
+        f"<span>{_class_chip(group.proposed_class)}</span>",
     ]
 
-    # Everything below the skeleton folds away, so a page of cards stays
-    # scannable. Inside, the analyst's pattern covers the whole check, and
-    # the per-Trial judges (the rule and Jev) share one table.
-    folded = ["<summary>Why it failed</summary>"]
+    # One line per arm across every Agent, naming the Agents that failed,
+    # rather than a sentence to parse.
+    facts = [("Task", links.task(group.task, group.prompt_variant))]
+    if group.description:
+        facts.append(("Requires", _inline_markdown(group.description)))
+    arm_rows = []
+    for name, (arm_failed, arm_scored) in group.arms.items():
+        label = escape(name) if name == BASELINE else f"+ {escape(name)}"
+        agents = ", ".join(escape(a) for a in group.failing_agents[name])
+        names = f'<div class="failing-agents">{agents}</div>' if agents else ""
+        arm_rows.append((label, _rate(arm_failed, arm_scored, "failed") + names))
+    body = [_facts(facts), f'<div class="panel">{_facts(arm_rows)}</div>']
+
+    # The analyst's pattern covers the whole check; the per-Trial judges (the
+    # rule and Jev) share one table.
     for pattern in group.patterns:
-        folded.append(
+        body.append(
             _judgment(
                 f"proposes {_class_chip(pattern['class'])}",
                 f"{pattern['model']}, reading the {pattern['treatment']} comparison",
@@ -155,10 +159,29 @@ def _finding(
                 ],
             )
         )
-    folded.append(_failing_trials(group, links, trial_pages))
-    parts.append(f'<details class="more">{"".join(folded)}</details>')
+    body.append(_failing_trials(group, links, trial_pages))
     anchor = _finding_anchor(group.task, group.prompt_variant, group.check)
-    return f'<div class="card" id="{anchor}">{"".join(parts)}</div>'
+    return _fold(anchor, summary, "".join(body))
+
+
+def _fold_list(kind: str, columns: list[str], rows: str) -> str:
+    """A list of ``_fold`` rows under a header naming their ``columns``;
+    ``kind`` picks the list's column widths in the stylesheet."""
+    header = "".join(f"<span>{column}</span>" for column in columns)
+    return (
+        f'<div class="fold-list {kind}"><div class="columns"><span></span>{header}</div>'
+        f"{rows}</div>"
+    )
+
+
+def _fold(anchor: str, cells: list[str], body: str) -> str:
+    """One item of a ``_fold_list``: a summary row of ``cells`` that opens to
+    ``body`` in place. The anchor sits on the row, so a link to it lands on
+    the row whether or not it is open."""
+    return (
+        f'<details class="fold" id="{anchor}"><summary>{"".join(cells)}</summary>'
+        f'<div class="card inset">{body}</div></details>'
+    )
 
 
 def _failing_trials(
@@ -216,21 +239,26 @@ def _comparisons_section(
     trial_pages: dict[Path, Path],
 ) -> str:
     intro = (
-        "Did the Treatment help? Each card compares one Treatment's Trials with baseline Trials of "
-        "the same Task, Agent, and versions, one column per arm. Each bar fills to the pass rate; "
-        "the p-value (Fisher's exact test) says how "
-        "easily the difference in passes could be chance. Usage rows "
-        "are means per Trial, and the last column gives the Treatment's change from the baseline. "
-        "The analyst's text is the saved <code>weval analyse</code> answer; the report never calls "
-        "the analyst itself."
+        "Did the Treatment help across agents? Each row compares one Treatment's Trials with "
+        "baseline Trials of the same Task and versions, from every agent that ran both arms, and "
+        "shows the pass counts and how many agents the Treatment helped or hurt. Open a row for "
+        "the detail. The first table adds the agents up, one column per arm; the second shows "
+        "each agent's own Trials and whether the Treatment helped, hurt, or left its pass rate "
+        "unchanged. Usage rows are means per Trial; their change counts the agents that went up "
+        "or down, and gives the change in the mean and the median of each agent's own change. "
+        "The analyst's text is the saved <code>weval analyse</code> answer; the report never "
+        "calls the analyst itself."
     )
-    blocks = "".join(
+    heading = f'<h2 id="comparisons">Treatment comparisons{_count(analyses)}</h2>{_intro(intro)}'
+    if not analyses:
+        return f'{heading}<p class="muted">No Treatment runs are retained.</p>'
+    rows = "".join(
         _comparison(comparison, found, links, trial_pages)
         for comparison, found in analyses
     )
-    if not blocks:
-        blocks = '<p class="muted">No Treatment runs are retained.</p>'
-    return f'<h2 id="comparisons">Treatment comparisons{_count(analyses)}</h2>{_intro(intro)}{blocks}'
+    return heading + _fold_list(
+        "comparisons", ["Treatment", "Task", "Passed", "Agents"], rows
+    )
 
 
 def _comparison(
@@ -243,7 +271,6 @@ def _comparison(
     # usage measures are shown; the last column compares the Treatment with
     # the baseline.
     arms = [comparison.baseline, comparison.treated]
-    trials = [[t for run in runs for t in run.trials] for runs in arms]
     scored = [[t for run in runs for t in run.scored] for runs in arms]
     passed = [sum(t.status == "passed" for t in arm) for arm in scored]
 
@@ -256,14 +283,12 @@ def _comparison(
     def group(label: str) -> str:
         return f'<tr class="group"><th colspan="4">{label}</th></tr>'
 
+    by_agent = comparison.by_agent()
     pass_change = ""
-    if all(scored):
-        p = fisher_exact(passed[1], len(scored[1]), passed[0], len(scored[0]))
-        # A difference in passes only reads as a count when the arms match.
-        if len(scored[0]) == len(scored[1]):
-            gained = passed[1] - passed[0]
-            pass_change = _delta(f"{gained:+d}", gained) + " "
-        pass_change += f'<span class="note">p = {p:.2g}</span>'
+    # A difference in passes only reads as a count when the arms match.
+    if all(scored) and len(scored[0]) == len(scored[1]):
+        gained = passed[1] - passed[0]
+        pass_change = _delta(f"{gained:+d}", gained)
     rows = [
         row(
             "Pass rate",
@@ -307,29 +332,29 @@ def _comparison(
                 )
             )
 
-    rows.append(group("Mean per Trial"))
+    rows.append(
+        group(
+            'Mean per Trial <span class="note">change: agents up or down; mean; '
+            "median per agent</span>"
+        )
+    )
     for measure, attribute, formatted in (
         ("Cost (USD)", "cost_usd", _format_cost),
         ("Uncached input (k)", "uncached_input", _format_tokens),
         ("Turns", "turns", lambda v: "" if v is None else f"{v:.0f}"),
         ("Duration", "duration_s", _format_duration),
     ):
-        base, treated = (mean_usage(arm, attribute) for arm in trials)
-        change = ""
-        if base and treated:
-            relative = (treated - base) / base
-            # Less usage is better; a change under 5% is shown without colour.
-            change = _delta(
-                f"{100 * relative:+.0f}%", 0 if abs(relative) < 0.05 else -relative
-            )
+        base, treated = (mean_usage(arm, attribute) for arm in scored)
+        change = _usage_change(base, treated, agent_usage_changes(by_agent, attribute))
         rows.append(row(measure, [formatted(base), formatted(treated)], change, "num"))
 
     table = (
         '<div class="panel"><table class="plain arms"><thead><tr><th></th>'
         f'<th class="num">{escape(BASELINE)}</th>'
-        f'<th class="num">+ {escape(comparison.treatment)}</th>'
+        f'<th class="num arm-name">+ {escape(comparison.treatment)}</th>'
         '<th class="num">Change</th></tr></thead>'
-        f"<tbody>{''.join(rows)}</tbody></table></div>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+        f"{_agent_table(comparison, by_agent, links, trial_pages)}</div>"
     )
     versions = ", ".join(
         f"{name} {escape(version[:8])}"
@@ -340,29 +365,84 @@ def _comparison(
         )
         if version
     )
-    head = _card_head(
-        escape(comparison.treatment),
-        f'<span class="muted">passed</span> {passed[0]}/{len(scored[0])} '
-        f"&rarr; {passed[1]}/{len(scored[1])}",
+    summary = [
+        f'<span class="name mono">{escape(comparison.treatment)}</span>',
+        f"<span>{escape(_task_name(comparison.task))}{_variant_note(comparison.prompt_variant)}</span>",
+        f'<span class="nowrap">{passed[0]}/{len(scored[0])} &rarr; {passed[1]}/{len(scored[1])}</span>',
+        f"<span>{_agent_summary(by_agent)}</span>",
+    ]
+    facts = _facts(
         [
-            links.task(comparison.task, comparison.prompt_variant),
-            escape(comparison.agent),
-            f"versions {versions}" if versions else "unversioned",
-        ],
+            ("Task", links.task(comparison.task, comparison.prompt_variant)),
+            ("Versions", versions or "unversioned"),
+        ]
     )
     anchor = f"comparison-{escape(comparison.treatment)}-{_slug(comparison.task)}"
-    return f'<div class="card" id="{anchor}">{head}{table}{_analysis(found, comparison)}</div>'
+    return _fold(anchor, summary, f"{facts}{table}{_analysis(found, comparison)}")
+
+
+# How each change reads in a comparison: its label and _delta direction.
+AGENT_CHANGES = {"helped": 1, "hurt": -1, "unchanged": 0}
+
+
+def _agent_summary(by_agent: list) -> str:
+    """How many compared Agents the Treatment helped, hurt, or left unchanged."""
+    counts = Counter(row.change for row in by_agent)
+    parts = [f"{counts[c]} {c}" for c in AGENT_CHANGES if counts[c]]
+    if counts[None]:
+        parts.append(f"{counts[None]} not scored")
+    agents = f"{len(by_agent)} agent{'' if len(by_agent) == 1 else 's'}"
+    return f"{agents}: {', '.join(parts)}" if parts else agents
+
+
+def _agent_table(
+    comparison: Comparison,
+    by_agent: list,
+    links: "_Links",
+    trial_pages: dict[Path, Path],
+) -> str:
+    """Each compared Agent's Trials in both arms, with the change in its
+    pass rate, and the Agents left out for running one arm only."""
+    rows = "".join(
+        f"<tr><th>{escape(row.agent)}</th>"
+        f'<td class="num"><span class="waffle small">{_cells(row.baseline, links, trial_pages)}</span></td>'
+        f'<td class="num"><span class="waffle small">{_cells(row.treated, links, trial_pages)}</span></td>'
+        f'<td class="num change">'
+        + (
+            _delta(row.change, AGENT_CHANGES[row.change])
+            if row.change
+            else '<span class="muted">not scored</span>'
+        )
+        + "</td></tr>"
+        for row in by_agent
+    )
+    unpaired = (
+        '<p class="note unpaired">Left out, with runs in one arm only: '
+        + ", ".join(escape(agent) for agent in comparison.unpaired)
+        + "</p>"
+        if comparison.unpaired
+        else ""
+    )
+    if not rows:
+        return unpaired
+    return (
+        '<table class="plain arms by-agent"><thead><tr><th>Agent</th>'
+        f'<th class="num">{escape(BASELINE)}</th>'
+        f'<th class="num arm-name">+ {escape(comparison.treatment)}</th>'
+        '<th class="num">Pass rate</th></tr></thead>'
+        f"<tbody>{rows}</tbody></table>{unpaired}"
+    )
 
 
 def _analysis(found: dict, comparison: Comparison) -> str:
-    """A comparison's saved analysis: its result unfolded, then its rule
-    disagreements, caveats, and open questions folded. The patterns
-    themselves render in the findings section."""
+    """A comparison's saved analysis: its result, rule disagreements,
+    caveats, and open questions. The patterns themselves render in the
+    findings section."""
     answer = found["analysis"]
     if not answer:
         reason = "; ".join(found["problems"]) or found["note"] or "not analysed"
         return _judgment("has no saved answer", "", [("Reason", escape(reason))])
-    folded, counts = [], []
+    rows = [("Result", escape(answer["result"]))]
     if found["disagreements"]:
         items = "".join(
             f'<li><a class="mono" href="#{_finding_anchor(comparison.task, comparison.prompt_variant, d["check"])}">'
@@ -370,25 +450,12 @@ def _analysis(found: dict, comparison: Comparison) -> str:
             f"{escape(d['analyst'])}, the rule says {escape(d['class'])}</li>"
             for d in found["disagreements"]
         )
-        folded.append(("Rule disagreements", f"<ul>{items}</ul>"))
-        counts.append(f"{len(found['disagreements'])} rule disagreements")
+        rows.append(("Rule disagreements", f"<ul>{items}</ul>"))
     for title, key in (("Caveats", "caveats"), ("Open questions", "open_questions")):
         if answer.get(key):
             items = "".join(f"<li>{escape(i)}</li>" for i in answer[key])
-            folded.append((title, f"<ul>{items}</ul>"))
-            counts.append(f"{len(answer[key])} {title.lower()}")
-    more = ""
-    if folded:
-        more = (
-            f'<details class="more"><summary>Caveats and open questions '
-            f'<span class="note">{", ".join(counts)}</span></summary>{_facts(folded)}</details>'
-        )
-    return _judgment(
-        "concludes",
-        str(found["model"]),
-        [("Result", escape(answer["result"]))],
-        more,
-    )
+            rows.append((title, f"<ul>{items}</ul>"))
+    return _judgment("concludes", str(found["model"]), rows)
 
 
 # --- Task reliability ----------------------------------------------------------
@@ -732,6 +799,13 @@ def render_trial(
             (
                 "Exception",
                 f'<span class="mono">{escape(str(record["exception"]))}</span>',
+            )
+        )
+    if record.get("model_error"):
+        facts.append(
+            (
+                "Model error",
+                f'<span class="wrapping">{escape(record["model_error"][:500])}</span>',
             )
         )
     if record.get("error_stage"):
@@ -1162,16 +1236,6 @@ def _variant_note(prompt_variant: str) -> str:
     return "" if prompt_variant == "default" else f"@{escape(prompt_variant)}"
 
 
-def _card_head(title: str, aside: str, sub: list[str]) -> str:
-    """The head shared by finding and comparison cards: the subject's
-    identifier, its one-glance outcome at the right, and a context line."""
-    return (
-        f'<div class="card-head"><div class="head"><span class="title mono">{title}</span>'
-        f'<span class="aside">{aside}</span></div>'
-        f'<div class="sub">{" &middot; ".join(sub)}</div></div>'
-    )
-
-
 def _delta(text: str, direction: float) -> str:
     """A Treatment-versus-baseline change, coloured by ``direction``:
     positive is better for the Treatment, negative worse, zero neutral."""
@@ -1179,15 +1243,39 @@ def _delta(text: str, direction: float) -> str:
     return f'<span class="delta {css}">{text}</span>'
 
 
-def _judgment(
-    verdict: str, provenance: str, rows: list[tuple[str, str]], more: str = ""
+def _usage_change(
+    base: float | None, treated: float | None, agent_changes: list[float]
 ) -> str:
+    """A usage row's change cell: a pill counting the Agents that went up or
+    down, coloured by the majority's direction, over the change in the arms'
+    means and the median of ``agent_changes`` (each Agent's own change, as a
+    fraction), one per line. Less usage is better for the Treatment."""
+    figures = []
+    if base and treated is not None:
+        figures.append(f"mean {100 * (treated - base) / base:+.0f}%")
+    if not agent_changes:
+        return f'<span class="figures">{"<br>".join(figures)}</span>' if figures else ""
+    figures.append(f"median {100 * median(agent_changes):+.0f}%")
+
+    up = sum(change > 0 for change in agent_changes)
+    down = sum(change < 0 for change in agent_changes)
+    agents = len(agent_changes)
+    if up > down:
+        pill = _delta(f"{up} of {agents} up", -1)
+    elif down > up:
+        pill = _delta(f"{down} of {agents} down", 1)
+    else:
+        pill = _delta(f"{up} up, {down} down", 0)
+    return f'{pill}<span class="figures">{"<br>".join(figures)}</span>'
+
+
+def _judgment(verdict: str, provenance: str, rows: list[tuple[str, str]]) -> str:
     """One saved opinion of the LLM analyst: what it says, which model said it
-    and where, its labelled fields, and ``more`` folded material of its own."""
+    and where, and its labelled fields."""
     source = f' <span class="note">{escape(provenance)}</span>' if provenance else ""
     return (
         f'<div class="part judgment"><div class="who"><span class="pill">LLM analyst</span> {verdict}{source}</div>'
-        f"{_facts(rows)}{more}</div>"
+        f"{_facts(rows)}</div>"
     )
 
 

@@ -54,7 +54,7 @@ html { overflow-x: clip; }
 h1, h2, h3 { font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif; }
 h1 { font-size: 20px; font-weight: 700; margin: 0; }
 h2 { font-size: 20px; font-weight: 600; margin: 40px 0 10px; }
-h2 .count { display: inline-block; vertical-align: 3px; margin-left: 6px; padding: 0 9px; border-radius: 999px;
+h2 .count, h3 .count { display: inline-block; vertical-align: 3px; margin-left: 6px; padding: 0 9px; border-radius: 999px;
   font: 600 12px/20px Inter, system-ui, sans-serif; color: var(--pill-fg); background: var(--pill-bg); }
 h3 { font-size: 15px; font-weight: 600; margin: 16px 0 6px; }
 h4 { font-size: 13px; font-weight: 600; margin: 12px 0 4px; color: var(--muted); }
@@ -153,21 +153,38 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
 .rate.failed .fill { background: var(--cell-fail); }
 .pct { display: inline-block; min-width: 4ch; }
 
-/* Findings and comparisons sit as cards on the page background, with one
-   shared head and one label column width so the two sections read alike. */
+/* Cards hold an item's detail, such as an opened finding or comparison, with
+   one label column width so the sections read alike. */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
   padding: 0 18px 14px; margin: 0 0 16px; max-width: 130ch; overflow-x: auto;
   box-shadow: 0 1px 3px rgba(19, 12, 73, 0.08); }
-/* A card without a head band still needs room above its content. */
-.card > :first-child:not(.card-head) { margin-top: 12px; }
+.card > :first-child { margin-top: 12px; }
 .card > pre.message { max-width: 110ch; margin-bottom: 0; }
-.card-head { margin: 0 -18px 10px; padding: 12px 18px 10px; background: var(--band);
-  border-bottom: 1px solid var(--line); }
-.card .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
-.card .head .title { font-weight: 600; font-size: 14px; }
-.card .head .aside { margin-left: auto; }
-.card .head .aside .muted { font-size: 12px; margin-right: 4px; }
-.card .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0 0; }
+/* Folded lists (findings, comparisons): one summary row per item in a shared
+   grid, opening in place to an inset card. Columns line up across rows
+   because every row and the column header use the list's --columns. */
+.fold-list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 0 0 16px;
+  max-width: 130ch; box-shadow: 0 1px 3px rgba(19, 12, 73, 0.08); overflow: hidden; }
+.fold-list.findings { --columns: 1em minmax(14em, 1.4fr) minmax(12em, 1fr) 15em 11em; }
+.fold-list.comparisons { --columns: 1em minmax(14em, 1.2fr) minmax(12em, 1fr) 9em minmax(14em, 1.2fr); }
+.fold-list > .columns, details.fold > summary { display: grid; align-items: center; gap: 12px;
+  grid-template-columns: var(--columns); padding: 7px 14px; }
+.fold-list > .columns { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--band);
+  border-bottom: 1px solid var(--line-strong); }
+details.fold + details.fold { border-top: 1px solid var(--line); }
+details.fold > summary { list-style: none; cursor: pointer; font-size: 13px; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::before { content: "\\25B8"; color: var(--muted); }
+details.fold[open] > summary::before { content: "\\25BE"; }
+details.fold > summary:hover, details.fold:target > summary { background: var(--stripe); }
+details.fold[open] > summary { background: var(--band); border-bottom: 1px solid var(--line); }
+details.fold .name { font-weight: 600; overflow-wrap: anywhere; }
+details.fold .nowrap { white-space: nowrap; }
+.card.inset { border: 0; border-radius: 0; box-shadow: none; margin: 0; max-width: none; }
+@media (max-width: 700px) {
+  .fold-list > .columns { display: none; }
+  .fold-list.findings, .fold-list.comparisons { --columns: 1em 1fr 1fr; }
+}
 .card dl.facts { grid-template-columns: 14em minmax(0, 95ch); margin: 10px 0 4px; }
 .card ul { margin: 0; padding-left: 18px; }
 .card li + li { margin-top: 4px; }
@@ -175,8 +192,9 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
    label column. */
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; margin: 8px 0;
   width: fit-content; max-width: 100%; box-sizing: border-box; }
-.panel .agent { font-size: 12px; font-weight: 600; margin-top: 4px; }
-.panel .agent + dl.facts { margin-top: 0; }
+.panel .failing-agents { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.panel table.by-agent { margin-top: 10px; border-top: 1px solid var(--line); }
+.panel .unpaired { margin: 6px 0 2px; }
 .card .panel dl.facts { grid-template-columns: calc(14em - 13px) max-content; margin: 2px 0; align-items: center; }
 /* Inside a card, each judge's part opens with a pill and a rule above it. */
 .part { border-top: 1px solid var(--line-strong); margin-top: 12px; padding-top: 10px; }
@@ -190,9 +208,6 @@ summary + .part { border-top: 0; padding-top: 4px; }
 .judgment dl.facts > dt:not(:first-child), .judgment dl.facts > dt:not(:first-child) + dd {
   border-top: 1px solid var(--line); padding-top: 6px; }
 .disputed { color: var(--warn-fg); font-size: 12px; white-space: nowrap; }
-details.more { margin: 8px 0 2px; }
-details.more > summary { font-size: 13px; color: var(--muted); }
-details.more > summary:hover { color: var(--fg); }
 table.trials { font-size: 13px; width: 100%; margin-top: 4px; }
 table.trials td.wrapping { min-width: 18ch; max-width: 50ch; }
 table.arms { font-size: 12.5px; }
@@ -200,13 +215,16 @@ table.arms th, table.arms td { padding-top: 3px; padding-bottom: 3px; vertical-a
 table.arms th { font-weight: 400; }
 table.arms thead th { font-weight: 600; }
 table.arms tbody th { color: var(--muted); padding-right: 24px; }
-table.arms tr.group th { color: var(--fg); font-weight: 600; padding-top: 10px; }
+table.arms tr.group th { color: var(--fg); font-weight: 600; padding-top: 10px; white-space: normal; }
 table.arms tbody tr:last-child > * { border-bottom: 0; }
 table.arms .waffle { margin-right: 0; }
 .delta { display: inline-block; padding: 0 7px; border-radius: 999px; font-weight: 600; line-height: 19px;
   color: var(--muted); background: var(--stripe); }
 .delta.better { color: var(--pass-fg); background: var(--pass-bg); }
 .delta.worse { color: var(--fail-fg); background: var(--fail-bg); }
+table.arms td.change .figures { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.35; margin-top: 2px; }
+/* A long Treatment name wraps at its hyphens instead of widening its column. */
+table.arms thead th.arm-name { white-space: normal; width: 8em; }
 @media (max-width: 600px) { .card dl.facts, .card .panel dl.facts { grid-template-columns: 1fr; } }
 
 tr.detail > td { background: var(--stripe); padding: 4px 12px 14px 40px; border-bottom: 1px solid var(--line-strong);

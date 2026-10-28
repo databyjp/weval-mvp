@@ -1,9 +1,10 @@
-"""An LLM analyst's reading of one Treatment comparison, checked against the
-facts it was given.
+"""An LLM analyst's reading of one Treatment comparison across Agents,
+checked against the facts it was given.
 
 The analyst never reads transcripts. It gets ``facts()``: each arm's pass
-counts, Wilson interval and mean usage, Fisher's exact p-value, and every
-failed check with its failure message, diagnostics, and saved Jev labels. It
+counts and mean usage, whether the Treatment helped, hurt, or left unchanged
+each Agent's pass rate, and every failed check with its Agent, failure
+message, diagnostics, and saved Jev labels. It
 answers in a fixed structure: a one-sentence result, failure patterns (each
 with its checks, Trial IDs, evidence, and a proposed class from ``CLASSES``),
 caveats, and open questions. ``verify()`` rejects an answer that cites an
@@ -28,24 +29,19 @@ import hashlib
 import json
 import os
 import re
+from collections import Counter
 from pathlib import Path
 
 import anthropic
 
 from weval import diagnostics, labels
-from weval.collect import (
-    Comparison,
-    TrialSummary,
-    fisher_exact,
-    mean_usage,
-    wilson_interval,
-)
+from weval.collect import SCORED, Comparison, TrialSummary, mean_usage, median_change
 
 API = "https://openrouter.ai/api"
 MODEL = "anthropic/claude-sonnet-5.5"
 KEY_VAR = "OPENROUTER_API_KEY"
 # Raise when SYSTEM, SCHEMA, or the shape of facts() changes meaning.
-PROMPT_VERSION = "1"
+PROMPT_VERSION = "2"
 ATTEMPTS = 3
 DIRECTORY = "_analysis"
 # Check failure messages are capped one by one; the analyst needs what was
@@ -69,18 +65,22 @@ NUMBER = re.compile(r"\d+(?:\.\d+)*")
 
 SYSTEM = """\
 You analyse one comparison from weval, which runs Weaviate coding Tasks against coding agents. A Treatment \
-gives the agent extra skills; the baseline arm runs without one. You get computed facts as JSON: each arm's \
-pass counts with a 95% Wilson interval and mean usage per Trial, the Fisher's exact p-value between the arms, \
-and every failed check of every Trial. A failed check carries its failure message; for some checks, the \
+gives the agent extra skills; the baseline arm runs without one. Several agents, each a harness and a model, \
+ran both arms, so the comparison asks whether the Treatment helps across agents. You get computed facts as \
+JSON: each arm's pass counts and mean usage per Trial over all agents; for each agent, its pass counts in \
+both arms and whether the Treatment helped, hurt, or left its pass rate unchanged; the median of the agents' \
+usage changes; and every failed check of every Trial, with the Trial's agent. A failed check carries its \
+failure message; for some checks, the \
 value the check expected and whether that value appeared in what the agent was shown; and Jev labels, a \
 classifier's reading of which source the agent took the failed value from (a URL, a Treatment file, a \
 search, or own-knowledge) and what the agent did to verify it, each with a confidence from 0 to 1.
 
 Answer with:
-- result: one sentence on what the Treatment changed, with both arms' pass counts and the p-value.
+- result: one sentence on what the Treatment changed, with both arms' pass counts and how many agents it \
+helped and hurt.
 - patterns: the failed checks grouped into failure patterns. Each names its checks, the IDs of the Trials \
 that show it, the evidence from the facts, a proposed class, and the reason for that class.
-- caveats: limits on what the facts support, such as Trial counts or low label confidence.
+- caveats: limits on what the facts support, such as one Trial per agent and arm, or low label confidence.
 - open_questions: what a person must check outside these facts, such as what a docs page says.
 
 Classes:
@@ -136,25 +136,24 @@ def facts(comparison: Comparison, expected: dict) -> dict:
     """The computed facts the analyst is given for ``comparison``, whose
     Task's ``check.py`` ``EXPECTED`` is ``expected`` (empty when it has none).
 
-    Only scored Trials are included. Numbers are rounded as the analyst
-    should quote them: pass intervals and usage changes in whole percent,
-    the p-value to two significant figures. A failure's ``expected`` is
-    ``None`` when ``EXPECTED`` has no entry for its check; otherwise its
-    ``value`` is ``None`` when the snapshot gave none, and its ``seen`` is
-    ``None`` when the Trial has no trajectory.
+    Only scored Trials are included. ``agents`` has one row per compared
+    Agent with its pass counts and ``change`` (``AgentChange``), and
+    ``agent_changes`` counts the rows by change. Usage changes are the median
+    over Agents of each Agent's change, in whole percent, so one costly model
+    does not set them. A failure's ``expected`` is ``None`` when ``EXPECTED``
+    has no entry for its check; otherwise its ``value`` is ``None`` when the
+    snapshot gave none, and its ``seen`` is ``None`` when the Trial has no
+    trajectory.
     """
     readme = _readme(comparison.treated[0].path / "treatment/README.md")
-    arms = {
-        "baseline": _arm(comparison.baseline, expected),
-        "treatment": _arm(comparison.treated, expected),
-    }
-    base, treated = arms["baseline"], arms["treatment"]
-    baseline_trials = [t for run in comparison.baseline for t in run.scored]
-    treated_trials = [t for run in comparison.treated for t in run.scored]
+    by_agent = comparison.by_agent()
+    usage_changes = {}
+    for attribute in ("cost_usd", "uncached_input", "turns"):
+        change = median_change(by_agent, attribute)
+        usage_changes[attribute] = None if change is None else round(100 * change)
     return {
         "task": comparison.task,
         "prompt_variant": comparison.prompt_variant,
-        "agent": comparison.agent,
         "treatment": comparison.treatment,
         "treatment_readme": readme,
         "versions": {
@@ -162,39 +161,35 @@ def facts(comparison: Comparison, expected: dict) -> dict:
             "check": comparison.check_version,
             "treatment": comparison.treatment_version,
         },
-        "arms": arms,
-        "fisher_p": _two_significant_figures(
-            fisher_exact(
-                treated["passed"], treated["scored"], base["passed"], base["scored"]
-            )
-        )
-        if base["scored"] and treated["scored"]
-        else None,
-        "usage_change_percent": _usage_change_percent(treated_trials, baseline_trials),
+        "arms": {
+            "baseline": _arm(comparison.baseline, expected),
+            "treatment": _arm(comparison.treated, expected),
+        },
+        "agents": [
+            {
+                "agent": row.agent,
+                "baseline": _counts(row.baseline),
+                "treatment": _counts(row.treated),
+                "change": row.change,
+            }
+            for row in by_agent
+        ],
+        "agent_changes": dict(Counter(row.change or "not scored" for row in by_agent)),
+        "unpaired_agents": comparison.unpaired,
+        "median_usage_change_percent": usage_changes,
     }
 
 
-def _two_significant_figures(p: float) -> float:
-    """Round to the two significant figures the analyst is told to quote."""
-    return float(f"{p:.2g}")
+def _counts(trials: list[TrialSummary]) -> dict:
+    scored = _scored(trials)
+    return {
+        "scored": len(scored),
+        "passed": sum(t.status == "passed" for t in scored),
+    }
 
 
-def _usage_change_percent(
-    treated_trials: list[TrialSummary], baseline_trials: list[TrialSummary]
-) -> dict[str, int | None]:
-    """Treatment mean against baseline mean, in whole percent, per usage
-    attribute. ``None`` when either arm has no figures, or the baseline mean
-    is zero and gives no ratio."""
-    changes: dict[str, int | None] = {}
-    for attribute in ("cost_usd", "uncached_input", "turns"):
-        treated = mean_usage(treated_trials, attribute)
-        baseline = mean_usage(baseline_trials, attribute)
-        changes[attribute] = (
-            round(100 * (treated - baseline) / baseline)
-            if treated is not None and baseline
-            else None
-        )
-    return changes
+def _scored(trials: list[TrialSummary]) -> list[TrialSummary]:
+    return [t for t in trials if t.status in SCORED]
 
 
 def propose_class(failure: dict) -> dict:
@@ -450,31 +445,28 @@ def _post(body: dict, key: str) -> dict:
 
 
 def _arm(runs: list, expected: dict) -> dict:
-    trials = [t for run in runs for t in run.scored]
-    passed = sum(t.status == "passed" for t in trials)
-    interval = wilson_interval(passed, len(trials)) if trials else None
+    trials = [(run.agent, t) for run in runs for t in run.scored]
+    scored = [t for _, t in trials]
 
     def mean(attribute: str, digits: int | None) -> float | None:
-        value = mean_usage(trials, attribute)
+        value = mean_usage(scored, attribute)
         return None if value is None else round(value, digits)
 
     return {
         "runs": [run.path.name for run in runs],
-        "scored": len(trials),
-        "passed": passed,
-        "pass_interval_95_percent": [round(100 * bound) for bound in interval]
-        if interval
-        else None,
+        "scored": len(scored),
+        "passed": sum(t.status == "passed" for t in scored),
         "mean_cost_usd": mean("cost_usd", 3),
         "mean_uncached_input_tokens": mean("uncached_input", None),
         "mean_turns": mean("turns", 1),
         "trials": [
             {
                 "id": t.path.name,
+                "agent": agent,
                 "status": t.status,
                 "failed_checks": _failed_checks(t, expected),
             }
-            for t in trials
+            for agent, t in trials
         ],
     }
 
@@ -548,4 +540,4 @@ def _name(comparison: Comparison) -> str:
         )
     )
     task = comparison.task.removeprefix("tasks/").replace("/", "__")
-    return f"{comparison.treatment}__{task}@{comparison.prompt_variant}__{comparison.agent}__{versions}"
+    return f"{comparison.treatment}__{task}@{comparison.prompt_variant}__{versions}"

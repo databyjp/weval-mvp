@@ -1,29 +1,34 @@
 # How to read a Trial
 
 To compare a [Treatment](../reference.md#treatments) with its baseline,
-analyse the retained runs:
+analyse the retained runs once a batch of runs has finished, naming any run
+in the comparison:
 
 ```sh
 uv run --env-file .env weval analyse experiment-outputs/<run>
 ```
 
-`weval run` also writes this analysis after labelling (below) when the run is
-part of a comparison, given `OPENROUTER_API_KEY`.
+`weval run` does not analyse: a comparison spans every Agent's runs, so each
+new run would ask the analyst again.
 
-A comparison holds one Task, prompt variant, and Agent: the baseline runs and
-the Treatment runs, with required pass rate, failed checks, and mean usage per
-Trial. Each pass rate has its 95% Wilson interval, and the Treatment arm adds
-Fisher's exact p-value against the baseline; at 5 Trials per arm, only large
-differences reach a small p-value. Uncached input leaves out prompt-cache
-reads, which make up most of each Trial's input tokens.
+A comparison holds one Task and prompt variant across Agents: the baseline
+runs and the Treatment runs of every Agent that ran both arms. Agents with
+runs in one arm only are listed and left out, so both arms cover the same
+models. It gives each arm's required pass count, failed checks, and mean
+usage per Trial, and for each Agent whether the Treatment helped, hurt, or
+left its pass rate unchanged. Each usage row counts the Agents whose usage
+went up or down, and gives the change in the mean and the median of each
+Agent's own change; when they disagree, a few costly models moved the mean
+against most Agents. Uncached input leaves out
+prompt-cache reads, which make up most of each Trial's input tokens.
 A comparison holds only runs with the same Task and check versions, and one
 Treatment version ([fingerprints](../reference.md#the-trial-directory)). Runs
 recorded before fingerprints existed are pooled with each other, so after a
 `check.py` change, re-score both arms with `weval check` (below).
 
 An LLM analyst (`MODEL` in `src/weval/analysis.py`) reads the comparison's
-computed facts, never the transcripts: pass counts and intervals, the
-p-value, mean usage, and each failed check's failure message,
+computed facts, never the transcripts: pass counts, each Agent's change,
+mean usage, and each failed check's Agent, failure message,
 [expected value](define-a-task.md#expected-values), and labels. It answers
 with a one-sentence result, failure patterns with their Trials, evidence,
 and a proposed [failure class](../../AGENTS.md#failed-checks-are-extremely-useful-findings),

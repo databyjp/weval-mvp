@@ -123,7 +123,7 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, the Treatment, `fingerprints` (below), missing logs, per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, the Treatment, `fingerprints` (below), missing logs, the model error that ended the session (if any), per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
 | `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |
@@ -132,7 +132,10 @@ Each retained Trial directory is Harbor's own output plus weval's
 `incomplete` means an expected log is missing; it is not a scored result.
 `timed-out` means Harbor recorded an agent limit but the verifier still graded
 the submission; the reward is recorded and does not count as `passed`.
-`non-result` names its cause in `exception`. A snapshot error scores `failed`
+`non-result` names its cause in `exception`, or in `model_error` when the
+agent's session ended because a model request failed after the harness's own
+retries, such as a provider rate limit; the verifier may still have graded
+that submission, but the Trial does not count. A snapshot error scores `failed`
 at any `error_stage`: `stack` and `app` are the agent's submission failing to
 start, and `snapshot` is `snapshot.py` raising, usually on a stack the agent
 left broken.

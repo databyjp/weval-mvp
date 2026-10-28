@@ -179,11 +179,11 @@ def run(
         finalize_run(
             run_dir, task_path, agent, attempts, prompt_variant, treatment, versions
         )
-        # Before labelling and analysis, which read other runs and could
-        # raise: the scrub must not depend on them.
+        # Before labelling, which could raise: the scrub must not depend on it.
+        # Analysis is not run here: a comparison spans every Agent's runs, so
+        # it is analysed once, by `weval analyse`, after the batch.
         redact(run_dir)
         label_run(run_dir)
-        analyse_run(run_dir)
     return run_dir
 
 
@@ -342,7 +342,7 @@ def analyse_run(run_dir: Path) -> None:
             run.path.resolve() for run in comparison.baseline + comparison.treated
         }:
             continue
-        name = f"{comparison.treatment} on {comparison.task}@{comparison.prompt_variant} with {comparison.agent}"
+        name = f"{comparison.treatment} on {comparison.task}@{comparison.prompt_variant} across {len(comparison.agents)} Agents"
         try:
             result = analysis.analyse(
                 comparison,
@@ -364,16 +364,20 @@ def analyse_run(run_dir: Path) -> None:
             print(f"{name}: {result['note']}")
 
 
-def derive_status(result: dict, missing: list[str]) -> str:
+def derive_status(
+    result: dict, missing: list[str], model_error: str | None = None
+) -> str:
     """Classify one Trial by whose outcome it records (statuses: docs/reference.md).
 
-    The snapshot plays no part: a snapshot error at any ``error_stage`` was
+    ``model_error`` is the harness's ``model_error``: a session ended by a
+    failed model request is a ``non-result`` whatever was graded, because
+    the agent never chose to stop. The snapshot plays no part: a snapshot error at any ``error_stage`` was
     graded, so it scores ``failed``. A ``snapshot``-stage error usually means
     the agent left its stack broken; a scorer bug is told apart when the
     failure is classified.
     """
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
-    if "reward" not in rewards:
+    if "reward" not in rewards or model_error:
         return "non-result"
     if result.get("exception_info"):
         return "timed-out"
@@ -417,8 +421,9 @@ def finalize(
     ``versions`` is the run's ``fingerprints()``; ``None`` records the Trial
     as unversioned.
 
-    Status comes from ``derive_status`` over Harbor's ``result.json`` and the
-    missing-log list.
+    Status comes from ``derive_status`` over Harbor's ``result.json``, the
+    missing-log list, and the harness's ``model_error``, recorded as
+    ``model_error``.
     """
     harness = HARNESSES[agent["harness"]]
     result = json.loads((trial_dir / "result.json").read_text())
@@ -428,12 +433,16 @@ def finalize(
     snapshot_file = trial_dir / "verifier/snapshot.json"
     snapshot = json.loads(snapshot_file.read_text()) if snapshot_file.exists() else None
     rewards = (result.get("verifier_result") or {}).get("rewards") or {}
+    model_error = (
+        harness.model_error(trial_dir) if hasattr(harness, "model_error") else None
+    )
     record = {
-        "status": derive_status(result, missing),
+        "status": derive_status(result, missing, model_error),
         **_trial_identity(task_path, agent, prompt_variant, treatment, versions),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),
         "exception": (result.get("exception_info") or {}).get("exception_type"),
+        "model_error": model_error,
         "error_stage": (snapshot or {}).get("error_stage"),
         "missing_logs": missing,
         "checks": json.loads(checks_file.read_text()) if checks_file.exists() else None,
