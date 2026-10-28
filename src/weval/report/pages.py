@@ -836,25 +836,85 @@ def _package_files(package: Path, links: "_Links", file_pages: dict[Path, Path])
 def _task_runs(
     row: TaskReliability, links: "_Links", trial_pages: dict[Path, Path]
 ) -> str:
+    checks = _check_columns(row.runs)
+    required = sum(is_required for _, is_required in checks)
     rows = []
     for run in row.runs:
         passed = sum(t.status == "passed" for t in run.scored)
         version = (run.fingerprints or {}).get("task") or ""
-        rows.append(
-            f"<tr><td>{links.link(run.path, run.date.strftime('%Y-%m-%d %H:%M') if run.date else run.path.name)}</td>"
-            f"<td>{escape(run.agent)}</td>"
-            f"<td>{f'+ {escape(run.treatment)}' if run.treatment else BASELINE}</td>"
-            f'<td class="mono">{escape(version[:8])}</td>'
-            f'<td class="num">{passed}/{len(run.scored)}</td>'
-            f'<td class="wrapping"><span class="waffle small">{_cells(run.trials, links, trial_pages)}</span></td></tr>'
+        # The run's cells span its Trials' rows.
+        span = f' rowspan="{len(run.trials)}"' if len(run.trials) > 1 else ""
+        run_cells = (
+            f"<td{span}>{links.link(run.path, run.date.strftime('%Y-%m-%d %H:%M') if run.date else run.path.name)}</td>"
+            f"<td{span}>{escape(run.agent)}</td>"
+            f"<td{span}>{f'+ {escape(run.treatment)}' if run.treatment else BASELINE}</td>"
+            f'<td class="mono"{span}>{escape(version[:8])}</td>'
+            f'<td class="num"{span}>{passed}/{len(run.scored)}</td>'
         )
+        for i, trial in enumerate(run.trials):
+            rows.append(
+                f"<tr>{run_cells if i == 0 else ''}"
+                f"{_check_cells(trial, checks, links.href(trial_pages[trial.path]))}</tr>"
+            )
+    groups = [
+        ("required", "Required checks", required),
+        ("preferred", "Preferred checks", len(checks) - required),
+    ]
     return (
-        '<p class="intro">Newest first. Each square is one Trial, passes first; click it to open '
-        "that Trial.</p>"
-        '<div class="card"><table class="plain trials"><thead><tr><th>Run</th><th>Agent</th>'
-        '<th>Arm</th><th>Task version</th><th class="num">Passed</th><th>Trials</th></tr></thead>'
-        f"<tbody>{''.join(rows)}</tbody></table></div>"
+        '<p class="intro">Newest first, one row per Trial. Each square is one check: green '
+        "passed, red failed, orange a preferred check failed, grey not scored. Click a "
+        "square to open that Trial.</p>"
+        '<div class="card"><table class="plain trials runs"><thead><tr>'
+        '<th rowspan="2">Run</th><th rowspan="2">Agent</th><th rowspan="2">Arm</th>'
+        '<th rowspan="2">Task version</th><th class="num" rowspan="2">Passed</th>'
+        + "".join(
+            f'<th class="group {kind}" colspan="{count}">{label}</th>'
+            for kind, label, count in groups
+            if count
+        )
+        + "</tr><tr>"
+        + "".join(
+            f'<th class="check {"required" if is_required else "preferred"}">'
+            f"<span>{escape(name)}</span></th>"
+            for name, is_required in checks
+        )
+        + f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
+
+
+def _check_columns(runs: list[RunSummary]) -> list[tuple[str, bool]]:
+    """Every check the runs' Trials recorded, as ``(check ID, required)``:
+    required checks first, each group in the order the Trials recorded them."""
+    seen: dict[str, bool] = {}
+    for run in runs:
+        for trial in run.trials:
+            for check in (trial.record or {}).get("checks") or []:
+                seen.setdefault(check["name"], bool(check.get("required")))
+    return sorted(seen.items(), key=lambda column: not column[1])
+
+
+def _check_cells(trial: TrialSummary, checks: list[tuple[str, bool]], href: str) -> str:
+    """One square per check column, each linking to the Trial at ``href``.
+    A check the Trial did not record, as in a ``non-result``, is not scored."""
+    results = {
+        check["name"]: check.get("passed")
+        for check in (trial.record or {}).get("checks") or []
+    }
+    cells = []
+    for name, is_required in checks:
+        passed = results.get(name)
+        if passed is None:
+            state, result = "unscored", f"not scored ({trial.status})"
+        elif passed:
+            state, result = "passed", "passed"
+        else:
+            state, result = "failed", "failed"
+        kind = "required" if is_required else "preferred"
+        cells.append(
+            f'<td class="check {kind}"><a class="{state}" href="{href}" '
+            f'title="{escape(trial.path.name)}: {escape(name)} {result}"></a></td>'
+        )
+    return "".join(cells)
 
 
 # --- Trial page ----------------------------------------------------------------

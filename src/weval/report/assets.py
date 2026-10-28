@@ -228,6 +228,20 @@ table.arms tbody th { color: var(--muted); padding-right: 24px; }
 table.arms tr.group th { color: var(--fg); font-weight: 600; padding-top: 10px; white-space: normal; }
 table.arms tbody tr:last-child > * { border-bottom: 0; }
 table.arms .waffle { margin-right: 0; }
+/* Task page runs: one row per Trial and one square per check, its name
+   written up the column. A rule sets the preferred checks apart. */
+table.runs td[rowspan] { vertical-align: top; }
+table.runs th.group { font-size: 12px; padding: 4px 3px 0; border-bottom: 0; }
+table.runs th.check { vertical-align: bottom; padding: 6px 3px; font-size: 12px; font-weight: 500; }
+table.runs th.check span { writing-mode: vertical-rl; transform: rotate(180deg); }
+table.runs td.check { padding: 5px 3px; vertical-align: middle; }
+table.runs .required + .preferred { padding-left: 10px; border-left: 1px solid var(--line-strong); }
+table.runs td.check a { display: block; width: 12px; height: 12px; border-radius: 2px; background: var(--cell-none);
+  box-shadow: inset 0 0 0 1px rgba(19, 12, 73, 0.12); }
+table.runs td.check a.passed { background: var(--cell-pass); }
+table.runs td.check a.failed { background: var(--cell-fail); }
+table.runs td.preferred a.failed { background: var(--cell-preferred); }
+table.runs td.check a:hover { outline: 2px solid var(--link); }
 .delta { display: inline-block; padding: 0 7px; border-radius: 999px; font-weight: 600; line-height: 19px;
   color: var(--muted); background: var(--stripe); }
 .delta.better { color: var(--pass-fg); background: var(--pass-bg); }

@@ -63,7 +63,13 @@ def model_error(trial_dir: Path) -> str | None:
     """
     log = trial_dir / "agent/pi.txt"
     lines = log.read_text().splitlines() if log.exists() else []
-    events = [json.loads(line) for line in lines if line.startswith("{")]
+    events = []
+    for line in lines:
+        # A session stopped at the agent timeout can end mid-line.
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
     end = next((e for e in reversed(events) if e.get("type") == "agent_end"), None)
     last = ((end or {}).get("messages") or [{}])[-1]
     if last.get("stopReason") != "error":

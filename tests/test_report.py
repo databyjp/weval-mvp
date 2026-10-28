@@ -10,7 +10,7 @@ from pathlib import Path
 
 from weval.collect import Comparison, RunSummary, TrialSummary
 from weval.report import write_report
-from weval.report.findings import failure_groups, task_reliability
+from weval.report.findings import TaskReliability, failure_groups, task_reliability
 from weval.report.pages import (
     _block_markdown,
     _cells,
@@ -18,6 +18,7 @@ from weval.report.pages import (
     _findings_section,
     _labels_note,
     _Links,
+    _task_runs,
     _transcript,
 )
 
@@ -436,6 +437,38 @@ def test_waffle_cells_group_by_outcome_in_run_order(tmp_path):
         return re.findall(r'title="(t\d)', html)
 
     assert order(_cells(trials, links, pages)) == ["t2", "t5", "t1", "t4", "t3"]
+
+
+def test_task_runs_show_each_trials_checks_with_required_first(tmp_path):
+    run = make_run(
+        tmp_path,
+        "20260101-000001__build__x__agent",
+        "",
+        [("t1", "failed", ["vector-config"]), ("t2", "non-result")],
+    )
+    run.trials[0].record["checks"].insert(
+        0, {"name": "server-version", "required": False, "passed": False}
+    )
+    run.trials[1].record = {"status": "non-result"}
+    row = TaskReliability(TASK, "default", [run], 1, 0, False, [])
+    pages = {t.path: tmp_path / f"{t.path.name}.html" for t in run.trials}
+
+    html = _task_runs(row, _Links(tmp_path), pages)
+
+    assert re.findall(r'<th class="check (\w+)"><span>([\w-]+)', html) == [
+        ("required", "vector-config"),
+        ("required", "other-check"),
+        ("preferred", "server-version"),
+    ]
+    assert re.findall(r'title="(t\d): ([\w-]+) ([^"]+)"', html) == [
+        ("t1", "vector-config", "failed"),
+        ("t1", "other-check", "passed"),
+        ("t1", "server-version", "failed"),
+        ("t2", "vector-config", "not scored (non-result)"),
+        ("t2", "other-check", "not scored (non-result)"),
+        ("t2", "server-version", "not scored (non-result)"),
+    ]
+    assert html.split("<tbody>")[1].count('rowspan="2"') == 5
 
 
 def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):

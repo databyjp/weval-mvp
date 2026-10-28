@@ -412,6 +412,15 @@ def test_a_pi_session_that_recovered_from_a_failed_request_has_no_model_error(
     assert pi.model_error(trial) is None
 
 
+def test_a_pi_log_cut_off_mid_line_by_the_timeout_still_reads(tmp_path):
+    trial = tmp_path / "trial"
+    (trial / "agent").mkdir(parents=True)
+    (trial / "agent/pi.txt").write_text(
+        f'{pi_agent_end("error", "429")}\n{{"type":"turn_start"}}\n{{"type":"message_start","me'
+    )
+    assert pi.model_error(trial) == "429"
+
+
 @pytest.mark.parametrize(
     "event, expected",
     [
