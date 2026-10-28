@@ -1,6 +1,6 @@
 [project]
 name = "weval"
-version = "0.0.1"
+version = "0.1.0"
 description = "Runs Weaviate coding Tasks against agent harnesses and scores each Trial"
 readme = "README.md"
 authors = [

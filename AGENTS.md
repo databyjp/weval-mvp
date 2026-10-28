@@ -209,15 +209,6 @@ files, such as a [report note](docs/how-to/read-a-trial.md#write-a-note).
 `incomplete` means an expected log is missing; do not treat it as a
 scored result.
 
-## Pre-0.1 formats
-
-While the project version in `pyproject.toml` is below `0.1.0`, treat almost all parts of this project as mutable.
-
-For example:
-- revise formats (snapshots, `weval.json`, `agents.toml`) in place;
-- use schema version `"1"` when a schema becomes necessary;
-- treat schema migrations and version increments as approval-required changes.
-
 ## Commits
 
 Tag the subject with authorship: `[AGENT]`, `[HUMAN]`, `[AGENT+HUMAN]`, or
