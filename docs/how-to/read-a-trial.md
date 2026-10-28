@@ -86,9 +86,27 @@ After the check results, `weval check` prints diagnostics from the Trial's logs.
 - for a Treatment Trial, whether the skill loaded and which Treatment files a tool call named (a glob such as `*.md` reads files without naming them);
 - Weaviate deprecation warnings (`Dep024: ...`) the agent was shown, and those in `verifier/application.log`.
 
-`weval run` and `weval check` also label each failed check with TypeSafe's Jev model, given `TYPESAFEAI_API_KEY`:
+`weval run` and `weval check` also label each failed check, given `OPENROUTER_API_KEY` and `TYPESAFEAI_API_KEY`, in two steps:
 
-- `answer source`: which source the agent took the failed value or approach from, out of the URLs, searches, and Treatment files whose results it was shown, or `own-knowledge`;
-- `verification`: `verified`, `deferred_to_user`, `not_attempted`, or `guessed`.
+1. A step finder (`STEPS_MODEL` in `src/weval/labels.py`) reads the whole trace once and picks, for each failed check, the decision step, where the agent made the choice the check found, and the other steps that bear on it. Step numbers are the transcript's on the Trial's report page, and link there. Finding no relevant steps is a valid answer.
+2. TypeSafe's Jev model reads only those steps and answers:
+   - `cause`: `no_lookup`, `followed_source`, `ignored_current_practice`, `considered_and_rejected`, `environment_forced`, or `no_trace_evidence` (definitions in `CAUSES`);
+   - `answer source`: which source shown in those steps the agent took the failed value or approach from, out of the URLs, searches, and Treatment files they showed, or `own-knowledge`.
 
-Each label has Jev's confidence from 0 to 1; read a low one (below about 0.5) as "check by hand". A source is credited with every tool result that named it, so a `grep` over several files credits all of them. A page Pi read with `get_search_content` counts for the URL it fetched, and a skill Claude Code loaded counts for its `SKILL.md`. A Trial whose snapshot failed is not labelled. Labels are saved in the run directory's `labels/<trial>.json` and reused until the request changes, such as after a `check.py` change.
+Each answer has Jev's confidence from 0 to 1; read a low one (below about 0.5) as "check by hand". A source is credited with every tool result that named it, so a `grep` over several files credits all of them. A page Pi read with `get_search_content` counts for the URL it fetched, and a skill Claude Code loaded counts for its `SKILL.md`. A Trial whose snapshot failed is not labelled. Labels are saved in the run directory's `labels/<trial>.json` and reused until a request changes, such as after a `check.py` change.
+
+## Write a note
+
+To record what you or an agent concluded about a result, write a Markdown file at `experiment-outputs/_report/notes/<task page>/<task version>/<name>.md`. The Task page is the Task page's file name under `_report/tasks/` without `.html`, such as `build-ecommerce-search`; the Task version is the `task` fingerprint in the runs' `weval.json`, such as `35f56f59e981`. Start the note with a header; every field is optional:
+
+```markdown
+---
+author: claude-code
+date: 2026-10-28
+check: sku-category-field-tokenization
+trials: [task__ZYLBTdY]
+---
+The agent kept `category` as WORD on purpose, to match multi-word categories.
+```
+
+`weval report` shows each note on its Task page, beside the version it belongs to; under the finding for its `check`; and on the page of each Trial it names. The report never changes or deletes a note, but deleting `_report/` deletes the notes with it.

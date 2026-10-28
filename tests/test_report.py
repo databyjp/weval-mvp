@@ -16,7 +16,9 @@ from weval.report.pages import (
     _cells,
     _comparison,
     _findings_section,
+    _labels_note,
     _Links,
+    _transcript,
 )
 
 TASK = "tasks/build/x"
@@ -554,3 +556,69 @@ def test_an_earlier_task_version_leaves_the_index_for_the_task_page(tmp_path):
     assert len(earlier) == 2, "the earlier versions come last, in their own section"
     assert "old-check" in earlier[1] and "old-check" not in earlier[0]
     assert "task old00000 / check c1" in earlier[1]
+
+
+def test_notes_show_with_their_version_check_and_trials_and_survive_a_rebuild(
+    tmp_path,
+):
+    def write_run(name: str, task_version: str) -> None:
+        trial_dir = tmp_path / name / "job" / "t1"
+        trial_dir.mkdir(parents=True)
+        record = {
+            "status": "failed",
+            "task": TASK,
+            "prompt_variant": "default",
+            "treatment": None,
+            "fingerprints": {"task": task_version, "check": "c1"},
+            "agent": {"name": "agent", "harness": "pi"},
+            "checks": [
+                {"name": "a-check", "required": True, "passed": False, "notes": "x"}
+            ],
+        }
+        (trial_dir / "weval.json").write_text(json.dumps(record))
+
+    write_run("20260101-000001__build__x__agent", "old000000000")
+    write_run("20260102-000001__build__x__agent", "new000000000")
+    notes = tmp_path / "_report/notes/build-x"
+    (notes / "new000000000").mkdir(parents=True)
+    (notes / "new000000000/why.md").write_text(
+        "---\nauthor: claude-code  # or a person\ndate: 2026-10-28\n"
+        "check: a-check\ntrials: [t1]\n---\nThe agent kept `WORD` on purpose.\n"
+    )
+    (notes / "old000000000").mkdir()
+    (notes / "old000000000/task.md").write_text("Superseded by the new prompt.\n")
+
+    index = write_report(tmp_path).read_text()
+    write_report(tmp_path)
+
+    # The check's note sits under its finding; the old version's stays off the index.
+    assert "by claude-code, 2026-10-28" in index
+    assert "kept <code>WORD</code> on purpose" in index
+    assert "Superseded" not in index
+    task_html = (tmp_path / "_report/tasks/build-x.html").read_text()
+    current, earlier = task_html.split('<h2 id="earlier-versions">')
+    assert "on <code>a-check</code>" in current and "Superseded" not in current
+    assert "by unknown author" in earlier and "Superseded" in earlier
+    for run in ("20260101-000001", "20260102-000001"):
+        trial_html = next((tmp_path / "_report").glob(f"{run}*/t1.html")).read_text()
+        assert ("on purpose" in trial_html) == (run == "20260102-000001")
+    assert (notes / "new000000000/why.md").exists()
+
+
+def test_a_label_links_its_steps_to_the_transcript():
+    answers = {
+        "model": "jev-1.14.0",
+        "steps_model": "openai/gpt-6-luna",
+        "decision_step": 2,
+        "steps": [{"step": 1, "kind": "source", "why": "lists 4.24.x"}],
+        "cause": {"choice": "followed_source", "confidence": 0.73},
+        "answer_source": {"choice": "own-knowledge", "confidence": 0.5},
+    }
+    steps = [{"step_id": 1, "source": "user"}, {"step_id": 2, "source": "agent"}]
+
+    note, transcript = _labels_note(answers), _transcript(steps)
+
+    assert 'decision step <a href="#step-2">2</a>' in note
+    assert 'relevant steps <a href="#step-1">1</a>' in note
+    assert "cause <code>followed_source</code> (0.73)" in note
+    assert 'id="step-1"' in transcript and 'id="step-2"' in transcript

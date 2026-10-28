@@ -25,9 +25,10 @@ from weval.collect import (
     mean_usage,
 )
 from weval.diagnostics import diagnose
-from weval.labels import label
+from weval.labels import QUESTIONS, label
 from weval.report.assets import LOGO, STYLE
 from weval.report.findings import BASELINE, FailureGroup, TaskReliability
+from weval.report.notes import Note
 
 # A JSON array longer than this shows its first items and points to the raw file.
 LIST_LIMIT = 50
@@ -181,6 +182,7 @@ def _finding(
                 ],
             )
         )
+    body.extend(_note(note, links, show_check=False) for note in group.notes)
     body.append(_failing_trials(group, links, trial_pages))
     anchor = anchor_prefix + _finding_anchor(
         group.task, group.prompt_variant, group.check
@@ -225,12 +227,14 @@ def _failing_trials(
     )
     for run, trial in failing:
         name = trial.path.name
-        source = ""
-        if name in group.sources:
-            choice, confidence = group.sources[name]
-            source = (
-                f"{escape(choice.removeprefix('https://'))} "
-                f'<span class="muted">{confidence}</span>'
+        answers = group.trial_labels.get(name)
+        jev = ""
+        if answers:
+            cause, source = answers["cause"], answers["answer_source"]
+            jev = (
+                f'{escape(cause["choice"])} <span class="muted">{cause["confidence"]}</span>'
+                f"<br>{escape(str(source['choice']).removeprefix('https://'))} "
+                f'<span class="muted">{source["confidence"]}</span>'
             )
         proposed = reason = ""
         if name in rule:
@@ -243,7 +247,7 @@ def _failing_trials(
             f"<td>{links.link(trial_pages[trial.path], name, css='mono')}</td>"
             f"<td>{escape(run.agent)}</td>"
             f"<td>{f'+ {escape(run.treatment)}' if run.treatment else BASELINE}</td>"
-            f'<td class="wrapping">{source}</td>'
+            f'<td class="wrapping">{jev}</td>'
             f"<td>{proposed}</td>"
             f'<td class="wrapping">{reason}</td></tr>'
         )
@@ -251,7 +255,7 @@ def _failing_trials(
         '<div class="part"><div class="who"><span class="pill">Failing Trials</span>'
         '<span class="note">judged one by one by the hand-coded rule and Jev</span></div>'
         '<table class="plain trials"><thead><tr>'
-        "<th>Trial</th><th>Agent</th><th>Arm</th><th>Jev's answer source</th>"
+        "<th>Trial</th><th>Agent</th><th>Arm</th><th>Jev's cause and source</th>"
         "<th>Rule's class</th><th>Rule's reason</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
@@ -604,13 +608,14 @@ def render_task(
     trial_pages: dict[Path, Path],
     file_pages: dict[Path, Path],
     docs: Path | None = None,
-    earlier: list[tuple[TaskReliability, list[FailureGroup]]] = (),
+    notes: list[Note] = (),
+    earlier: list[tuple[TaskReliability, list[FailureGroup], list[Note]]] = (),
 ) -> str:
     """Return one Task and prompt variant's page: the definition its newest
     run packaged (prompt, checks, and files) and the current version's runs,
-    each with its Trials. ``row`` covers the current version, and
-    ``earlier`` each earlier version, newest first, with its findings;
-    they are listed at the bottom. ``file_pages`` maps packaged files to
+    each with its Trials. ``row`` covers the current version, with its
+    ``notes`` at the top, and ``earlier`` each earlier version, newest
+    first, with its findings and notes; they are listed at the bottom. ``file_pages`` maps packaged files to
     their rendered pages; a file without one links to the raw file.
     ``docs`` is the Task's page under ``docs/tasks/``, when one exists.
     Links are relative to ``page_dir``."""
@@ -637,7 +642,7 @@ def render_task(
     if docs:
         facts.append(("Documentation", links.link(docs, docs.name)))
     if earlier:
-        earlier_runs = sum(len(version.runs) for version, _ in earlier)
+        earlier_runs = sum(len(version.runs) for version, _, _ in earlier)
         link = f'<a href="#earlier-versions">{len(earlier)}, {earlier_runs} runs</a>'
         facts.append(("Earlier versions", link))
 
@@ -649,6 +654,8 @@ def render_task(
         f"<h1>{LOGO}{escape(_task_name(row.task))}{_variant_note(row.prompt_variant)}</h1>",
         _facts(facts),
     ]
+    if notes:
+        sections.append(f"<h2>Notes{_count(notes)}</h2>{_notes(notes, links)}")
     prompt_file = package / "instruction.md"
     if prompt_file.is_file():
         sections.append(
@@ -674,19 +681,19 @@ def render_task(
 
 
 def _earlier_versions(
-    earlier: list[tuple[TaskReliability, list[FailureGroup]]],
+    earlier: list[tuple[TaskReliability, list[FailureGroup], list[Note]]],
     links: "_Links",
     trial_pages: dict[Path, Path],
 ) -> str:
     """One folded row per earlier version, newest first, opening to its
-    findings and runs."""
+    notes, findings, and runs."""
     intro = (
         "Runs of this Task under an earlier Task or check version: a different prompt, "
         "environment, snapshot, or checks. Their findings stay here rather than in the "
         "report's findings, which cover the current version only."
     )
     rows = []
-    for version, groups in earlier:
+    for version, groups, notes in earlier:
         fingerprints = version.runs[0].fingerprints or {}
         name = " / ".join(
             f"{key} {escape(fingerprints[key][:8])}"
@@ -712,7 +719,8 @@ def _earlier_versions(
             else '<p class="muted">No failed checks.</p>'
         )
         body = (
-            f"<h3>Findings{_count(groups)}</h3>{findings}"
+            (f"<h3>Notes{_count(notes)}</h3>{_notes(notes, links)}" if notes else "")
+            + f"<h3>Findings{_count(groups)}</h3>{findings}"
             f"<h3>Runs</h3>{_task_runs(version, links, trial_pages)}"
         )
         cells = [
@@ -861,12 +869,14 @@ def render_trial(
     task_page: Path,
     expected: dict | None = None,
     proposals: dict[str, list[dict]] | None = None,
+    notes: list[Note] = (),
 ) -> str:
     """Return one Trial's page; links are relative to ``page_dir``, and the
     Task's name links to ``task_page``.
     ``expected`` is the Task's ``EXPECTED``, for the checks' diagnostics;
     ``proposals`` maps a failed check to its saved class proposals, each
-    ``{"class", "who", "reason"}``."""
+    ``{"class", "who", "reason"}``; ``notes`` are the notes naming the
+    Trial."""
     links = _Links(page_dir, {(run.task, run.prompt_variant): task_page})
     record = trial.record or {}
     agent = record.get("agent") or {}
@@ -951,6 +961,10 @@ def render_trial(
             else '<p class="muted">No checks recorded.</p>'
         )
         + _diagnostics(found),
+    ]
+    if notes:
+        sections.append(f"<h2>Notes{_count(notes)}</h2>{_notes(notes, links)}")
+    sections += [
         "<h2>Usage</h2>" + _usage(trial, usage),
         "<h2>Files</h2>"
         + '<p class="links">'
@@ -987,6 +1001,25 @@ def render_trial(
             f'<div class="tree">{_tree_children(trial.record, open_depth=0)}</div></details>'
         )
     return _page(f"{_task_name(run.task)} with {run.agent}", "\n".join(sections))
+
+
+def _notes(notes: list[Note], links: "_Links") -> str:
+    return f'<div class="card">{"".join(_note(note, links) for note in notes)}</div>'
+
+
+def _note(note: Note, links: "_Links", *, show_check: bool = True) -> str:
+    """One note with its author, date, and file; ``show_check`` names the
+    check it is about, which a finding's own note need not repeat."""
+    about = [f"by {escape(note.author or 'unknown author')}"]
+    if note.date:
+        about.append(escape(note.date))
+    if show_check and note.check:
+        about.append(f"on <code>{escape(note.check)}</code>")
+    about.append(links.link(note.path, note.path.name))
+    return (
+        f'<div class="part"><div class="who"><span class="pill">Note</span>'
+        f'<span class="note">{", ".join(about)}</span></div>{_block_markdown(note.body)}</div>'
+    )
 
 
 def _checks_table(
@@ -1029,13 +1062,24 @@ def _seen_note(item: dict | None) -> str:
 
 
 def _labels_note(answers: dict | None) -> str:
-    """A failed check's saved Jev labels, each with its confidence."""
+    """A failed check's saved labels: Jev's answers, each with its
+    confidence, after the steps the step finder chose, linked to this
+    page's transcript."""
     if answers is None:
         return ""
+
+    def step(number: int) -> str:
+        return f'<a href="#step-{number}">{number}</a>'
+
+    decided = answers["decision_step"]
+    relevant = ", ".join(step(s["step"]) for s in answers["steps"])
     parts = [
+        f"decision step {step(decided)}" if decided is not None else "no decision step",
+        f"relevant steps {relevant or 'none'} ({escape(str(answers['steps_model']))})",
+    ] + [
         f"{question.replace('_', ' ')} <code>{escape(str(answers[question]['choice']))}</code> "
         f"({answers[question]['confidence']})"
-        for question in ("answer_source", "verification")
+        for question in QUESTIONS
     ]
     return f'<p class="note">{" · ".join(parts)} · {escape(str(answers["model"]))}</p>'
 
@@ -1133,7 +1177,9 @@ def _transcript(steps: list[dict]) -> str:
     call with its arguments and collapsed output."""
     started = _parse_time(steps[0].get("timestamp")) if steps else None
     items = []
-    for step in steps:
+    for position, step in enumerate(steps, 1):
+        # Labels name steps by Harbor's step_id, as weval.labels does.
+        number = step.get("step_id", position)
         source = step.get("source", "")
         at = _parse_time(step.get("timestamp"))
         offset = (
@@ -1194,7 +1240,9 @@ def _transcript(steps: list[dict]) -> str:
             f' <span class="muted">+{offset}</span>'
             f' <span class="preview">{_step_preview(step)}</span></summary>'
         )
-        items.append(f'<li class="step"><details>{head}{"".join(parts)}</details></li>')
+        items.append(
+            f'<li class="step" id="step-{escape(str(number))}"><details>{head}{"".join(parts)}</details></li>'
+        )
     return f'<ol class="steps">{"".join(items)}</ol>'
 
 

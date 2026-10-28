@@ -41,7 +41,7 @@ API = "https://openrouter.ai/api"
 MODEL = "anthropic/claude-sonnet-5.5"
 KEY_VAR = "OPENROUTER_API_KEY"
 # Raise when SYSTEM, SCHEMA, or the shape of facts() changes meaning.
-PROMPT_VERSION = "2"
+PROMPT_VERSION = "3"
 ATTEMPTS = 3
 DIRECTORY = "_analysis"
 # Check failure messages are capped one by one; the analyst needs what was
@@ -72,8 +72,10 @@ both arms and whether the Treatment helped, hurt, or left its pass rate unchange
 usage changes; and every failed check of every Trial, with the Trial's agent. A failed check carries its \
 failure message; for some checks, the \
 value the check expected and whether that value appeared in what the agent was shown; and Jev labels, a \
-classifier's reading of which source the agent took the failed value from (a URL, a Treatment file, a \
-search, or own-knowledge) and what the agent did to verify it, each with a confidence from 0 to 1.
+classifier's reading of the trace steps that bear on the failed choice: why the agent made it (no_lookup, \
+followed_source, ignored_current_practice, considered_and_rejected, environment_forced, or \
+no_trace_evidence) and which source it took the value from (a URL, a Treatment file, a search, or \
+own-knowledge), each with a confidence from 0 to 1.
 
 Answer with:
 - result: one sentence on what the Treatment changed, with both arms' pass counts and how many agents it \

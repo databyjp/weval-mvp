@@ -1,6 +1,6 @@
 # Ecommerce search workspace
 
-This directory contains the FastAPI application. Python 3.13, FastAPI, Uvicorn, and the Weaviate Python client are installed.
+This directory contains the FastAPI application. Python 3.13, FastAPI, and Uvicorn are installed. The application runs with this Python (`python3`), so install any other packages it needs there.
 
 A Docker daemon and Docker Compose are available for supporting services. The application itself runs directly in this workspace rather than in the submitted Compose stack.
 

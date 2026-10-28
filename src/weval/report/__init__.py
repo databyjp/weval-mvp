@@ -7,9 +7,11 @@ and prompt variant under ``_report/tasks/`` (with one syntax-highlighted
 page per packaged Task file beside it) and one page per Trial under
 ``_report/<run>/<trial>.html``. The index covers each Task's current
 version only (``collect.split_versions``); its earlier versions, with their
-findings, are at the bottom of its Task page. It renders only retained files, saved
-analyses, and saved labels: building the report never calls the analyst or
-Jev, and never modifies a run directory. Pages link to each other and to
+findings, are at the bottom of its Task page. Notes written under
+``_report/notes/`` (``weval.report.notes``) show beside the findings, Task
+versions, and Trials they name. It renders only retained files, saved
+analyses, saved labels, and notes: building the report never calls the
+analyst or Jev, and never modifies a run directory or a note. Pages link to each other and to
 retained files relatively, so the site opens from ``file://``.
 """
 
@@ -24,7 +26,9 @@ from weval.collect import (
     compare_treatments,
     split_versions,
 )
-from weval.report.findings import failure_groups, task_reliability
+from weval.report.findings import FailureGroup, failure_groups, task_reliability
+from weval.report.notes import DIRECTORY as NOTES_DIR
+from weval.report.notes import Note, read_notes
 from weval.report.pages import _task_name, render_index, render_task, render_trial
 from weval.report.source import render_source
 
@@ -74,6 +78,12 @@ def write_report(outputs_dir: Path) -> Path:
         for row in reliability
     }
     file_pages: dict[Path, Path] = {}
+    notes_dir = pages_dir / NOTES_DIR
+    current_notes = {
+        (row.task, row.prompt_variant): _version_notes(notes_dir, row.runs)
+        for row in reliability
+    }
+    trial_notes: dict[Path, list[Note]] = {}
     for row in reliability:
         page = task_pages[row.task, row.prompt_variant]
         page.parent.mkdir(parents=True, exist_ok=True)
@@ -86,9 +96,21 @@ def write_report(outputs_dir: Path) -> Path:
         for version_runs in earlier.get((row.task, row.prompt_variant), []):
             version_analyses = _analyses_of(version_runs, analyses)
             (version_row,) = task_reliability(version_runs, version_analyses, fixtures)
-            earlier_versions.append(
-                (version_row, failure_groups(version_runs, version_analyses))
-            )
+            version_groups = failure_groups(version_runs, version_analyses)
+            version_notes = _version_notes(notes_dir, version_runs)
+            _attach_notes(version_groups, version_notes)
+            earlier_versions.append((version_row, version_groups, version_notes))
+        task_notes = current_notes[row.task, row.prompt_variant]
+        # A note names Trials by directory name, within its own version.
+        for version_row, notes in [
+            (row, task_notes),
+            *((version, notes) for version, _, notes in earlier_versions),
+        ]:
+            for run in version_row.runs:
+                for trial in run.trials:
+                    trial_notes[trial.path] = [
+                        n for n in notes if trial.path.name in n.trials
+                    ]
         page.write_text(
             render_task(
                 row,
@@ -97,6 +119,7 @@ def write_report(outputs_dir: Path) -> Path:
                 trial_pages=trial_pages,
                 file_pages=task_files,
                 docs=docs if docs.is_file() else None,
+                notes=task_notes,
                 earlier=earlier_versions,
             )
         )
@@ -113,6 +136,7 @@ def write_report(outputs_dir: Path) -> Path:
                     task_page=task_pages[run.task, run.prompt_variant],
                     expected=expected[run.task],
                     proposals=proposals.get(trial.path.name, {}),
+                    notes=trial_notes.get(trial.path, []),
                 )
             )
     _remove_stale_pages(
@@ -120,11 +144,17 @@ def write_report(outputs_dir: Path) -> Path:
         {*trial_pages.values(), *task_pages.values(), *file_pages.values()},
     )
 
+    groups = failure_groups(current, current_analyses)
+    for (task, prompt_variant), notes in current_notes.items():
+        task_groups = [
+            g for g in groups if (g.task, g.prompt_variant) == (task, prompt_variant)
+        ]
+        _attach_notes(task_groups, notes)
     index.write_text(
         render_index(
             current,
             current_analyses,
-            failure_groups(current, current_analyses),
+            groups,
             reliability,
             earlier,
             index_dir=outputs_dir,
@@ -172,6 +202,29 @@ def _analyses_of(
         for comparison, found in analyses
         if any(run.path in paths for run in [*comparison.baseline, *comparison.treated])
     ]
+
+
+def _version_notes(notes_dir: Path, runs: list[RunSummary]) -> list[Note]:
+    """The notes for the Task version that ``runs`` share, found by the
+    first recorded Task fingerprint; runs from before fingerprints read
+    ``unversioned``."""
+    version = next(
+        (
+            run.fingerprints["task"]
+            for run in runs
+            if (run.fingerprints or {}).get("task")
+        ),
+        "unversioned",
+    )
+    task_page_name = _task_page_name(runs[0].task, runs[0].prompt_variant)
+    return read_notes(notes_dir, task_page_name, version)
+
+
+def _attach_notes(groups: list[FailureGroup], notes: list[Note]) -> None:
+    """Give each of one Task version's findings the notes that name its
+    check."""
+    for group in groups:
+        group.notes = [note for note in notes if note.check == group.check]
 
 
 def _task_page_name(task: str, prompt_variant: str) -> str:

@@ -12,8 +12,7 @@ RUN apt-get update \
         uv==0.9.25 \
         fastapi==0.141.1 \
         httpx==0.28.1 \
-        uvicorn==0.52.4 \
-        weaviate-client==4.23.1
+        uvicorn==0.52.4
 
 COPY products.json /fixtures/products.json
 COPY app/ /app/

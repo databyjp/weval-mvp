@@ -9,8 +9,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl git \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir \
-        uv==0.9.25 \
-        weaviate-client==4.23.1
+        uv==0.9.25
 
 COPY app/ /app/
 

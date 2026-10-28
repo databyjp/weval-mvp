@@ -5,7 +5,7 @@ one Task and prompt variant, with per-arm fail counts computed from the
 retained ``weval.json`` records alone, so the findings section is structurally
 true even where nothing has been analysed. Saved judgments attach to that
 skeleton as annotations with provenance: the analyst's patterns, the rule's
-proposals, their disagreements, and Jev's answer-source labels. Nothing here
+proposals, their disagreements, and Jev's labels. Nothing here
 calls an LLM; analyses and labels are read as saved.
 """
 
@@ -15,6 +15,7 @@ from pathlib import Path
 
 from weval import labels
 from weval.collect import Comparison, RunSummary, TrialSummary
+from weval.report.notes import Note
 
 BASELINE = "baseline"
 # Classes that blame weval rather than the agent or Weaviate.
@@ -34,8 +35,10 @@ class FailureGroup:
     ``patterns`` holds the analyst patterns covering the check (each with its
     ``model`` and ``treatment`` added), ``proposals`` the rule's per-Trial
     classifications, ``disputed`` the (trial, analyst class, rule class)
-    disagreements, and ``sources`` maps each failing Trial's directory name to
-    its saved Jev answer-source label as ``(choice, confidence)``.
+    disagreements, and ``trial_labels`` maps each failing Trial's directory
+    name to its saved labels for the check (``labels.label``). ``notes``
+    holds the notes written about the check, which ``failure_groups`` leaves
+    for the caller to attach.
     """
 
     task: str
@@ -52,7 +55,8 @@ class FailureGroup:
     patterns: list[dict] = field(default_factory=list)
     proposals: list[dict] = field(default_factory=list)
     disputed: list[dict] = field(default_factory=list)
-    sources: dict[str, tuple[str, float]] = field(default_factory=dict)
+    trial_labels: dict[str, dict] = field(default_factory=dict)
+    notes: list[Note] = field(default_factory=list)
 
     @property
     def proposed_class(self) -> str:
@@ -158,9 +162,9 @@ def failure_groups(
                 fail_counts.setdefault(key, Counter())[arm] += 1
                 group.failing_agents.setdefault(arm, []).append(run.agent)
                 group.failing.append((run, trial))
-                source = _answer_source(trial, check, label_cache)
-                if source:
-                    group.sources[trial.path.name] = source
+                answers = _labels(trial, check, label_cache)
+                if answers:
+                    group.trial_labels[trial.path.name] = answers
     # Every arm of the group's Task and prompt variant gets a count, so a
     # check failing in one arm still shows the others' 0 of N.
     for key, group in groups.items():
@@ -308,15 +312,9 @@ def _description(trial: TrialSummary, check: str) -> str:
     return ""
 
 
-def _answer_source(
-    trial: TrialSummary, check: str, cache: dict[Path, dict]
-) -> tuple[str, float] | None:
-    """The saved Jev answer-source label for one failed check, if any."""
+def _labels(trial: TrialSummary, check: str, cache: dict[Path, dict]) -> dict | None:
+    """The saved labels for one failed check, if any."""
     if trial.path not in cache:
         checks = (trial.record or {}).get("checks") or []
         cache[trial.path] = labels.label(trial.path, checks, call=False)["labels"]
-    answers = cache[trial.path].get(check)
-    if not answers:
-        return None
-    source = answers["answer_source"]
-    return str(source["choice"]), source["confidence"]
+    return cache[trial.path].get(check)

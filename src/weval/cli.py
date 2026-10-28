@@ -29,6 +29,11 @@ def print_labels(answers: dict) -> None:
     # Imported here so ``weval --help`` does not pay for labels' httpx import.
     from weval.labels import QUESTIONS
 
+    steps = ", ".join(f"{s['step']} ({s['kind']})" for s in answers["steps"])
+    print(
+        f"     decided at step {answers['decision_step']}; relevant steps: "
+        f"{steps or 'none'} ({answers['steps_model']})"
+    )
     for question in QUESTIONS:
         answer = answers[question]
         print(

@@ -1,7 +1,6 @@
 # Weaviate workspace
 
-A Docker daemon and Docker Compose are available. Python 3.13 and the Weaviate
-Python client are installed.
+A Docker daemon and Docker Compose are available. Python 3.13 is installed.
 
 Define the stack in `/app/docker-compose.yaml`. Name the database service
 `weaviate`. Connect the services to the existing Docker network whose name is

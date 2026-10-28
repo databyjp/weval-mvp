@@ -205,7 +205,8 @@ Each Trial directory is Harbor's own output plus `weval.json`. Start there:
   harness version and timings.
 
 Never edit or summarise retained logs in place. Write analysis to separate
-files. `incomplete` means an expected log is missing; do not treat it as a
+files, such as a [report note](docs/how-to/read-a-trial.md#write-a-note).
+`incomplete` means an expected log is missing; do not treat it as a
 scored result.
 
 ## Pre-0.1 formats

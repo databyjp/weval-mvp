@@ -1,7 +1,7 @@
-"""Jev labels for failed checks are built from the Trial's logs, saved beside
-the run, and asked again only when the request changes. No test calls the
-network: ``labels._post`` is replaced with a fake built from a recorded
-response."""
+"""Labels for failed checks are built from the Trial's logs, saved beside
+the run, and asked again only when a request changes. No test calls the
+network: the step finder (``labels._ask_steps``) and Jev (``labels._post``)
+are replaced with fakes, Jev's built from a recorded response."""
 
 import json
 from pathlib import Path
@@ -55,6 +55,28 @@ def write_trial(run_dir: Path) -> Path:
     return trial
 
 
+class FakeSteps:
+    """Answers like the step finder: the write at step 3 decided the value
+    and the release notes at step 1 bear on it."""
+
+    def __init__(self):
+        self.requests = []
+
+    def __call__(self, body: dict, key: str) -> dict:
+        self.requests.append(body)
+        return {
+            "model": "openai/gpt-6-luna",
+            "checks": [
+                {
+                    "check": "python-client-version-latest",
+                    "decision_step": 3,
+                    "relevant": [{"step": 1, "kind": "source", "why": "lists 4.24.x"}],
+                }
+            ],
+            "usage": {"cost": 0.001},
+        }
+
+
 class FakeJev:
     """Answers like the recorded response, choosing the first source."""
 
@@ -63,22 +85,32 @@ class FakeJev:
 
     def __call__(self, body: dict, key: str) -> dict:
         self.requests.append(body)
-        verification = RECORDED["answers"]["verification"]
+        recorded = RECORDED["answers"]["verification"]
+        cause = {
+            **recorded,
+            "choice": "followed_source",
+            "probabilities": {option: 0.0 for option in labels.CAUSES},
+        }
         source = {
-            **verification,
+            **recorded,
             "choice": "source_000",
             "probabilities": {
                 option: 0.0 for option in body["questions"]["answer_source"]["criteria"]
             },
         }
-        return {
-            **RECORDED,
-            "answers": {"answer_source": source, "verification": verification},
-        }
+        return {**RECORDED, "answers": {"cause": cause, "answer_source": source}}
 
 
 @pytest.fixture
-def jev(monkeypatch):
+def steps(monkeypatch):
+    fake = FakeSteps()
+    monkeypatch.setattr(labels, "_ask_steps", fake)
+    monkeypatch.setenv(labels.STEPS_KEY_VAR, "test-key")
+    return fake
+
+
+@pytest.fixture
+def jev(monkeypatch, steps):
     fake = FakeJev()
     monkeypatch.setattr(labels, "_post", fake)
     monkeypatch.setenv(labels.KEY_VAR, "test-key")
@@ -94,8 +126,11 @@ def test_each_failed_check_gets_both_labels_and_they_are_saved(tmp_path, jev):
         "labels": {
             "python-client-version-latest": {
                 "model": "jev-1.14.0",
+                "steps_model": "openai/gpt-6-luna",
+                "decision_step": 3,
+                "steps": [{"step": 1, "kind": "source", "why": "lists 4.24.x"}],
+                "cause": {"choice": "followed_source", "confidence": 0.73},
                 "answer_source": {"choice": RELEASE_NOTES, "confidence": 0.73},
-                "verification": {"choice": "deferred_to_user", "confidence": 0.73},
             }
         },
         "note": None,
@@ -104,12 +139,43 @@ def test_each_failed_check_gets_both_labels_and_they_are_saved(tmp_path, jev):
     assert (tmp_path / "labels/trial.json").exists()
 
 
-def test_sources_are_what_the_agent_was_shown(tmp_path, jev):
+def test_jev_reads_only_the_selected_steps_and_their_sources(tmp_path, jev, steps):
     labels.label(write_trial(tmp_path), FAILED)
 
+    # The step finder reads the whole trace and may name only failed checks.
+    trace = steps.requests[0]["messages"][1]["content"]
+    assert "### Step 2 (agent)" in trace
+    schema = steps.requests[0]["response_format"]["json_schema"]["schema"]
+    check = schema["properties"]["checks"]["items"]["properties"]["check"]
+    assert check["enum"] == ["python-client-version-latest"]
+    # Jev reads steps 1 and 3, not the ToolSearch at step 2, nor the reasons.
+    shown = jev.requests[0]["state"]["steps"]
+    assert [text.split("\n")[:2] for text in shown] == [
+        ["[source]", "### Step 1 (agent)"],
+        ["[decision]", "### Step 3 (agent)"],
+    ]
+    assert "lists 4.24.x" not in json.dumps(jev.requests[0])
     options = jev.requests[0]["questions"]["answer_source"]["criteria"]
-    names = [description.split("\n")[0] for description in options.values()]
-    assert names == [RELEASE_NOTES, labels.OWN_KNOWLEDGE]
+    assert list(options.values()) == [
+        f"{RELEASE_NOTES} (shown in step 1)",
+        labels.OWN_KNOWLEDGE,
+    ]
+
+
+def test_steps_missing_from_the_trace_are_dropped(tmp_path, jev, steps, monkeypatch):
+    def finder(body: dict, key: str) -> dict:
+        answer = FakeSteps()(body, key)
+        answer["checks"][0]["decision_step"] = 99
+        answer["checks"][0]["relevant"][0]["step"] = 0
+        return answer
+
+    monkeypatch.setattr(labels, "_ask_steps", finder)
+
+    found = labels.label(write_trial(tmp_path), FAILED)["labels"]
+
+    assert found["python-client-version-latest"]["decision_step"] is None
+    assert found["python-client-version-latest"]["steps"] == []
+    assert jev.requests[0]["state"]["steps"] == []
 
 
 def test_pi_pages_and_claude_code_skills_count_for_their_source(tmp_path):
@@ -160,11 +226,10 @@ def test_pi_pages_and_claude_code_skills_count_for_their_source(tmp_path):
         {"source": "user", "message": skill_text},
     ]
 
-    sources = labels._sources(steps, tmp_path / "skills")
+    names = labels._source_names(labels._numbered(steps), tmp_path / "skills")
 
     # The unread page is not a source: the agent saw only its title.
-    assert list(sources) == [page, "best/SKILL.md"]
-    assert sources[page].startswith("# Vector config")
+    assert names == {1: [page], 2: ["best/SKILL.md"]}
 
 
 def test_a_trial_whose_snapshot_failed_is_not_labelled(tmp_path, jev):
@@ -181,20 +246,20 @@ def test_a_trial_whose_snapshot_failed_is_not_labelled(tmp_path, jev):
     assert jev.requests == []
 
 
-def test_a_saved_label_is_reused_until_the_request_changes(tmp_path, jev):
+def test_a_saved_label_is_reused_until_the_request_changes(tmp_path, jev, steps):
     trial = write_trial(tmp_path)
     labels.label(trial, FAILED)
 
     assert labels.label(trial, FAILED)["labels"]
-    assert len(jev.requests) == 1
+    assert (len(steps.requests), len(jev.requests)) == (1, 1)
 
     rescored = [{**FAILED[0], "notes": "got 'Python 4.24'"}]
     labels.label(trial, rescored)
-    assert len(jev.requests) == 2
+    assert (len(steps.requests), len(jev.requests)) == (2, 2)
 
 
-def test_without_the_key_or_a_call_only_saved_labels_are_returned(
-    tmp_path, jev, monkeypatch
+def test_without_the_keys_or_a_call_only_saved_labels_are_returned(
+    tmp_path, jev, steps, monkeypatch
 ):
     trial = write_trial(tmp_path)
 
@@ -204,9 +269,9 @@ def test_without_the_key_or_a_call_only_saved_labels_are_returned(
     }
     monkeypatch.delenv(labels.KEY_VAR)
     assert labels.label(trial, FAILED)["note"] == (
-        f"unlabelled ({labels.KEY_VAR} is not set): python-client-version-latest"
+        f"unlabelled ({labels.KEY_VAR} not set): python-client-version-latest"
     )
-    assert jev.requests == []
+    assert steps.requests == jev.requests == []
 
 
 def test_a_run_is_labelled_after_scoring_and_a_failure_does_not_raise(
@@ -216,8 +281,12 @@ def test_a_run_is_labelled_after_scoring_and_a_failure_does_not_raise(
 
     trial = write_trial(tmp_path)
     (trial / "weval.json").write_text(json.dumps({"checks": FAILED}))
+    monkeypatch.delenv(labels.STEPS_KEY_VAR, raising=False)
     monkeypatch.delenv(labels.KEY_VAR, raising=False)
 
     label_run(tmp_path)
 
-    assert f"unlabelled ({labels.KEY_VAR} is not set)" in capsys.readouterr().out
+    assert (
+        f"unlabelled ({labels.STEPS_KEY_VAR} and {labels.KEY_VAR} not set)"
+        in capsys.readouterr().out
+    )
