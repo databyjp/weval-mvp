@@ -232,7 +232,7 @@ def test_findings_group_by_task_with_the_most_failures_first(tmp_path):
     groups = failure_groups([x, y], [])
     pages = {t.path: tmp_path / f"{t.path.name}.html" for r in (x, y) for t in r.trials}
 
-    html = _findings_section(groups, _Links(tmp_path), pages)
+    html = _findings_section(groups, {}, _Links(tmp_path), pages)
 
     headings = re.findall(r"<h3>([^< ]+)", html)
     assert headings == ["build/y", "build/x"]
@@ -520,3 +520,37 @@ def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
     assert '<span class="k">def</span>' in check_page.read_text()
     assert 'href="build-x/tests/check.py.html#L-4">source</a>' in task_html
     assert f"../{run_dir.name}/task/environment/data.bin" in task_html
+
+
+def test_an_earlier_task_version_leaves_the_index_for_the_task_page(tmp_path):
+    def write_run(name: str, task_version: str, failed: str) -> None:
+        trial_dir = tmp_path / name / "job" / "t1"
+        trial_dir.mkdir(parents=True)
+        record = {
+            "status": "failed",
+            "task": TASK,
+            "prompt_variant": "default",
+            "treatment": None,
+            "fingerprints": {"task": task_version, "check": "c1"},
+            "agent": {"name": "agent", "harness": "pi"},
+            "checks": [
+                {"name": failed, "required": True, "passed": False, "notes": "x"}
+            ],
+        }
+        (trial_dir / "weval.json").write_text(json.dumps(record))
+
+    write_run("20260101-000001__build__x__agent", "old000000000", "old-check")
+    write_run("20260102-000001__build__x__agent", "new000000000", "new-check")
+
+    index = write_report(tmp_path).read_text()
+
+    assert "new-check" in index and "old-check" not in index
+    assert (
+        'href="_report/tasks/build-x.html#earlier-versions">1 earlier version, 1 run'
+        in index
+    )
+    task_html = (tmp_path / "_report" / "tasks" / "build-x.html").read_text()
+    earlier = task_html.split('<h2 id="earlier-versions">')
+    assert len(earlier) == 2, "the earlier versions come last, in their own section"
+    assert "old-check" in earlier[1] and "old-check" not in earlier[0]
+    assert "task old00000 / check c1" in earlier[1]

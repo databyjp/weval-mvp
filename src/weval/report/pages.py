@@ -53,14 +53,17 @@ def render_index(
     analyses: list[tuple[Comparison, dict]],
     groups: list[FailureGroup],
     reliability: list[TaskReliability],
+    earlier: dict[tuple[str, str], list[list[RunSummary]]],
     *,
     index_dir: Path,
     trial_pages: dict[Path, Path],
     task_pages: dict[tuple[str, str], Path],
     generated: datetime,
 ) -> str:
-    """Return ``index.html``. ``analyses`` pairs each Comparison with its
-    saved ``analysis.analyse`` result; ``trial_pages`` maps each Trial
+    """Return ``index.html`` over each Task's current version. ``analyses``
+    pairs each Comparison with its saved ``analysis.analyse`` result;
+    ``earlier`` holds each Task's earlier versions, which the index only
+    counts and links to the Task page; ``trial_pages`` maps each Trial
     directory to its page, and ``task_pages`` each ``(task, prompt variant)``
     to its Task page. Links are relative to ``index_dir``."""
     links = _Links(index_dir, task_pages)
@@ -80,9 +83,9 @@ def render_index(
 Generated {generated:%Y-%m-%d %H:%M}.</span>
 <nav class="sections"><a href="#findings">Findings</a><a href="#comparisons">Treatment comparisons</a>
 <a href="#reliability">Task reliability</a></nav></header>
-{_findings_section(groups, links, trial_pages)}
+{_findings_section(groups, earlier, links, trial_pages)}
 {_comparisons_section(analyses, links, trial_pages)}
-{_reliability_section(reliability, links)}"""
+{_reliability_section(reliability, earlier, links)}"""
     return _page("Weaviate AX Evaluation", body)
 
 
@@ -90,10 +93,15 @@ Generated {generated:%Y-%m-%d %H:%M}.</span>
 
 
 def _findings_section(
-    groups: list[FailureGroup], links: "_Links", trial_pages: dict[Path, Path]
+    groups: list[FailureGroup],
+    earlier: dict[tuple[str, str], list[list[RunSummary]]],
+    links: "_Links",
+    trial_pages: dict[Path, Path],
 ) -> str:
     intro = (
-        "Findings are grouped by Task, the Task with the most failures first. Each row is one "
+        "Findings are grouped by Task, the Task with the most failures first, and cover the "
+        "Task's current version: its newest run's Task and check versions. Earlier versions "
+        "are at the bottom of the Task's page. Each row is one "
         "check that failed, with its failure rate in the baseline: the bar fills to the rate, "
         "red for a required check and orange for a preferred one. Required checks come first. "
         "A check that failed only with a Treatment shows that arm's rate instead, after the "
@@ -119,14 +127,22 @@ def _findings_section(
         rows = "".join(_finding(group, links, trial_pages) for group in task_groups)
         lists.append(
             f"<h3>{links.task(task, prompt_variant)}{_count(task_groups)}</h3>"
+            + _earlier_note(
+                earlier.get((task, prompt_variant), []), task, prompt_variant, links
+            )
             + _fold_list("findings", ["Check", "Failure rate", "Proposed cause"], rows)
         )
     return heading + "".join(lists)
 
 
 def _finding(
-    group: FailureGroup, links: "_Links", trial_pages: dict[Path, Path]
+    group: FailureGroup,
+    links: "_Links",
+    trial_pages: dict[Path, Path],
+    anchor_prefix: str = "",
 ) -> str:
+    """One finding's row; ``anchor_prefix`` keeps its anchor unique on a
+    page that lists several versions of one Task."""
     # The summary row is the whole finding at a glance; opening it shows the
     # detail at once, with no second fold to open.
     arm, failed, scored = group.headline()
@@ -166,7 +182,9 @@ def _finding(
             )
         )
     body.append(_failing_trials(group, links, trial_pages))
-    anchor = _finding_anchor(group.task, group.prompt_variant, group.check)
+    anchor = anchor_prefix + _finding_anchor(
+        group.task, group.prompt_variant, group.check
+    )
     css = "required" if group.required else "preferred"
     return _fold(anchor, summary, "".join(body), css)
 
@@ -470,7 +488,11 @@ def _analysis(found: dict, comparison: Comparison) -> str:
 # --- Task reliability ----------------------------------------------------------
 
 
-def _reliability_section(reliability: list[TaskReliability], links: "_Links") -> str:
+def _reliability_section(
+    reliability: list[TaskReliability],
+    earlier: dict[tuple[str, str], list[list[RunSummary]]],
+    links: "_Links",
+) -> str:
     intro = (
         "Before trusting a number above, check its Task here, arm by arm. An oracle fixture means the reference "
         "solution's snapshot is kept in the test suite, so the checks are calibrated against a known "
@@ -480,7 +502,10 @@ def _reliability_section(reliability: list[TaskReliability], links: "_Links") ->
         "passes, or none does, cannot show a Treatment's effect. Open a Task for its "
         "definition and every retained run and Trial."
     )
-    rows = "".join(_reliability_row(row, links) for row in reliability)
+    rows = "".join(
+        _reliability_row(row, earlier.get((row.task, row.prompt_variant), []), links)
+        for row in reliability
+    )
     return f"""
 <h2 id="reliability">Task reliability{_count(reliability)}</h2>{_intro(intro)}
 <div class="wrap"><table class="reliability">
@@ -489,9 +514,11 @@ def _reliability_section(reliability: list[TaskReliability], links: "_Links") ->
 <tbody>{rows}</tbody></table></div>"""
 
 
-def _reliability_row(row: TaskReliability, links: "_Links") -> str:
-    """The Task's arm rows; the Task's name and calibration, which hold for
-    every arm, span them."""
+def _reliability_row(
+    row: TaskReliability, earlier: list[list[RunSummary]], links: "_Links"
+) -> str:
+    """The Task's arm rows; the Task's name, calibration, and earlier
+    versions, which hold for every arm, span them."""
     calibrated = (
         '<span class="chip pass">oracle fixture</span>'
         if row.calibrated
@@ -499,7 +526,8 @@ def _reliability_row(row: TaskReliability, links: "_Links") -> str:
     )
     task = (
         f'<td class="task" rowspan="{len(row.arms)}">'
-        f"<div>{links.task(row.task, row.prompt_variant)}</div>{calibrated}</td>"
+        f"<div>{links.task(row.task, row.prompt_variant)}</div>{calibrated}"
+        f"{_earlier_note(earlier, row.task, row.prompt_variant, links)}</td>"
     )
     anchor = f' id="task-{_slug(row.task)}"'
     rows = []
@@ -576,13 +604,16 @@ def render_task(
     trial_pages: dict[Path, Path],
     file_pages: dict[Path, Path],
     docs: Path | None = None,
+    earlier: list[tuple[TaskReliability, list[FailureGroup]]] = (),
 ) -> str:
     """Return one Task and prompt variant's page: the definition its newest
-    run packaged (prompt, checks, and files) and every retained run, each
-    with its Trials. ``file_pages`` maps packaged files to their rendered
-    pages; a file without one links to the raw file. ``docs`` is the Task's
-    page under ``docs/tasks/``, when one exists. Links are relative to
-    ``page_dir``."""
+    run packaged (prompt, checks, and files) and the current version's runs,
+    each with its Trials. ``row`` covers the current version, and
+    ``earlier`` each earlier version, newest first, with its findings;
+    they are listed at the bottom. ``file_pages`` maps packaged files to
+    their rendered pages; a file without one links to the raw file.
+    ``docs`` is the Task's page under ``docs/tasks/``, when one exists.
+    Links are relative to ``page_dir``."""
     links = _Links(page_dir)
     newest = row.runs[0]
     package = newest.path / "task"
@@ -605,6 +636,10 @@ def render_task(
     ]
     if docs:
         facts.append(("Documentation", links.link(docs, docs.name)))
+    if earlier:
+        earlier_runs = sum(len(version.runs) for version, _ in earlier)
+        link = f'<a href="#earlier-versions">{len(earlier)}, {earlier_runs} runs</a>'
+        facts.append(("Earlier versions", link))
 
     sections = [
         (
@@ -633,7 +668,67 @@ def render_task(
         + _package_files(package, links, file_pages)
     )
     sections.append("<h2>Runs</h2>" + _task_runs(row, links, trial_pages))
+    if earlier:
+        sections.append(_earlier_versions(earlier, links, trial_pages))
     return _page(_task_name(row.task), "\n".join(sections))
+
+
+def _earlier_versions(
+    earlier: list[tuple[TaskReliability, list[FailureGroup]]],
+    links: "_Links",
+    trial_pages: dict[Path, Path],
+) -> str:
+    """One folded row per earlier version, newest first, opening to its
+    findings and runs."""
+    intro = (
+        "Runs of this Task under an earlier Task or check version: a different prompt, "
+        "environment, snapshot, or checks. Their findings stay here rather than in the "
+        "report's findings, which cover the current version only."
+    )
+    rows = []
+    for version, groups in earlier:
+        fingerprints = version.runs[0].fingerprints or {}
+        name = " / ".join(
+            f"{key} {escape(fingerprints[key][:8])}"
+            for key in ("task", "check")
+            if fingerprints.get(key)
+        )
+        dates = sorted(run.date for run in version.runs if run.date)
+        when = (
+            f"{dates[0]:%Y-%m-%d} to {dates[-1]:%Y-%m-%d}"
+            if dates and dates[0].date() != dates[-1].date()
+            else f"{dates[0]:%Y-%m-%d}"
+            if dates
+            else ""
+        )
+        prefix = f"v-{_slug(version.runs[0].path.name)}-"
+        findings = (
+            _fold_list(
+                "findings",
+                ["Check", "Failure rate", "Proposed cause"],
+                "".join(_finding(g, links, trial_pages, prefix) for g in groups),
+            )
+            if groups
+            else '<p class="muted">No failed checks.</p>'
+        )
+        body = (
+            f"<h3>Findings{_count(groups)}</h3>{findings}"
+            f"<h3>Runs</h3>{_task_runs(version, links, trial_pages)}"
+        )
+        cells = [
+            f'<span class="name mono">{name or "unversioned"}</span>',
+            f"<span>{when}</span>",
+            f'<span class="nowrap">{_rate(version.passed, version.scored, "passed")}</span>',
+            f"<span>{len(version.runs)} runs, {len(groups)} findings</span>",
+        ]
+        rows.append(_fold(prefix + "version", cells, body))
+    return (
+        f'<h2 id="earlier-versions">Earlier versions{_count(earlier)}</h2>'
+        f'<p class="intro">{intro}</p>'
+        + _fold_list(
+            "versions", ["Version", "Runs from", "Passed", "Contents"], "".join(rows)
+        )
+    )
 
 
 def _task_checks(
@@ -1298,6 +1393,26 @@ def _facts(rows: list[tuple[str, str]]) -> str:
 
 def _count(items: list) -> str:
     return f' <span class="count">{len(items)}</span>' if items else ""
+
+
+def _earlier_note(
+    versions: list[list[RunSummary]], task: str, prompt_variant: str, links: "_Links"
+) -> str:
+    """A line counting a Task's earlier versions and their runs, linked to
+    the Task page section that lists them; empty when there are none."""
+    if not versions:
+        return ""
+    runs = [run for version in versions for run in version]
+    dates = [run.date for run in runs if run.date]
+    text = (
+        f"{len(versions)} earlier version{'s' if len(versions) > 1 else ''}, "
+        f"{len(runs)} run{'s' if len(runs) > 1 else ''}"
+        + (f", last run {max(dates):%Y-%m-%d}" if dates else "")
+    )
+    page = links.task_pages.get((task, prompt_variant))
+    if page:
+        text = f'<a href="{links.href(page)}#earlier-versions">{text}</a>'
+    return f'<p class="earlier muted">{text}</p>'
 
 
 def _intro(text: str) -> str:

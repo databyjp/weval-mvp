@@ -14,6 +14,7 @@ the options, or the Trial text asks again. Calls need ``TYPESAFEAI_API_KEY``.
 import hashlib
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -35,6 +36,13 @@ MAX_SOURCES = 254
 # A call that returned less showed the agent nothing to take a value from,
 # such as the write that saves an answer citing URLs.
 MIN_SHOWN_CHARS = 200
+# Pi's fetch_content and web_search results end with a responseId; the
+# pages themselves arrive through get_search_content(responseId, urlIndex),
+# whose arguments name no URL.
+RESPONSE_ID = re.compile(r'responseId:?\s*"(\w+)"')
+# Claude Code's Skill tool returns only "Launching skill"; the skill's text
+# arrives as the next user message, which starts with its directory.
+SKILL_BASE = re.compile(r"Base directory for this skill: \S*/skills/([^/\s]+)")
 # The two Choice questions asked per failed check, in presentation order.
 QUESTIONS = ("answer_source", "verification")
 OWN_KNOWLEDGE = (
@@ -57,12 +65,16 @@ def label(trial_dir: Path, results: list[dict], *, call: bool = True) -> dict:
     ``own-knowledge``. With ``call`` false, or without the API key, only
     saved answers are returned and ``note`` says what was skipped. A failed
     request is skipped with a ``note`` rather than raised, so labelling never
-    stops a run.
+    stops a run. A Trial whose snapshot failed is not labelled: its checks
+    failed without observing a value to trace.
     """
     failed = [r for r in results if not r["passed"]]
     trajectory = trial_dir / "agent/trajectory.json"
     if not failed or not trajectory.exists():
         return {"labels": {}, "note": None}
+    snapshot = trial_dir / "verifier/snapshot.json"
+    if snapshot.exists() and "error" in json.loads(snapshot.read_text()):
+        return {"labels": {}, "note": "unlabelled: the snapshot failed"}
     steps = json.loads(trajectory.read_text())["steps"]
     sources = _sources(steps, trial_dir.parents[1] / "treatment/skills")
     messages = [
@@ -112,8 +124,10 @@ def label(trial_dir: Path, results: list[dict], *, call: bool = True) -> dict:
 
 def _sources(steps: list[dict], skills: Path) -> dict[str, str]:
     """What the Trial looked up, by name, with an excerpt of what it was shown:
-    each fetched URL, search, and named Treatment file whose tool call
-    returned at least ``MIN_SHOWN_CHARS``, in first-use order."""
+    each fetched URL, search, and Treatment file whose tool call returned at
+    least ``MIN_SHOWN_CHARS``, in first-use order. A page Pi read with
+    ``get_search_content`` counts for the URL or search that stored it, and
+    a skill Claude Code loaded counts for its ``SKILL.md``."""
     shown = {
         r.get("source_call_id"): str(r.get("content") or "")
         for s in steps
@@ -125,9 +139,17 @@ def _sources(steps: list[dict], skills: Path) -> dict[str, str]:
         else []
     )
     sources: dict[str, str] = {}
+    # responseId -> the URLs the storing call fetched, and the names it got.
+    responses: dict[str, tuple[list, list[str]]] = {}
     for step in steps:
+        skill = SKILL_BASE.match(str(step.get("message") or ""))
+        if step.get("source") == "user" and skill:
+            name = f"{skill[1]}/SKILL.md"
+            if name in treatment_files:
+                sources[name] = sources.get(name, "") + step["message"]
         for call in step.get("tool_calls") or []:
-            if len(shown.get(call.get("tool_call_id"), "")) < MIN_SHOWN_CHARS:
+            content = shown.get(call.get("tool_call_id"), "")
+            if len(content) < MIN_SHOWN_CHARS:
                 continue
             arguments = json.dumps(call.get("arguments"))
             names = URL.findall(arguments)
@@ -140,10 +162,20 @@ def _sources(steps: list[dict], skills: Path) -> dict[str, str]:
                     f"search: {(call.get('arguments') or {}).get('query', arguments)}"
                 ]
             names += [f for f in treatment_files if Path(f).name in arguments]
+            given = call.get("arguments") or {}
+            stored = RESPONSE_ID.search(content)
+            if stored and ("urls" in given or "queries" in given):
+                responses[stored[1]] = (given.get("urls") or [], names)
+                # Only page titles: the pages count when they are read.
+                if content.startswith("## Fetched URLs"):
+                    continue
+            if call["function_name"] == "get_search_content":
+                urls, origin = responses.get(given.get("responseId"), ([], []))
+                index = given.get("urlIndex")
+                in_range = isinstance(index, int) and 0 <= index < len(urls)
+                names = [urls[index]] if in_range else origin
             for name in names:
-                sources[name] = sources.get(name, "") + shown.get(
-                    call.get("tool_call_id"), ""
-                )
+                sources[name] = sources.get(name, "") + content
     sources = dict(list(sources.items())[:MAX_SOURCES])
     share = SOURCES_CHARS // max(len(sources), 1)
     return {name: excerpt[:share] for name, excerpt in sources.items()}

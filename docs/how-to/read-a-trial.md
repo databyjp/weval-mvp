@@ -25,6 +25,9 @@ A comparison holds only runs with the same Task and check versions, and one
 Treatment version ([fingerprints](../reference.md#the-trial-directory)). Runs
 recorded before fingerprints existed are pooled with each other, so after a
 `check.py` change, re-score both arms with `weval check` (below).
+`weval report` likewise covers only each Task's current version, the Task and
+check versions of its newest run; earlier versions and their findings are at
+the bottom of the Task's page.
 
 An LLM analyst (`MODEL` in `src/weval/analysis.py`) reads the comparison's
 computed facts, never the transcripts: pass counts, each Agent's change,
@@ -88,4 +91,4 @@ After the check results, `weval check` prints diagnostics from the Trial's logs.
 - `answer source`: which source the agent took the failed value or approach from, out of the URLs, searches, and Treatment files whose results it was shown, or `own-knowledge`;
 - `verification`: `verified`, `deferred_to_user`, `not_attempted`, or `guessed`.
 
-Each label has Jev's confidence from 0 to 1; read a low one (below about 0.5) as "check by hand". A source is credited with every tool result that named it, so a `grep` over several files credits all of them. Labels are saved in the run directory's `labels/<trial>.json` and reused until the request changes, such as after a `check.py` change.
+Each label has Jev's confidence from 0 to 1; read a low one (below about 0.5) as "check by hand". A source is credited with every tool result that named it, so a `grep` over several files credits all of them. A page Pi read with `get_search_content` counts for the URL it fetched, and a skill Claude Code loaded counts for its `SKILL.md`. A Trial whose snapshot failed is not labelled. Labels are saved in the run directory's `labels/<trial>.json` and reused until the request changes, such as after a `check.py` change.

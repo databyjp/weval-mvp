@@ -5,7 +5,9 @@ with the findings (every failed check with its saved judgments), then each
 Treatment comparison, then each Task's reliability, plus one page per Task
 and prompt variant under ``_report/tasks/`` (with one syntax-highlighted
 page per packaged Task file beside it) and one page per Trial under
-``_report/<run>/<trial>.html``. It renders only retained files, saved
+``_report/<run>/<trial>.html``. The index covers each Task's current
+version only (``collect.split_versions``); its earlier versions, with their
+findings, are at the bottom of its Task page. It renders only retained files, saved
 analyses, and saved labels: building the report never calls the analyst or
 Jev, and never modifies a run directory. Pages link to each other and to
 retained files relatively, so the site opens from ``file://``.
@@ -15,7 +17,13 @@ from datetime import datetime
 from pathlib import Path
 
 from weval import analysis
-from weval.collect import Comparison, collect_runs, compare_treatments
+from weval.collect import (
+    Comparison,
+    RunSummary,
+    collect_runs,
+    compare_treatments,
+    split_versions,
+)
 from weval.report.findings import failure_groups, task_reliability
 from weval.report.pages import _task_name, render_index, render_task, render_trial
 from weval.report.source import render_source
@@ -46,6 +54,9 @@ def write_report(outputs_dir: Path) -> Path:
         for comparison in compare_treatments(runs)
     ]
     proposals = _trial_proposals(analyses)
+    current, earlier = split_versions(runs)
+    current_analyses = _analyses_of(current, analyses)
+    fixtures = ROOT / "tests/fixtures"
     outputs_dir.mkdir(parents=True, exist_ok=True)
     index = outputs_dir / "index.html"
     pages_dir = outputs_dir / PAGES_DIR
@@ -55,7 +66,7 @@ def write_report(outputs_dir: Path) -> Path:
         for run in runs
         for trial in run.trials
     }
-    reliability = task_reliability(runs, analyses, ROOT / "tests/fixtures")
+    reliability = task_reliability(current, current_analyses, fixtures)
     task_pages = {
         (row.task, row.prompt_variant): pages_dir
         / TASK_PAGES_DIR
@@ -71,6 +82,13 @@ def write_report(outputs_dir: Path) -> Path:
         )
         file_pages.update(task_files)
         docs = ROOT / "docs" / f"{row.task}.md"
+        earlier_versions = []
+        for version_runs in earlier.get((row.task, row.prompt_variant), []):
+            version_analyses = _analyses_of(version_runs, analyses)
+            (version_row,) = task_reliability(version_runs, version_analyses, fixtures)
+            earlier_versions.append(
+                (version_row, failure_groups(version_runs, version_analyses))
+            )
         page.write_text(
             render_task(
                 row,
@@ -79,6 +97,7 @@ def write_report(outputs_dir: Path) -> Path:
                 trial_pages=trial_pages,
                 file_pages=task_files,
                 docs=docs if docs.is_file() else None,
+                earlier=earlier_versions,
             )
         )
     for run in runs:
@@ -103,10 +122,11 @@ def write_report(outputs_dir: Path) -> Path:
 
     index.write_text(
         render_index(
-            runs,
-            analyses,
-            failure_groups(runs, analyses),
+            current,
+            current_analyses,
+            failure_groups(current, current_analyses),
             reliability,
+            earlier,
             index_dir=outputs_dir,
             trial_pages=trial_pages,
             task_pages=task_pages,
@@ -139,6 +159,19 @@ def _write_file_pages(
             page.write_text(html)
             pages[path] = page
     return pages
+
+
+def _analyses_of(
+    runs: list[RunSummary], analyses: list[tuple[Comparison, dict]]
+) -> list[tuple[Comparison, dict]]:
+    """The ``analyses`` whose comparisons hold ``runs``; a comparison never
+    spans Task versions, so one shared run places it."""
+    paths = {run.path for run in runs}
+    return [
+        (comparison, found)
+        for comparison, found in analyses
+        if any(run.path in paths for run in [*comparison.baseline, *comparison.treated])
+    ]
 
 
 def _task_page_name(task: str, prompt_variant: str) -> str:

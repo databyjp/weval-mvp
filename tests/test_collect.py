@@ -5,9 +5,11 @@ from pathlib import Path
 
 from weval.collect import (
     AgentChange,
+    RunSummary,
     TrialSummary,
     collect_runs,
     compare_treatments,
+    split_versions,
 )
 
 RUN = "20261020-120000__build__ecommerce-search@terse__pi-glm-5.3-flash"
@@ -237,6 +239,44 @@ def test_treatment_runs_are_paired_only_with_baselines_of_the_same_task_and_chec
         ("docs-v1", "task-v1", "check-v1", ["20261020"], ["20261023"]),
         ("docs-v2", "task-v1", "check-v1", ["20261020"], ["20261024"]),
     ]
+
+
+def test_each_task_keeps_the_version_its_newest_run_ran(tmp_path):
+    def run(
+        name: str, task: str, fingerprints: dict | None, recorded: bool = True
+    ) -> RunSummary:
+        record = {"status": "passed"} if recorded else None
+        return RunSummary(
+            path=tmp_path / name,
+            date=None,
+            task=task,
+            prompt_variant="default",
+            treatment="",
+            agent="agent",
+            trials=[TrialSummary(tmp_path / name / "t", "passed", record)],
+            fingerprints=fingerprints,
+        )
+
+    # Newest first, as collect_runs returns them. tasks/build/x moved to
+    # check version c2, then to Task version t2, and x-5 is still running;
+    # tasks/build/y has one version, recorded before fingerprints existed.
+    runs = [
+        run("x-5", "tasks/build/x", None, recorded=False),
+        run("x-4", "tasks/build/x", {"task": "t2", "check": "c2"}),
+        run("y-1", "tasks/build/y", None),
+        run("x-3", "tasks/build/x", {"task": "t2", "check": "c2"}),
+        run("x-2", "tasks/build/x", {"task": "t1", "check": "c2"}),
+        run("x-1", "tasks/build/x", {"task": "t1", "check": "c1"}),
+        run("x-0", "tasks/build/x", {"task": "t1", "check": "c2"}),
+    ]
+
+    current, earlier = split_versions(runs)
+
+    assert [r.path.name for r in current] == ["x-5", "x-4", "y-1", "x-3"]
+    assert {
+        key: [[r.path.name for r in version] for version in versions]
+        for key, versions in earlier.items()
+    } == {("tasks/build/x", "default"): [["x-2", "x-0"], ["x-1"]]}
 
 
 def test_uncached_input_leaves_out_cache_reads(tmp_path):

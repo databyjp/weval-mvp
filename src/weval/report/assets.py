@@ -173,6 +173,7 @@ details.fold.preferred .rate.failed .fill { background: var(--cell-preferred); }
   max-width: 130ch; box-shadow: 0 1px 3px rgba(19, 12, 73, 0.08); overflow: hidden; }
 .fold-list.findings { --columns: 1em minmax(14em, 1fr) 15em 11em; }
 .fold-list.comparisons { --columns: 1em minmax(14em, 1.2fr) minmax(12em, 1fr) 9em minmax(14em, 1.2fr); }
+.fold-list.versions { --columns: 1em minmax(14em, 1fr) 10em 17em 12em; }
 .fold-list > .columns, details.fold > summary { display: grid; align-items: center; gap: 12px;
   grid-template-columns: var(--columns); padding: 7px 14px; }
 .fold-list > .columns { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--band);
@@ -186,11 +187,13 @@ details.fold > summary:hover, details.fold:target > summary { background: var(--
 details.fold[open] > summary { background: var(--band); border-bottom: 1px solid var(--line); }
 details.fold .name { font-weight: 600; overflow-wrap: anywhere; }
 details.fold .nowrap { white-space: nowrap; }
+p.earlier { margin: -4px 0 8px; font-size: 12px; }
+td.task p.earlier { margin: 4px 0 0; }
 details.fold .tier { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--preferred-fg); }
 .card.inset { border: 0; border-radius: 0; box-shadow: none; margin: 0; max-width: none; }
 @media (max-width: 700px) {
   .fold-list > .columns { display: none; }
-  .fold-list.findings, .fold-list.comparisons { --columns: 1em 1fr 1fr; }
+  .fold-list.findings, .fold-list.comparisons, .fold-list.versions { --columns: 1em 1fr 1fr; }
 }
 .card dl.facts { grid-template-columns: 14em minmax(0, 95ch); margin: 10px 0 4px; }
 .card ul { margin: 0; padding-left: 18px; }

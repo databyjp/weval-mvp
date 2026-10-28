@@ -210,6 +210,36 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
     )
 
 
+def split_versions(
+    runs: list[RunSummary],
+) -> tuple[list[RunSummary], dict[tuple[str, str], list[list[RunSummary]]]]:
+    """Split newest-first ``runs`` by Task version: the Task and check
+    fingerprints, as in ``compare_treatments``, with unrecorded fingerprints
+    as one version. Return the runs of each Task and prompt variant's
+    current version, the one its newest recorded run ran, in ``runs`` order;
+    and, keyed by ``(task, prompt_variant)``, the runs of each earlier
+    version, newest version first. A run with no ``weval.json`` yet, such as
+    one still running, has no known version and stays with the current
+    runs."""
+    versions: dict[tuple[str, str], dict[tuple, list[RunSummary]]] = {}
+    unknown = []
+    for run in runs:
+        if not any(trial.record for trial in run.trials):
+            unknown.append(run)
+            continue
+        fingerprints = run.fingerprints or {}
+        version = (fingerprints.get("task"), fingerprints.get("check"))
+        task = versions.setdefault((run.task, run.prompt_variant), {})
+        task.setdefault(version, []).append(run)
+    current_runs = {id(run) for run in unknown} | {
+        id(run) for task in versions.values() for run in next(iter(task.values()))
+    }
+    earlier = {
+        key: list(task.values())[1:] for key, task in versions.items() if len(task) > 1
+    }
+    return [run for run in runs if id(run) in current_runs], earlier
+
+
 def mean_usage(trials: list[TrialSummary], attribute: str) -> float | None:
     """Mean of a usage field over the ``trials`` that report it."""
     values = [

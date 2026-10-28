@@ -112,6 +112,75 @@ def test_sources_are_what_the_agent_was_shown(tmp_path, jev):
     assert names == [RELEASE_NOTES, labels.OWN_KNOWLEDGE]
 
 
+def test_pi_pages_and_claude_code_skills_count_for_their_source(tmp_path):
+    # Pi's fetch_content shows only titles and stores the pages; the agent
+    # reads page 1 by responseId. Claude Code's Skill call shows only
+    # "Launching skill"; the skill's text is the next user message.
+    page = "https://docs.weaviate.io/weaviate/manage-collections/vector-config"
+    listing = (
+        "## Fetched URLs\n\n- Collections (9000 chars)\n- Vector config (9636 chars)\n"
+        + "x" * 200
+        + '\nUse get_search_content({ responseId: "r1", urlIndex: 0 }) to read.'
+    )
+    skill_text = (
+        "Base directory for this skill: /logs/agent/sessions/skills/best\n\n"
+        "# Best practices\nUse vector_config. " * 10
+    )
+    skills = tmp_path / "skills/best"
+    skills.mkdir(parents=True)
+    (skills / "SKILL.md").write_text(skill_text)
+    steps = [
+        {
+            "source": "agent",
+            "tool_calls": [
+                {
+                    "tool_call_id": "c0",
+                    "function_name": "fetch_content",
+                    "arguments": {"urls": ["https://docs.weaviate.io/x", page]},
+                },
+                {
+                    "tool_call_id": "c1",
+                    "function_name": "get_search_content",
+                    "arguments": {"responseId": "r1", "urlIndex": 1},
+                },
+                {
+                    "tool_call_id": "c2",
+                    "function_name": "Skill",
+                    "arguments": {"skill": "best"},
+                },
+            ],
+            "observation": {
+                "results": [
+                    {"source_call_id": "c0", "content": listing},
+                    {"source_call_id": "c1", "content": "# Vector config\n" * 20},
+                    {"source_call_id": "c2", "content": "Launching skill: best"},
+                ]
+            },
+        },
+        {"source": "user", "message": skill_text},
+    ]
+
+    sources = labels._sources(steps, tmp_path / "skills")
+
+    # The unread page is not a source: the agent saw only its title.
+    assert list(sources) == [page, "best/SKILL.md"]
+    assert sources[page].startswith("# Vector config")
+
+
+def test_a_trial_whose_snapshot_failed_is_not_labelled(tmp_path, jev):
+    trial = write_trial(tmp_path)
+    (trial / "verifier").mkdir()
+    (trial / "verifier/snapshot.json").write_text(
+        json.dumps({"error": "Traceback ...", "error_stage": "stack"})
+    )
+
+    assert labels.label(trial, FAILED) == {
+        "labels": {},
+        "note": "unlabelled: the snapshot failed",
+    }
+    assert jev.requests == []
+
+
 def test_a_saved_label_is_reused_until_the_request_changes(tmp_path, jev):
     trial = write_trial(tmp_path)
     labels.label(trial, FAILED)

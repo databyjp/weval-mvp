@@ -1,5 +1,6 @@
 {
  "weaviate_version": "1.39.5",
+ "weaviate_client_version": "4.23.1",
  "schema": {
   "classes": [
    {
@@ -1503,5 +1504,6 @@
    "category": "travel",
    "price": 37.0
   }
- ]
+ ],
+ "prompt_variant": "default"
 }

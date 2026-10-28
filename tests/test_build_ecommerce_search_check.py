@@ -14,9 +14,6 @@ from conftest import ROOT, failures, load_module
 ORACLE = json.loads(
     (ROOT / "tests/fixtures/build-ecommerce-search-oracle-snapshot.json").read_text()
 )
-# The fixture predates the client version in the snapshot; the Oracle runs
-# the client the environment's Dockerfile pins.
-ORACLE["weaviate_client_version"] = "4.23.1"
 check = load_module(ROOT / "tasks/build/ecommerce-search/check.py")
 
 
