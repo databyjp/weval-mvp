@@ -10,6 +10,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from importlib import metadata
 from pathlib import Path
 
 COLLECTION = "Product"
@@ -73,8 +74,21 @@ def objects(collection: str) -> list[dict]:
         after = page[-1]["id"]
 
 
+def client_version() -> str | None:
+    """Return the installed weaviate-client version, or None when absent.
+
+    verify.py starts the app with this interpreter, so this is the client
+    the app ran with.
+    """
+    try:
+        return metadata.version("weaviate-client")
+    except metadata.PackageNotFoundError:
+        return None
+
+
 def snapshot(app_url: str) -> dict:
-    """Return Weaviate meta, schema, objects, /search probes, and submitted files."""
+    """Return Weaviate meta, schema, objects, /search probes, the installed
+    client version, and submitted files."""
     _, meta = get(f"{WEAVIATE}/v1/meta")
     _, schema = get(f"{WEAVIATE}/v1/schema")
     probes = {}
@@ -88,6 +102,7 @@ def snapshot(app_url: str) -> dict:
     }
     return {
         "weaviate_version": meta.get("version"),
+        "weaviate_client_version": client_version(),
         "schema": schema,
         "objects": {COLLECTION: objects(COLLECTION)},
         "probes": probes,

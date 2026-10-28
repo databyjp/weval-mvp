@@ -29,6 +29,9 @@ ITEM_TYPES = {
 }
 # Modules covered by the Oracle and calibration; others are not scored as passing.
 LOCAL_VECTORIZERS = {"text2vec-ollama", "text2vec-transformers"}
+# Oldest (major, minor) releases scored as current.
+MIN_WEAVIATE_VERSION = (1, 39)
+MIN_CLIENT_VERSION = (4, 23)
 
 
 def collection(snapshot: dict) -> dict:
@@ -42,6 +45,12 @@ def collection(snapshot: dict) -> dict:
 
 def properties(snapshot: dict) -> dict[str, dict]:
     return {p["name"]: p for p in collection(snapshot).get("properties", [])}
+
+
+def release(version: str | None) -> tuple[int, ...]:
+    """Return a version's (major, minor), or () when it has none."""
+    match = re.match(r"v?(\d+)\.(\d+)", version or "")
+    return tuple(int(part) for part in match.groups()) if match else ()
 
 
 def items(snapshot: dict, label: str) -> list[dict]:
@@ -206,6 +215,25 @@ def hybrid_query(snapshot: dict) -> None:
     )
 
 
+# Detection checks: the prompt names no version (see AGENTS.md).
+def weaviate_server_version(snapshot: dict) -> str:
+    """The Weaviate server is version 1.39 or later."""
+    version = snapshot["weaviate_version"]
+    assert release(version) >= MIN_WEAVIATE_VERSION, (
+        f"the Weaviate server is version 1.39 or later; it runs {version}"
+    )
+    return f"Weaviate {version}"
+
+
+def python_client_version(snapshot: dict) -> str:
+    """The application runs weaviate-client 4.23 or later."""
+    version = snapshot["weaviate_client_version"]
+    assert release(version) >= MIN_CLIENT_VERSION, (
+        f"the application runs weaviate-client 4.23 or later; installed: {version}"
+    )
+    return f"weaviate-client {version}"
+
+
 REQUIRED = [
     catalog_ingestion,
     product_schema,
@@ -215,4 +243,9 @@ REQUIRED = [
     semantic_retrieval,
     pagination,
 ]
-PREFERRED = [sku_category_field_tokenization, hybrid_query]
+PREFERRED = [
+    sku_category_field_tokenization,
+    hybrid_query,
+    weaviate_server_version,
+    python_client_version,
+]

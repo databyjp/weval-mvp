@@ -14,6 +14,9 @@ from conftest import ROOT, failures, load_module
 ORACLE = json.loads(
     (ROOT / "tests/fixtures/build-ecommerce-search-oracle-snapshot.json").read_text()
 )
+# The fixture predates the client version in the snapshot; the Oracle runs
+# the client the environment's Dockerfile pins.
+ORACLE["weaviate_client_version"] = "4.23.1"
 check = load_module(ROOT / "tasks/build/ecommerce-search/check.py")
 
 
@@ -51,6 +54,14 @@ def default_page_size_10(s: dict) -> None:
     body["items"] = body["items"] * 2
 
 
+def old_server(s: dict) -> None:
+    s["weaviate_version"] = "1.27.0"
+
+
+def old_client(s: dict) -> None:
+    s["weaviate_client_version"] = "4.9.6"
+
+
 def test_oracle_passes_every_check():
     assert failures(check, ORACLE) == {}
 
@@ -67,6 +78,8 @@ def test_oracle_passes_every_check():
         (word_tokenization, "sku-category-field-tokenization", "'sku': 'word'"),
         (near_text_search, "hybrid-query", "it calls .query.near_text(...)"),
         (default_page_size_10, "search-contract", "page_size=5"),
+        (old_server, "weaviate-server-version", "it runs 1.27.0"),
+        (old_client, "python-client-version", "installed: 4.9.6"),
     ],
 )
 def test_broken_variant_fails_only_its_check(break_snapshot, failing_check, reason):
