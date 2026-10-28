@@ -1,6 +1,9 @@
 # Harbor task config. weval adds tests/.
 artifacts = [{ source = "/app", destination = "submission" }]
 
+[metadata]
+draft = true
+
 [agent]
 timeout_sec = 1200.0
 

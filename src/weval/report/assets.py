@@ -29,6 +29,7 @@ STYLE = """
   --pass-fg: #1e6f38; --pass-bg: #d9f3cf; --fail-fg: #bb1627; --fail-bg: #fde3e5;
   --warn-fg: #6d5f00; --warn-bg: #faf4c0; --flag-fg: #4d2f9e; --flag-bg: #e7dff7;
   --cell-pass: #61bd73; --cell-fail: #f4404e; --cell-warn: #f0e447; --cell-none: #b9c8de;
+  --cell-preferred: #f08a24; --preferred-bg: #fde9d4; --preferred-fg: #8a4500;
   --accent: linear-gradient(90deg, #55cde0, #06cd00);
   --header: linear-gradient(90deg, #0c1428, #1b1464);
   --band: #e6f6fa; --panel: #f3f8fb; --pill-fg: #ffffff; --pill-bg: #130c49;
@@ -42,6 +43,7 @@ STYLE = """
     --bar-required: rgba(97, 189, 115, 0.3); --bar-preferred: rgba(185, 200, 222, 0.2);
     --pass-fg: #8fe3a3; --pass-bg: rgba(97, 189, 115, 0.2); --fail-fg: #ff8a94; --fail-bg: rgba(244, 64, 78, 0.22);
     --warn-fg: #f1e96a; --warn-bg: rgba(249, 241, 93, 0.16); --flag-fg: #c9b8f0; --flag-bg: rgba(165, 144, 221, 0.22);
+    --cell-preferred: #f2a057; --preferred-bg: rgba(242, 160, 87, 0.22); --preferred-fg: #f6bb85;
     --band: #1a2b4c; --panel: #16203e; --pill-fg: #0c1428; --pill-bg: #7ad6eb;
     --code-keyword: #c9b8f0; --code-string: #8fe3a3; --code-name: #7ad6eb; --code-number: #f2b36b;
   }
@@ -151,6 +153,10 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
 .rate.passed .fill { background: var(--cell-pass); }
 .rate.failed { background: var(--fail-bg); }
 .rate.failed .fill { background: var(--cell-fail); }
+/* A preferred check's failures are orange, so they read apart from the
+   required ones that set a Trial's reward. */
+details.fold.preferred .rate.failed { background: var(--preferred-bg); }
+details.fold.preferred .rate.failed .fill { background: var(--cell-preferred); }
 .pct { display: inline-block; min-width: 4ch; }
 
 /* Cards hold an item's detail, such as an opened finding or comparison, with
@@ -165,7 +171,7 @@ table.plain td + td, table.plain th + th { padding-left: 12px; }
    because every row and the column header use the list's --columns. */
 .fold-list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 0 0 16px;
   max-width: 130ch; box-shadow: 0 1px 3px rgba(19, 12, 73, 0.08); overflow: hidden; }
-.fold-list.findings { --columns: 1em minmax(14em, 1.4fr) minmax(12em, 1fr) 15em 11em; }
+.fold-list.findings { --columns: 1em minmax(14em, 1fr) 15em 11em; }
 .fold-list.comparisons { --columns: 1em minmax(14em, 1.2fr) minmax(12em, 1fr) 9em minmax(14em, 1.2fr); }
 .fold-list > .columns, details.fold > summary { display: grid; align-items: center; gap: 12px;
   grid-template-columns: var(--columns); padding: 7px 14px; }
@@ -180,6 +186,7 @@ details.fold > summary:hover, details.fold:target > summary { background: var(--
 details.fold[open] > summary { background: var(--band); border-bottom: 1px solid var(--line); }
 details.fold .name { font-weight: 600; overflow-wrap: anywhere; }
 details.fold .nowrap { white-space: nowrap; }
+details.fold .tier { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--preferred-fg); }
 .card.inset { border: 0; border-radius: 0; box-shadow: none; margin: 0; max-width: none; }
 @media (max-width: 700px) {
   .fold-list > .columns { display: none; }

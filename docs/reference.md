@@ -14,6 +14,14 @@ reads it directly; weval passes it through unchanged at packaging.
 | `[environment] build_timeout_sec` | Budget for building the environment images. |
 | `[environment.healthcheck]` | `command` is retried every `interval_sec` inside the environment; the agent starts only after it succeeds. `start_period_sec` is the grace period for slow setup such as seeding. |
 
+weval reads its own Task settings from `[metadata]`, which Harbor's schema
+leaves free-form:
+
+| Key | Function (weval-defined) |
+|---|---|
+| `draft = true` | The Task is not run for now. `weval run` refuses it unless you pass `--draft`; its tests still run. |
+| `weaviate_workspace = false` | Leaves out the Weaviate settings ([Trial environment](#trial-environment)). |
+
 ### Verifier flags
 
 Set in `[verifier] env` per Task; a Task sets neither, either, or both.

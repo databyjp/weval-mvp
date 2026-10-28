@@ -120,17 +120,25 @@ def run(
     local: bool = False,
     prompt_variant: str = "default",
     treatment: str | None = None,
+    draft: bool = False,
 ) -> Path:
     """Run ``attempts`` Trials of one Task's prompt variant by one Agent on
     Modal, or on the local Docker daemon when ``local``; return the run
     directory. With ``treatment``, the Agent gets that Treatment's skills
-    (``treatment_skills``).
+    (``treatment_skills``). A draft Task (``task.toml`` sets ``[metadata]
+    draft = true``) raises ``ValueError`` unless ``draft``, before anything
+    runs or is written.
 
     Harbor failures inside a Trial are recorded as Non-results in ``weval.json``,
     not raised. Retained files are scrubbed of credential values afterwards,
     even when Harbor itself raised.
     """
     task_dir = task_dir.resolve()
+    if task_metadata(task_dir).get("draft") and not draft:
+        raise ValueError(
+            f"{task_dir.name} is a draft Task ([metadata] draft = true in its "
+            "task.toml); pass --draft to run it anyway"
+        )
     # weval.json records the Task path relative to the repo, so a Task outside
     # it fails here rather than after the Trials have run.
     task_path = task_dir.relative_to(ROOT)
@@ -261,10 +269,17 @@ def compose_overlays(task_dir: Path) -> list[Path]:
     the order Harbor applies them. The Weaviate settings are left out when
     ``task.toml`` sets ``[metadata] weaviate_workspace = false``, for a Task
     whose workspace must not suggest a data store."""
-    metadata = tomllib.loads((task_dir / "task.toml").read_text()).get("metadata", {})
     return [SHARED_COMPOSE] + (
-        [WEAVIATE_COMPOSE] if metadata.get("weaviate_workspace", True) else []
+        [WEAVIATE_COMPOSE]
+        if task_metadata(task_dir).get("weaviate_workspace", True)
+        else []
     )
+
+
+def task_metadata(task_dir: Path) -> dict:
+    """The ``[metadata]`` table of the Task's ``task.toml``, where weval reads
+    its own Task settings; Harbor's schema leaves the table free-form."""
+    return tomllib.loads((task_dir / "task.toml").read_text()).get("metadata", {})
 
 
 async def _run_job(config: JobConfig) -> None:

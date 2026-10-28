@@ -23,6 +23,7 @@ from weval.run import (
     finalize_run,
     fingerprints,
     package_task,
+    run,
     treatment_skills,
 )
 
@@ -288,6 +289,17 @@ def test_fingerprints_version_the_task_and_check_separately(tmp_path):
     after_prompt = fingerprints(task_dir, None)
     assert after_prompt["task"] != before["task"]
     assert after_prompt["check"] == after_check["check"]
+
+
+def test_a_draft_task_runs_only_with_draft(tmp_path):
+    (tmp_path / "task.toml").write_text("[metadata]\ndraft = true\n")
+
+    with pytest.raises(ValueError, match="pass --draft"):
+        run(tmp_path, "oracle")
+    # With draft, run() gets past the gate and fails later, on this Task
+    # sitting outside the repo.
+    with pytest.raises(ValueError, match="is not in the subpath"):
+        run(tmp_path, "oracle", draft=True)
 
 
 def test_treatment_fingerprint_covers_the_skills_only(tmp_path):

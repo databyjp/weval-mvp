@@ -2,6 +2,7 @@
 artifacts = [{ source = "/app", destination = "submission" }]
 
 [metadata]
+draft = true
 # The workspace must not suggest a data store; see weval's compose_overlays.
 weaviate_workspace = false
 

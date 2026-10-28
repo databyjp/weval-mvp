@@ -11,7 +11,13 @@ from pathlib import Path
 from weval.collect import Comparison, RunSummary, TrialSummary
 from weval.report import write_report
 from weval.report.findings import failure_groups, task_reliability
-from weval.report.pages import _block_markdown, _cells, _comparison, _Links
+from weval.report.pages import (
+    _block_markdown,
+    _cells,
+    _comparison,
+    _findings_section,
+    _Links,
+)
 
 TASK = "tasks/build/x"
 
@@ -209,6 +215,31 @@ def test_findings_order_by_tier_then_baseline_rate_then_count(tmp_path):
         "style",  # preferred, after every required check
     ]
     assert groups[3].headline() == ("skills", 1, 1)
+
+
+def test_findings_group_by_task_with_the_most_failures_first(tmp_path):
+    # tasks/build/x fails 1 check in 1 Trial; tasks/build/y fails 2 checks
+    # in 1 Trial and a preferred check in another, so it leads.
+    x = make_run(tmp_path, "x", "", [("x-0", "failed", ["vector-config"])])
+    y = make_run(
+        tmp_path,
+        "y",
+        "",
+        [("y-0", "failed", ["vector-config", "other-check"]), ("y-1", "passed")],
+    )
+    y.task = "tasks/build/y"
+    y.trials[1].failed_preferred = ["style"]
+    groups = failure_groups([x, y], [])
+    pages = {t.path: tmp_path / f"{t.path.name}.html" for r in (x, y) for t in r.trials}
+
+    html = _findings_section(groups, _Links(tmp_path), pages)
+
+    headings = re.findall(r"<h3>([^< ]+)", html)
+    assert headings == ["build/y", "build/x"]
+    style = re.search(r'<details class="fold preferred" id="[^"]*style"', html)
+    assert style, "a preferred check's row carries the preferred class"
+    assert '<span class="tier">preferred</span>' in html
+    assert html.count('class="fold required"') == 3
 
 
 def test_disagreeing_judges_leave_a_group_unclassified(tmp_path):

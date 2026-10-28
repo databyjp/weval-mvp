@@ -93,27 +93,33 @@ def _findings_section(
     groups: list[FailureGroup], links: "_Links", trial_pages: dict[Path, Path]
 ) -> str:
     intro = (
-        "Each row is one check that failed, with its failure rate in the baseline: the bar fills "
-        "to the rate. A check that failed only with a Treatment shows that arm's rate instead, "
-        "after the baseline failures. Open a row for the rate in every arm, the agents that "
-        "failed, and the saved opinions about why. The counts come straight from the retained "
-        "records; each opinion names its judge: the LLM analyst, a hand-coded rule, or the Jev "
+        "Findings are grouped by Task, the Task with the most failures first. Each row is one "
+        "check that failed, with its failure rate in the baseline: the bar fills to the rate, "
+        "red for a required check and orange for a preferred one. Required checks come first. "
+        "A check that failed only with a Treatment shows that arm's rate instead, after the "
+        "baseline failures. Open a row for the rate in every arm, the agents that failed, and "
+        "the saved opinions about why. The counts come straight from the retained records; "
+        "each opinion names its judge: the LLM analyst, a hand-coded rule, or the Jev "
         "labeller. Open a failing Trial to see the evidence; the final call on a class is yours."
     )
     heading = f'<h2 id="findings">Findings{_count(groups)}</h2>{_intro(intro)}'
     if not groups:
         return f'{heading}<p class="muted">No failed checks are retained.</p>'
+    by_task: dict[tuple[str, str], list[FailureGroup]] = {}
+    for group in groups:
+        by_task.setdefault((group.task, group.prompt_variant), []).append(group)
+    # Most failing Trials, summed over the Task's checks, first; each Task's
+    # findings keep failure_groups' order.
+    ordered = sorted(
+        by_task.items(),
+        key=lambda item: (-sum(len(g.failing) for g in item[1]), item[0]),
+    )
     lists = []
-    for required, title in ((True, "Required checks"), (False, "Preferred checks")):
-        tier = [group for group in groups if group.required == required]
-        if not tier:
-            continue
-        rows = "".join(_finding(group, links, trial_pages) for group in tier)
+    for (task, prompt_variant), task_groups in ordered:
+        rows = "".join(_finding(group, links, trial_pages) for group in task_groups)
         lists.append(
-            f"<h3>{title}{_count(tier)}</h3>"
-            + _fold_list(
-                "findings", ["Check", "Task", "Failure rate", "Proposed cause"], rows
-            )
+            f"<h3>{links.task(task, prompt_variant)}{_count(task_groups)}</h3>"
+            + _fold_list("findings", ["Check", "Failure rate", "Proposed cause"], rows)
         )
     return heading + "".join(lists)
 
@@ -125,9 +131,9 @@ def _finding(
     # detail at once, with no second fold to open.
     arm, failed, scored = group.headline()
     arm_note = "" if arm == BASELINE else f' <span class="muted">+ {escape(arm)}</span>'
+    tier = "" if group.required else ' <span class="tier">preferred</span>'
     summary = [
-        f'<span class="name mono">{escape(group.check)}</span>',
-        f"<span>{escape(_task_name(group.task))}{_variant_note(group.prompt_variant)}</span>",
+        f'<span class="name"><span class="mono">{escape(group.check)}</span>{tier}</span>',
         f'<span class="nowrap">{_rate(failed, scored, "failed")}{arm_note}</span>',
         f"<span>{_class_chip(group.proposed_class)}</span>",
     ]
@@ -161,7 +167,8 @@ def _finding(
         )
     body.append(_failing_trials(group, links, trial_pages))
     anchor = _finding_anchor(group.task, group.prompt_variant, group.check)
-    return _fold(anchor, summary, "".join(body))
+    css = "required" if group.required else "preferred"
+    return _fold(anchor, summary, "".join(body), css)
 
 
 def _fold_list(kind: str, columns: list[str], rows: str) -> str:
@@ -174,12 +181,14 @@ def _fold_list(kind: str, columns: list[str], rows: str) -> str:
     )
 
 
-def _fold(anchor: str, cells: list[str], body: str) -> str:
+def _fold(anchor: str, cells: list[str], body: str, css: str = "") -> str:
     """One item of a ``_fold_list``: a summary row of ``cells`` that opens to
-    ``body`` in place. The anchor sits on the row, so a link to it lands on
-    the row whether or not it is open."""
+    ``body`` in place, with ``css`` as extra classes on the item. The anchor
+    sits on the row, so a link to it lands on the row whether or not it is
+    open."""
+    classes = f"fold {css}".rstrip()
     return (
-        f'<details class="fold" id="{anchor}"><summary>{"".join(cells)}</summary>'
+        f'<details class="{classes}" id="{anchor}"><summary>{"".join(cells)}</summary>'
         f'<div class="card inset">{body}</div></details>'
     )
 

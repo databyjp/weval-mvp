@@ -64,6 +64,11 @@ def main() -> None:
         "--treatment",
         help="Treatment: a directory name in treatments/ (default: none, a baseline)",
     )
+    run_parser.add_argument(
+        "--draft",
+        action="store_true",
+        help="run a Task whose task.toml marks it a draft",
+    )
     check_parser = commands.add_parser(
         "check", help="re-score a retained Trial's snapshot"
     )
@@ -110,6 +115,7 @@ def main() -> None:
                 local=args.local,
                 prompt_variant=args.prompt_variant,
                 treatment=args.treatment,
+                draft=args.draft,
             )
         )
     else:
