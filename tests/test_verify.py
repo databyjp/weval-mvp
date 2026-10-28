@@ -3,12 +3,16 @@
 Task and prompt variant must then fail, with a note pointing to ``snapshot.json``.
 """
 
+import json
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from conftest import ROOT, load_module
 
+from weval import verify
 from weval.verify import score
 
 # The stages defined in AGENTS.md; each Task lives at tasks/<stage>/<scenario>/.
@@ -90,3 +94,45 @@ def test_score_adds_the_snapshot_prompt_variants_checks():
     assert scored({"prompt_variant": "default"}) == [("shared", True)]
     # A snapshot without prompt_variant scores as default.
     assert scored({}) == [("shared", True)]
+
+
+def test_a_hung_stack_teardown_keeps_the_snapshot_and_score(tmp_path, monkeypatch):
+    tests, app, logs = tmp_path / "tests", tmp_path / "app", tmp_path / "logs"
+    for folder in (tests, app, logs):
+        folder.mkdir()
+    (tests / "snapshot.py").write_text(
+        "def snapshot(app_url):\n    return {'up': True}\n"
+    )
+    (tests / "check.py").write_text(
+        "def stack_up(snapshot):\n"
+        '    """The stack answered."""\n'
+        "    assert snapshot['up']\n\n"
+        "REQUIRED = [stack_up]\nPREFERRED = []\n"
+    )
+    (tests / "prompt_variant").write_text("default")
+    (app / "docker-compose.yaml").write_text("services: {}\n")
+
+    def compose(*args, timeout=240):
+        if args[0] == "up":
+            return subprocess.CompletedProcess(args, 0, "", "")
+        raise subprocess.TimeoutExpired(["docker", "compose", *args], timeout)
+
+    monkeypatch.setattr(verify, "__file__", str(tests / "verify.py"))
+    monkeypatch.setattr(verify, "APP_DIR", app)
+    monkeypatch.setattr(verify, "LOG_DIR", logs)
+    monkeypatch.setattr(verify, "_compose", compose)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    for name in ("snapshot", "check"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    try:
+        verify.main()
+    finally:
+        for name in ("snapshot", "check"):
+            sys.modules.pop(name, None)
+
+    assert json.loads((logs / "snapshot.json").read_text()) == {
+        "up": True,
+        "prompt_variant": "default",
+    }
+    assert json.loads((logs / "checks.json").read_text())[0]["passed"]
+    assert (logs / "reward.txt").read_text() == "1"

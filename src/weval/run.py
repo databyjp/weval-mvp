@@ -184,13 +184,15 @@ def run(
     try:
         asyncio.run(_run_job(config))
     finally:
-        finalize_run(
-            run_dir, task_path, agent, attempts, prompt_variant, treatment, versions
-        )
-        # Before labelling, which could raise: the scrub must not depend on it.
+        # The scrub must not depend on recording or labelling, which can raise.
+        try:
+            finalize_run(
+                run_dir, task_path, agent, attempts, prompt_variant, treatment, versions
+            )
+        finally:
+            redact(run_dir)
         # Analysis is not run here: a comparison spans every Agent's runs, so
         # it is analysed once, by `weval analyse`, after the batch.
-        redact(run_dir)
         label_run(run_dir)
     return run_dir
 
@@ -300,24 +302,30 @@ def finalize_run(
     ``versions`` is the run's ``fingerprints()``, recorded in every Trial.
 
     A Trial without ``result.json`` (Harbor stops the environment before
-    writing it, so a stop failure or kill can leave none) gets a
-    ``non-result`` stub naming the cause, so no Trial vanishes from the
-    record. Warns when fewer Trial directories exist than ``attempts``.
+    writing it, so a stop failure or kill can leave none), or whose files
+    ``finalize`` cannot read, gets a ``non-result`` stub naming the cause, so
+    no Trial vanishes from the record and the others are still recorded.
+    Warns when fewer Trial directories exist than ``attempts``.
     """
     trial_dirs = sorted(path for path in (run_dir / "job").glob("*") if path.is_dir())
     for trial_dir in trial_dirs:
+        record = None
+        exception = "result.json never written"
         if (trial_dir / "result.json").exists():
-            record = finalize(
-                trial_dir, task_path, agent, prompt_variant, treatment, versions
-            )
-        else:
+            try:
+                record = finalize(
+                    trial_dir, task_path, agent, prompt_variant, treatment, versions
+                )
+            except Exception as error:  # noqa: BLE001  Record the other Trials.
+                exception = f"recording failed: {error!r}"
+        if record is None:
             record = {
                 "status": "non-result",
                 **_trial_identity(
                     task_path, agent, prompt_variant, treatment, versions
                 ),
                 "reward": None,
-                "exception": "result.json never written",
+                "exception": exception,
             }
             (trial_dir / "weval.json").write_text(json.dumps(record, indent=1))
         print(f"{trial_dir}: {record['status']}")

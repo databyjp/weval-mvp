@@ -466,6 +466,24 @@ def test_finalize_records_a_snapshot_error_at_any_stage_as_failed(tmp_path, stag
     assert record["error_stage"] == stage
 
 
+def test_finalize_run_records_the_other_trials_past_an_unreadable_one(tmp_path):
+    job = tmp_path / "job"
+    graded = job / "trial-0"
+    (graded / "verifier").mkdir(parents=True)
+    (graded / "result.json").write_text(json.dumps(harbor_result(reward=1)))
+    shutil.copy(ORACLE_SNAPSHOT, graded / "verifier/snapshot.json")
+    truncated = job / "trial-1"
+    truncated.mkdir()
+    (truncated / "result.json").write_text('{"verifier_result": {"rew')
+
+    finalize_run(tmp_path, TASK_PATH, {"name": "oracle", "harness": "oracle"}, 2)
+
+    assert json.loads((graded / "weval.json").read_text())["reward"] == 1
+    stub = json.loads((truncated / "weval.json").read_text())
+    assert stub["status"] == "non-result"
+    assert stub["exception"].startswith("recording failed: JSONDecodeError")
+
+
 def test_finalize_run_records_a_trial_without_result_json(tmp_path, capsys):
     job = tmp_path / "job"
     graded = job / "trial-0"

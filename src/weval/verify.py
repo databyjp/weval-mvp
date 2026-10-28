@@ -156,10 +156,15 @@ def main() -> None:
         if app is not None:
             app.terminate()
         if has_stack:
-            logs = _compose("logs", "--no-color", "--timestamps", timeout=60)
-            (LOG_DIR / "docker-compose.log").write_text(logs.stdout + logs.stderr)
-            # Matters for local Docker, where the stack would outlive the Trial.
-            _compose("down", "--volumes", timeout=120)
+            # A hung or missing Docker daemon is printed, not raised, so it
+            # cannot cost the snapshot already taken.
+            try:
+                logs = _compose("logs", "--no-color", "--timestamps", timeout=60)
+                (LOG_DIR / "docker-compose.log").write_text(logs.stdout + logs.stderr)
+                # Matters for local Docker, where the stack would outlive the Trial.
+                _compose("down", "--volumes", timeout=120)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                print(f"stack teardown failed: {error!r}")
 
     # Recorded even on failure, so the failed snapshot is scored on the
     # prompt variant's checks too.
