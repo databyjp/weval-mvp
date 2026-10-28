@@ -3,7 +3,7 @@
 ``write_report`` writes ``index.html`` into the outputs directory, leading
 with the findings (every failed check with its saved judgments), then each
 Treatment comparison, then each Task's reliability, plus one page per Task
-and prompt variant under ``_report/tasks/`` (with one syntax-highlighted
+under ``_report/tasks/`` (with one syntax-highlighted
 page per packaged Task file beside it) and one page per Trial under
 ``_report/<run>/<trial>.html``. The index covers each Task's current
 version only (``collect.split_versions``); its earlier versions, with their
@@ -72,35 +72,32 @@ def write_report(outputs_dir: Path) -> Path:
     }
     reliability = task_reliability(current, current_analyses, fixtures)
     task_pages = {
-        (row.task, row.prompt_variant): pages_dir
-        / TASK_PAGES_DIR
-        / f"{_task_page_name(row.task, row.prompt_variant)}.html"
+        row.task: pages_dir / TASK_PAGES_DIR / f"{_task_page_name(row.task)}.html"
         for row in reliability
     }
     file_pages: dict[Path, Path] = {}
     notes_dir = pages_dir / NOTES_DIR
     current_notes = {
-        (row.task, row.prompt_variant): _version_notes(notes_dir, row.runs)
-        for row in reliability
+        row.task: _version_notes(notes_dir, row.runs) for row in reliability
     }
     trial_notes: dict[Path, list[Note]] = {}
     for row in reliability:
-        page = task_pages[row.task, row.prompt_variant]
+        page = task_pages[row.task]
         page.parent.mkdir(parents=True, exist_ok=True)
         task_files = _write_file_pages(
-            row.runs[0].path / "task", page, _task_name(row.task)
+            row.definition().path / "task", page, _task_name(row.task)
         )
         file_pages.update(task_files)
         docs = ROOT / "docs" / f"{row.task}.md"
         earlier_versions = []
-        for version_runs in earlier.get((row.task, row.prompt_variant), []):
+        for version_runs in earlier.get(row.task, []):
             version_analyses = _analyses_of(version_runs, analyses)
             (version_row,) = task_reliability(version_runs, version_analyses, fixtures)
             version_groups = failure_groups(version_runs, version_analyses)
             version_notes = _version_notes(notes_dir, version_runs)
             _attach_notes(version_groups, version_notes)
             earlier_versions.append((version_row, version_groups, version_notes))
-        task_notes = current_notes[row.task, row.prompt_variant]
+        task_notes = current_notes[row.task]
         # A note names Trials by directory name, within its own version.
         for version_row, notes in [
             (row, task_notes),
@@ -133,7 +130,7 @@ def write_report(outputs_dir: Path) -> Path:
                     trial,
                     page_dir=page.parent,
                     index=index,
-                    task_page=task_pages[run.task, run.prompt_variant],
+                    task_page=task_pages[run.task],
                     expected=expected[run.task],
                     proposals=proposals.get(trial.path.name, {}),
                     notes=trial_notes.get(trial.path, []),
@@ -145,11 +142,8 @@ def write_report(outputs_dir: Path) -> Path:
     )
 
     groups = failure_groups(current, current_analyses)
-    for (task, prompt_variant), notes in current_notes.items():
-        task_groups = [
-            g for g in groups if (g.task, g.prompt_variant) == (task, prompt_variant)
-        ]
-        _attach_notes(task_groups, notes)
+    for task, notes in current_notes.items():
+        _attach_notes([g for g in groups if g.task == task], notes)
     index.write_text(
         render_index(
             current,
@@ -216,8 +210,7 @@ def _version_notes(notes_dir: Path, runs: list[RunSummary]) -> list[Note]:
         ),
         "unversioned",
     )
-    task_page_name = _task_page_name(runs[0].task, runs[0].prompt_variant)
-    return read_notes(notes_dir, task_page_name, version)
+    return read_notes(notes_dir, _task_page_name(runs[0].task), version)
 
 
 def _attach_notes(groups: list[FailureGroup], notes: list[Note]) -> None:
@@ -227,10 +220,9 @@ def _attach_notes(groups: list[FailureGroup], notes: list[Note]) -> None:
         group.notes = [note for note in notes if note.check == group.check]
 
 
-def _task_page_name(task: str, prompt_variant: str) -> str:
-    """``tasks/build/x`` as ``build-x``, with ``--<variant>`` unless default."""
-    name = task.removeprefix("tasks/").replace("/", "-")
-    return name if prompt_variant == "default" else f"{name}--{prompt_variant}"
+def _task_page_name(task: str) -> str:
+    """``tasks/build/x`` as ``build-x``."""
+    return task.removeprefix("tasks/").replace("/", "-")
 
 
 def _expected(task: str) -> dict:

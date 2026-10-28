@@ -1,13 +1,12 @@
 """Scoring a failed snapshot: when stack preparation or ``snapshot()`` raises,
 ``verify.py`` scores ``{"error": <traceback>}`` instead. Every check of every
-Task and prompt variant must then fail, with a note pointing to ``snapshot.json``.
+Task must then fail, with a note pointing to ``snapshot.json``.
 """
 
 import json
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from conftest import ROOT, load_module
@@ -35,65 +34,12 @@ def task_id(check_file: Path) -> str:
 def test_failed_snapshot_fails_every_check(check_file):
     check = load_module(check_file)
 
-    for prompt_variant in getattr(check, "PROMPT_VARIANT_REQUIRED", {"default": []}):
-        results = score(
-            check,
-            {
-                "error": "Traceback: weaviate unreachable",
-                "prompt_variant": prompt_variant,
-            },
-        )
+    results = score(check, {"error": "Traceback: weaviate unreachable"})
 
-        assert results
-        passed = [r["name"] for r in results if r["passed"]]
-        assert not passed, (
-            f"{prompt_variant}: checks passed on a failed snapshot: {passed}"
-        )
-        assert all("snapshot failed" in r["notes"] for r in results)
-
-
-@pytest.mark.parametrize("check_file", CHECK_FILES, ids=task_id)
-def test_variant_check_lists_name_exactly_the_tasks_prompt_variants(check_file):
-    check = load_module(check_file)
-    prompts = {p.stem for p in (check_file.parent / "prompts").glob("*.md")}
-    if not prompts:
-        assert not hasattr(check, "PROMPT_VARIANT_REQUIRED") and not hasattr(
-            check, "PROMPT_VARIANT_PREFERRED"
-        )
-        return
-
-    assert set(check.PROMPT_VARIANT_REQUIRED) == {"default"} | prompts
-    assert set(check.PROMPT_VARIANT_PREFERRED) == {"default"} | prompts
-
-
-def test_score_adds_the_snapshot_prompt_variants_checks():
-    def shared(snapshot):
-        """Shared."""
-
-    def legal_only(snapshot):
-        """legal-archive only."""
-
-    def legal_preferred(snapshot):
-        """legal-archive, preferred."""
-
-    check = SimpleNamespace(
-        REQUIRED=[shared],
-        PREFERRED=[],
-        PROMPT_VARIANT_REQUIRED={"default": [], "legal-archive": [legal_only]},
-        PROMPT_VARIANT_PREFERRED={"default": [], "legal-archive": [legal_preferred]},
-    )
-
-    def scored(snapshot):
-        return [(r["name"], r["required"]) for r in score(check, snapshot)]
-
-    assert scored({"prompt_variant": "legal-archive"}) == [
-        ("shared", True),
-        ("legal-only", True),
-        ("legal-preferred", False),
-    ]
-    assert scored({"prompt_variant": "default"}) == [("shared", True)]
-    # A snapshot without prompt_variant scores as default.
-    assert scored({}) == [("shared", True)]
+    assert results
+    passed = [r["name"] for r in results if r["passed"]]
+    assert not passed, f"checks passed on a failed snapshot: {passed}"
+    assert all("snapshot failed" in r["notes"] for r in results)
 
 
 def test_a_hung_stack_teardown_keeps_the_snapshot_and_score(tmp_path, monkeypatch):
@@ -109,7 +55,6 @@ def test_a_hung_stack_teardown_keeps_the_snapshot_and_score(tmp_path, monkeypatc
         "    assert snapshot['up']\n\n"
         "REQUIRED = [stack_up]\nPREFERRED = []\n"
     )
-    (tests / "prompt_variant").write_text("default")
     (app / "docker-compose.yaml").write_text("services: {}\n")
 
     def compose(*args, timeout=240):
@@ -130,9 +75,6 @@ def test_a_hung_stack_teardown_keeps_the_snapshot_and_score(tmp_path, monkeypatc
         for name in ("snapshot", "check"):
             sys.modules.pop(name, None)
 
-    assert json.loads((logs / "snapshot.json").read_text()) == {
-        "up": True,
-        "prompt_variant": "default",
-    }
+    assert json.loads((logs / "snapshot.json").read_text()) == {"up": True}
     assert json.loads((logs / "checks.json").read_text())[0]["passed"]
     assert (logs / "reward.txt").read_text() == "1"

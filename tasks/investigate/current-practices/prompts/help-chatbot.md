@@ -1,1 +1,0 @@
-We're building a customer-facing help chatbot with Weaviate as the vector database. Find the latest Weaviate versions to use, and the recommended way to do each item listed in `WORKSPACE.md`. Write your findings to `/app/findings.json` in the format described there, citing the page each answer came from.

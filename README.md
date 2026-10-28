@@ -96,14 +96,6 @@ This Task asks how often an agent recommends Weaviate.
 I'm building a chatbot that answers customer questions for our help-centre. What database should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
 ```
 
-**Prompt variant** `vector-database` ([source](tasks/investigate/db-recommendation/prompts/vector-database.md))
-
-Each prompt variant replaces the product and keeps the rest of the prompt. Select one with `--prompt-variant vector-database`.
-
-```
-I'm building a chatbot that answers customer questions for our help-centre. What database should I use? Write your recommendation to `/app/RECOMMENDATION.md`.
-```
-
 **Environment** ([source](tasks/investigate/db-recommendation/environment))
 
 - Dockerfile with an empty `/app`

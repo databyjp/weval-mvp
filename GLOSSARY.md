@@ -18,9 +18,7 @@ These definitions are authoritative for `weval`. Add a term only when the projec
 
 **Agent.** One Agent harness plus one Model configuration, named in `agents.toml`.
 
-**Treatment.** Skills, MCP servers, documentation, or other additions given to an Agent to answer an experimental question. A Trial without a Treatment is a baseline.
-
-**Prompt variant.** An alternative prompt for a Task, at `prompts/<prompt-variant>.md` beside `instruction.md`, which is the `default` variant. Variants share the Task's environment, snapshot, and shared checks, and may add checks of their own. Not to be confused with the broken snapshot variants used in calibration.
+**Treatment.** Skills, a replacement prompt, MCP servers, documentation, or other additions given to an Agent to answer an experimental question. A Trial without a Treatment is a baseline.
 
 **Trial.** One attempt to complete a Task by one Agent, with or without a Treatment.
 

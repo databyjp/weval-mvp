@@ -147,7 +147,7 @@ every queued run, including ones meant to be kept. The Treatment runs were
 queued last, so stopping the baselines early would have dropped them too.
 
 - Add an Experiment runner that takes the batch's list of runs (Task, Agent,
-  Treatment, prompt variant, Trial count) and the number to run at once.
+  Treatment, Trial count) and the number to run at once.
 - Show each run's state: queued, running, or finished with its Trials'
   statuses.
 - Drop queued runs, or abort one running run, without touching the others.

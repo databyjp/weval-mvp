@@ -98,7 +98,6 @@ A Task is a directory that runs without framework changes:
 | File | Purpose |
 |---|---|
 | `instruction.md` | What the agent is told (Harbor's file name for the prompt). Packaging appends `src/weval/shared-instructions.md`. |
-| `prompts/<prompt-variant>.md` | Optional prompt variants, used instead of `instruction.md` with `weval run --prompt-variant <prompt-variant>`. `check.py` then lists each prompt variant's own checks ([reference](docs/reference.md#prompt-variants)). |
 | `task.toml` | Harbor task config: timeouts, `/app` artifact, healthcheck, verifier env. |
 | `environment/` | Harbor environment: `Dockerfile`, starter app, fixtures, and an optional Compose overlay for Task-specific settings such as a healthcheck. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |
@@ -177,7 +176,7 @@ Before running agents on a new Task:
 ## Running and reading Trials
 
 ```sh
-uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--prompt-variant <prompt-variant>] [--treatment <treatment>]
+uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--treatment <treatment>]
 uv run weval check experiment-outputs/<run>/job/<trial>   # re-score offline
 uv run --env-file .env weval analyse experiment-outputs/<run>   # LLM analysis of its Treatment comparisons
 uv run weval report   # rebuild experiment-outputs/index.html and the Task and Trial pages
@@ -193,7 +192,7 @@ Each Trial directory is Harbor's own output plus `weval.json`. Start there:
 
 - `weval.json`: status (`passed`, `failed`, `incomplete`, `timed-out`,
   `non-result`), the
-  Agent, the prompt variant, the Treatment, missing logs, per-check results, and `usage` (tokens, cost, tool
+  Agent, the Treatment, missing logs, per-check results, and `usage` (tokens, cost, tool
   calls, URLs, and search queries).
 - `verifier/snapshot.json`, `checks.json`, `test-stdout.txt`,
   `application.log`, `docker-compose.log`.

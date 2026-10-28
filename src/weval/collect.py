@@ -44,7 +44,7 @@ class TrialSummary:
 class RunSummary:
     """One run directory: the Trials one ``weval run`` invocation produced.
 
-    ``task``, ``prompt_variant``, ``treatment``, ``agent``, and
+    ``task``, ``treatment``, ``agent``, and
     ``fingerprints`` come from the first Trial's ``weval.json``, or from the
     run directory name when no Trial has one. ``treatment`` is blank for a
     baseline run. ``fingerprints`` (docs/reference.md) is ``None`` for a run
@@ -54,7 +54,6 @@ class RunSummary:
     path: Path
     date: datetime | None
     task: str
-    prompt_variant: str
     treatment: str
     agent: str
     trials: list[TrialSummary]
@@ -98,8 +97,7 @@ class AgentChange:
 
 @dataclass
 class Comparison:
-    """One Treatment against its baseline for one Task and prompt variant,
-    across Agents.
+    """One Treatment against its baseline for one Task, across Agents.
 
     ``agents`` names, sorted, the Agents with runs in both arms, and
     ``baseline`` and ``treated`` hold only their runs, so both arms cover the
@@ -113,7 +111,6 @@ class Comparison:
     """
 
     task: str
-    prompt_variant: str
     treatment: str
     baseline: list[RunSummary]
     treated: list[RunSummary]
@@ -134,6 +131,20 @@ class Comparison:
             for agent in self.agents
         ]
 
+    def prompts(self) -> tuple[str, str] | None:
+        """The prompts the baseline and the Treatment were packaged with,
+        when the Treatment replaced the Task's prompt; ``None`` when it kept
+        it or either arm has no package."""
+        if not self.baseline:
+            return None
+        files = [
+            arm[0].path / "task/instruction.md" for arm in (self.baseline, self.treated)
+        ]
+        if not all(file.is_file() for file in files):
+            return None
+        before, after = (file.read_text() for file in files)
+        return (before, after) if before != after else None
+
 
 def collect_runs(outputs_dir: Path) -> list[RunSummary]:
     """Summarise every run directory under ``outputs_dir``, newest first."""
@@ -142,8 +153,8 @@ def collect_runs(outputs_dir: Path) -> list[RunSummary]:
 
 
 def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
-    """One ``Comparison`` per Treatment version, Task, prompt variant, and
-    Task and check versions with a Treatment run, sorted by those fields."""
+    """One ``Comparison`` per Treatment version, Task, and Task and check
+    versions with a Treatment run, sorted by those fields."""
     groups: dict[tuple, list[RunSummary]] = {}
     for run in runs:
         versions = run.fingerprints or {}
@@ -151,7 +162,6 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
             run.treatment,
             versions.get("treatment"),
             run.task,
-            run.prompt_variant,
             versions.get("task"),
             versions.get("check"),
         )
@@ -162,15 +172,12 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
             treatment,
             treatment_version,
             task,
-            prompt_variant,
             task_version,
             check_version,
         ) = key
         if not treatment:
             continue
-        baseline = groups.get(
-            ("", None, task, prompt_variant, task_version, check_version), []
-        )
+        baseline = groups.get(("", None, task, task_version, check_version), [])
         treated_agents = {run.agent for run in treated}
         baseline_agents = {run.agent for run in baseline}
         agents = sorted(treated_agents & baseline_agents)
@@ -182,7 +189,6 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
         comparisons.append(
             Comparison(
                 task,
-                prompt_variant,
                 treatment,
                 baseline=baseline,
                 treated=treated,
@@ -201,7 +207,6 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
             for v in (
                 c.treatment,
                 c.task,
-                c.prompt_variant,
                 c.task_version,
                 c.check_version,
                 c.treatment_version,
@@ -212,16 +217,16 @@ def compare_treatments(runs: list[RunSummary]) -> list[Comparison]:
 
 def split_versions(
     runs: list[RunSummary],
-) -> tuple[list[RunSummary], dict[tuple[str, str], list[list[RunSummary]]]]:
+) -> tuple[list[RunSummary], dict[str, list[list[RunSummary]]]]:
     """Split newest-first ``runs`` by Task version: the Task and check
     fingerprints, as in ``compare_treatments``, with unrecorded fingerprints
-    as one version. Return the runs of each Task and prompt variant's
-    current version, the one its newest recorded run ran, in ``runs`` order;
-    and, keyed by ``(task, prompt_variant)``, the runs of each earlier
+    as one version. Return the runs of each Task's current version, the one
+    its newest recorded run ran, in ``runs`` order; and, keyed by Task, the
+    runs of each earlier
     version, newest version first. A run with no ``weval.json`` yet, such as
     one still running, has no known version and stays with the current
     runs."""
-    versions: dict[tuple[str, str], dict[tuple, list[RunSummary]]] = {}
+    versions: dict[str, dict[tuple, list[RunSummary]]] = {}
     unknown = []
     for run in runs:
         if not any(trial.record for trial in run.trials):
@@ -229,7 +234,7 @@ def split_versions(
             continue
         fingerprints = run.fingerprints or {}
         version = (fingerprints.get("task"), fingerprints.get("check"))
-        task = versions.setdefault((run.task, run.prompt_variant), {})
+        task = versions.setdefault(run.task, {})
         task.setdefault(version, []).append(run)
     current_runs = {id(run) for run in unknown} | {
         id(run) for task in versions.values() for run in next(iter(task.values()))
@@ -278,18 +283,16 @@ def summarise_run(run_dir: Path) -> RunSummary:
     first = next((record for record in records if record), None)
     if first:
         task = first.get("task", "")
-        prompt_variant = first.get("prompt_variant", "default")
         treatment = first.get("treatment") or ""
         agent = (first.get("agent") or {}).get("name", "")
         fingerprints = first.get("fingerprints")
     else:
-        task, prompt_variant, agent, treatment = _parse_run_name(run_dir.name)
+        task, agent, treatment = _parse_run_name(run_dir.name)
         fingerprints = None
     return RunSummary(
         path=run_dir,
         date=_parse_stamp(run_dir.name),
         task=task,
-        prompt_variant=prompt_variant,
         treatment=treatment,
         agent=agent,
         trials=[
@@ -353,17 +356,16 @@ def _parse_stamp(run_name: str) -> datetime | None:
         return None
 
 
-def _parse_run_name(run_name: str) -> tuple[str, str, str, str]:
-    """Return ``(task, prompt_variant, agent, treatment)`` from ``run.py``'s
-    run name, ``<stamp>__<stage>__<scenario>[@<prompt-variant>]__<agent>[+<treatment>]``;
-    blanks when the name has another form."""
+def _parse_run_name(run_name: str) -> tuple[str, str, str]:
+    """Return ``(task, agent, treatment)`` from ``run.py``'s run name,
+    ``<stamp>__<stage>__<scenario>__<agent>[+<treatment>]``; blanks when the
+    name has another form."""
     parts = run_name.split("__")
     if len(parts) != 4:
-        return "", "", "", ""
+        return "", "", ""
     _, stage, scenario, agent = parts
-    scenario, _, prompt_variant = scenario.partition("@")
     agent, _, treatment = agent.partition("+")
-    return f"tasks/{stage}/{scenario}", prompt_variant or "default", agent, treatment
+    return f"tasks/{stage}/{scenario}", agent, treatment
 
 
 def _read_json(path: Path) -> dict | None:

@@ -2,7 +2,7 @@
 
 Output layout, one directory per invocation::
 
-    experiment-outputs/<timestamp>__<stage>__<scenario>[@<prompt-variant>]__<agent>[+<treatment>]/
+    experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>[+<treatment>]/
         task/                 Harbor task package built from tasks/<stage>/<scenario>/
         treatment/            copy of treatments/<treatment>/, when given
         labels/<trial>.json   saved Jev labels for the Trial's failed checks (weval.labels)
@@ -74,36 +74,21 @@ LOCAL = EnvironmentConfig(
 )
 
 
-def package_task(
-    task_dir: Path, destination: Path, prompt_variant: str = "default"
-) -> None:
+def package_task(task_dir: Path, destination: Path, prompt: Path | None = None) -> None:
     """Build a Harbor task package: the Task directory plus ``tests/``, which
     holds the shared verifier with the Task's snapshot and check. The packaged
-    ``instruction.md`` is the prompt variant followed by the shared
-    instructions: the Task's ``instruction.md`` for ``default``, otherwise
-    ``prompts/<prompt-variant>.md``, which must exist.
-    ``tests/prompt_variant`` holds the prompt variant name for the verifier."""
-    prompt = task_dir / (
-        "instruction.md"
-        if prompt_variant == "default"
-        else f"prompts/{prompt_variant}.md"
-    )
-    if not prompt.exists():
-        raise FileNotFoundError(
-            f"no prompt for prompt variant {prompt_variant!r}: {prompt}"
-        )
+    ``instruction.md`` is ``prompt``, a Treatment's replacement for the Task's
+    own ``instruction.md`` (the default), followed by the shared instructions."""
+    prompt = prompt or task_dir / "instruction.md"
     shutil.copytree(
         task_dir,
         destination,
-        ignore=shutil.ignore_patterns(
-            "__pycache__", "snapshot.py", "check.py", "prompts"
-        ),
+        ignore=shutil.ignore_patterns("__pycache__", "snapshot.py", "check.py"),
     )
     instruction = destination / "instruction.md"
     instruction.write_text(f"{prompt.read_text()}\n{SHARED_INSTRUCTIONS.read_text()}")
     tests = destination / "tests"
     tests.mkdir()
-    (tests / "prompt_variant").write_text(prompt_variant)
     shutil.copy(Path(verify.__file__), tests / "verify.py")
     shutil.copy(task_dir / "snapshot.py", tests)
     shutil.copy(task_dir / "check.py", tests)
@@ -118,14 +103,13 @@ def run(
     agent_name: str,
     attempts: int = 1,
     local: bool = False,
-    prompt_variant: str = "default",
     treatment: str | None = None,
     draft: bool = False,
 ) -> Path:
-    """Run ``attempts`` Trials of one Task's prompt variant by one Agent on
-    Modal, or on the local Docker daemon when ``local``; return the run
-    directory. With ``treatment``, the Agent gets that Treatment's skills
-    (``treatment_skills``). A draft Task (``task.toml`` sets ``[metadata]
+    """Run ``attempts`` Trials of one Task by one Agent on Modal, or on the
+    local Docker daemon when ``local``; return the run directory. With
+    ``treatment``, the Agent gets that Treatment's skills, its prompt for the
+    Task, or both (``treatment_files``). A draft Task (``task.toml`` sets ``[metadata]
     draft = true``) raises ``ValueError`` unless ``draft``, before anything
     runs or is written.
 
@@ -145,16 +129,13 @@ def run(
     agents = tomllib.loads((ROOT / "agents.toml").read_text())
     agent = {"name": agent_name, **agents[agent_name]}
     harness = HARNESSES[agent["harness"]]
-    skills = treatment_skills(treatment) if treatment else None
+    skills, prompt = (
+        treatment_files(treatment, task_path) if treatment else (None, None)
+    )
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     # Task and Agent names contain dashes; Harbor's "__" keeps the parts separable.
-    scenario = (
-        task_dir.name
-        if prompt_variant == "default"
-        else f"{task_dir.name}@{prompt_variant}"
-    )
     agent_part = agent_name if treatment is None else f"{agent_name}+{treatment}"
-    run_name = f"{stamp}__{task_dir.parent.name}__{scenario}__{agent_part}"
+    run_name = f"{stamp}__{task_dir.parent.name}__{task_dir.name}__{agent_part}"
     run_dir = ROOT / "experiment-outputs" / run_name
     environment = (LOCAL if local else MODAL).model_copy(
         update={"extra_docker_compose": compose_overlays(task_dir)}
@@ -162,16 +143,19 @@ def run(
     # Before the run directory exists, so a failed preparation leaves no empty run.
     if not local and hasattr(harness, "modal_environment"):
         environment = harness.modal_environment(agent, environment)
-    package_task(task_dir, run_dir / "task", prompt_variant)
+    package_task(task_dir, run_dir / "task", prompt)
     agent_config = harness.agent_config(agent)
-    if skills:
+    if treatment:
         # Harbor installs the retained copy, so the run keeps the skills its Trials had.
         shutil.copytree(
-            skills.parent, run_dir / "treatment", ignore=shutil.ignore_patterns(".*")
+            TREATMENTS / treatment,
+            run_dir / "treatment",
+            ignore=shutil.ignore_patterns(".*"),
         )
+    if skills:
         agent_config.skills = [str(run_dir / "treatment/skills")]
     # Before the Trials run, so the fingerprints cover exactly what they were given.
-    versions = fingerprints(task_dir, run_dir / "treatment/skills" if skills else None)
+    versions = fingerprints(task_dir, skills, prompt)
     config = JobConfig(
         job_name="job",
         jobs_dir=run_dir,
@@ -186,9 +170,7 @@ def run(
     finally:
         # The scrub must not depend on recording or labelling, which can raise.
         try:
-            finalize_run(
-                run_dir, task_path, agent, attempts, prompt_variant, treatment, versions
-            )
+            finalize_run(run_dir, task_path, agent, attempts, treatment, versions)
         finally:
             redact(run_dir)
         # Analysis is not run here: a comparison spans every Agent's runs, so
@@ -197,29 +179,48 @@ def run(
     return run_dir
 
 
-def treatment_skills(treatment: str) -> Path:
-    """Return ``treatments/<treatment>/skills/``, whose subdirectories each
-    hold one skill's ``SKILL.md``; Harbor installs them for the Agent's
-    harness. Raises ``FileNotFoundError`` when the directory is missing, and
-    Harbor fails each Trial when a subdirectory has no ``SKILL.md``."""
-    skills = TREATMENTS / treatment / "skills"
-    if not skills.is_dir():
-        raise FileNotFoundError(f"no skills for Treatment {treatment!r}: {skills}")
-    return skills
+def treatment_files(treatment: str, task_path: Path) -> tuple[Path | None, Path | None]:
+    """Return what ``treatments/<treatment>/`` gives the Agent on the Task at
+    ``task_path`` (``tasks/<stage>/<scenario>``): its ``skills/``, whose
+    subdirectories each hold one skill's ``SKILL.md`` for Harbor to install,
+    and its ``prompts/<stage>/<scenario>.md``, which replaces the Task's
+    prompt. Either is ``None`` when the Treatment has none.
+
+    Raises ``FileNotFoundError`` when the Treatment has neither, or has
+    prompts but none for this Task. Harbor fails each Trial when a skill
+    subdirectory has no ``SKILL.md``."""
+    directory = TREATMENTS / treatment
+    skills = directory / "skills"
+    prompts = directory / "prompts"
+    prompt = prompts / f"{task_path.relative_to('tasks')}.md"
+    if prompts.is_dir() and not prompt.is_file():
+        raise FileNotFoundError(
+            f"Treatment {treatment!r} has no prompt for this Task: {prompt}"
+        )
+    if not skills.is_dir() and not prompts.is_dir():
+        raise FileNotFoundError(
+            f"Treatment {treatment!r} has no skills/ or prompts/: {directory}"
+        )
+    return (
+        skills if skills.is_dir() else None,
+        prompt if prompts.is_dir() else None,
+    )
 
 
-def fingerprints(task_dir: Path, skills: Path | None) -> dict[str, str | None]:
+def fingerprints(
+    task_dir: Path, skills: Path | None = None, prompt: Path | None = None
+) -> dict[str, str | None]:
     """Content hashes that version what a run's Trials were given, for
     ``weval.json``'s ``fingerprints``.
 
-    - ``task``: the Task directory without ``check.py``, covering every
-      prompt variant, plus what packaging and the environment add: the shared
-      instructions, ``verify.py``, and the Compose overlays. One version
-      spans all prompt variants. A change here needs new Trials.
+    - ``task``: the Task directory without ``check.py``, plus what packaging
+      and the environment add: the shared instructions, ``verify.py``, and
+      the Compose overlays. A change here needs new Trials.
     - ``check``: the Task's ``check.py``. A change here needs only a
       re-score (``weval check``).
-    - ``treatment``: the Treatment's ``skills``, the files the Agent gets, or
-      ``None`` for a baseline. The Treatment's ``README.md`` is not covered.
+    - ``treatment``: what the Treatment gives the Agent on this Task: its
+      ``skills`` and its replacement ``prompt``, or ``None`` for a baseline.
+      Its ``README.md`` and its prompts for other Tasks are not covered.
 
     Each is 12 hex digits of a SHA-256 over file paths and contents, so it is
     independent of timestamps and directory order.
@@ -235,12 +236,21 @@ def fingerprints(task_dir: Path, skills: Path | None) -> dict[str, str | None]:
     return {
         "task": _digest(task_files),
         "check": check_fingerprint(check),
-        "treatment": _digest(
-            {str(path.relative_to(skills)): path for path in _tree(skills)}
-        )
-        if skills
-        else None,
+        "treatment": _treatment_digest(skills, prompt) if skills or prompt else None,
     }
+
+
+def _treatment_digest(skills: Path | None, prompt: Path | None) -> str:
+    # Skill paths are relative to skills/, so a Treatment without a prompt
+    # keeps the fingerprint it had before Treatments could carry prompts.
+    files = (
+        {str(path.relative_to(skills)): path for path in _tree(skills)}
+        if skills
+        else {}
+    )
+    if prompt:
+        files["prompt.md"] = prompt
+    return _digest(files)
 
 
 def check_fingerprint(check_file: Path) -> str:
@@ -294,7 +304,6 @@ def finalize_run(
     task_path: Path,
     agent: dict,
     attempts: int,
-    prompt_variant: str = "default",
     treatment: str | None = None,
     versions: dict[str, str | None] | None = None,
 ) -> None:
@@ -313,17 +322,13 @@ def finalize_run(
         exception = "result.json never written"
         if (trial_dir / "result.json").exists():
             try:
-                record = finalize(
-                    trial_dir, task_path, agent, prompt_variant, treatment, versions
-                )
+                record = finalize(trial_dir, task_path, agent, treatment, versions)
             except Exception as error:  # noqa: BLE001  Record the other Trials.
                 exception = f"recording failed: {error!r}"
         if record is None:
             record = {
                 "status": "non-result",
-                **_trial_identity(
-                    task_path, agent, prompt_variant, treatment, versions
-                ),
+                **_trial_identity(task_path, agent, treatment, versions),
                 "reward": None,
                 "exception": exception,
             }
@@ -365,7 +370,7 @@ def analyse_run(run_dir: Path) -> None:
             run.path.resolve() for run in comparison.baseline + comparison.treated
         }:
             continue
-        name = f"{comparison.treatment} on {comparison.task}@{comparison.prompt_variant} across {len(comparison.agents)} Agents"
+        name = f"{comparison.treatment} on {comparison.task} across {len(comparison.agents)} Agents"
         try:
             result = analysis.analyse(
                 comparison,
@@ -412,17 +417,15 @@ def derive_status(
 def _trial_identity(
     task_path: Path,
     agent: dict,
-    prompt_variant: str,
     treatment: str | None,
     versions: dict[str, str | None] | None,
 ) -> dict:
     """The fields every ``weval.json`` carries whatever the outcome: which
-    Task, prompt variant, Treatment, fingerprints, and Agent the Trial ran.
+    Task, Treatment, fingerprints, and Agent the Trial ran.
     One construction path, so ``finalize`` and ``finalize_run``'s non-result
     stub cannot drift apart."""
     return {
         "task": str(task_path),
-        "prompt_variant": prompt_variant,
         "treatment": treatment,
         "fingerprints": versions,
         "agent": HARNESSES[agent["harness"]].agent_record(agent),
@@ -433,7 +436,6 @@ def finalize(
     trial_dir: Path,
     task_path: Path,
     agent: dict,
-    prompt_variant: str = "default",
     treatment: str | None = None,
     versions: dict[str, str | None] | None = None,
 ) -> dict:
@@ -461,7 +463,7 @@ def finalize(
     )
     record = {
         "status": derive_status(result, missing, model_error),
-        **_trial_identity(task_path, agent, prompt_variant, treatment, versions),
+        **_trial_identity(task_path, agent, treatment, versions),
         "agent_info": result.get("agent_info"),
         "reward": rewards.get("reward"),
         "exception": (result.get("exception_info") or {}).get("exception_type"),

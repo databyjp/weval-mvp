@@ -55,36 +55,27 @@ An environment that starts an application before the agent runs writes its
 process ID to `/tmp/application.pid`. The shared instructions tell the agent
 this is how to find and restart it.
 
-## Prompt variants
-
-A Task may keep alternative prompts at `prompts/<prompt-variant>.md`;
-`instruction.md` is the `default` prompt variant.
-`weval run --prompt-variant <prompt-variant>` packages that prompt as the
-Task's `instruction.md`, writes its name to the package's
-`tests/prompt_variant`, and adds `@<prompt-variant>` to the run directory's
-scenario part. An unknown prompt variant fails before anything runs.
-
-The verifier adds the name to the snapshot as `prompt_variant`, also when the
-snapshot failed. `check.py` then defines `PROMPT_VARIANT_REQUIRED` and
-`PROMPT_VARIANT_PREFERRED`, mapping `default` and every prompt variant name to
-check functions scored after the shared `REQUIRED` and `PREFERRED` lists.
-`tests/test_verify.py` fails unless both dicts name exactly `default` and the
-files in `prompts/`. A snapshot without `prompt_variant` is scored as
-`default`.
-
 ## Treatments
 
-A Treatment is a directory `treatments/<treatment>/` whose `skills/` holds one
-subdirectory per skill, each with a `SKILL.md`. Its `README.md` states the
-experimental question and is not given to the Agent.
+A Treatment is a directory `treatments/<treatment>/` with a `README.md`
+stating the experimental question, which is not given to the Agent, and at
+least one of:
+
+- `skills/`: one subdirectory per skill, each with a `SKILL.md`. Harbor
+  installs them where the harness looks for them:
+  `$CLAUDE_CONFIG_DIR/skills/` for Claude Code and `~/.agents/skills/` for
+  Pi. They are not in `/app`, so they are not in `artifacts/submission/`.
+- `prompts/<stage>/<scenario>.md`: a prompt that replaces that Task's
+  `instruction.md`. The shared instructions follow it as usual. A Treatment
+  with `prompts/` runs only on the Tasks it has a prompt for, and every Agent
+  reads the prompt, whereas a harness loads a skill only when it chooses to.
+
 `weval run --treatment <treatment>` copies the directory to the run
-directory's `treatment/`, passes the copy's `skills/` to Harbor as the Agent's
-skills, records the name in each Trial's `weval.json` as `treatment`, and adds
-`+<treatment>` to the run directory's Agent part. Harbor installs the skills
-where the harness looks for them: `$CLAUDE_CONFIG_DIR/skills/` for Claude Code
-and `~/.agents/skills/` for Pi. They are not in `/app`, so they are not in
-`artifacts/submission/`. An unknown Treatment fails before anything runs.
-Without `--treatment`, a Trial is a baseline and `treatment` is `null`.
+directory's `treatment/`, records the name in each Trial's `weval.json` as
+`treatment`, and adds `+<treatment>` to the run directory's Agent part. A
+Treatment that is unknown, has neither part, or has prompts but none for the
+Task fails before anything runs. Without `--treatment`, a Trial is a baseline
+and `treatment` is `null`.
 
 ## Trial environment
 
@@ -131,7 +122,7 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the prompt variant, the Treatment, `fingerprints` (below), missing logs, the model error that ended the session (if any), per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the Treatment, `fingerprints` (below), missing logs, the model error that ended the session (if any), per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
 | `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |
@@ -153,9 +144,9 @@ hex digits of a SHA-256 over file paths and contents:
 
 | Key | Covers | A change means |
 |---|---|---|
-| `task` | The Task directory without `check.py`, including every prompt variant, plus `shared-instructions.md`, `verify.py`, and the Compose overlays. One version spans all prompt variants. | the Trials must be re-run |
+| `task` | The Task directory without `check.py`, plus `shared-instructions.md`, `verify.py`, and the Compose overlays | the Trials must be re-run |
 | `check` | The Task's `check.py` | the Trials can be re-scored with `weval check` |
-| `treatment` | The Treatment's `skills/`, the files the Agent gets; `null` for a baseline. Its `README.md` is not covered. | a different Treatment version |
+| `treatment` | What the Treatment gives the Agent on this Task: its `skills/` and its prompt for the Task; `null` for a baseline. Its `README.md` and its prompts for other Tasks are not covered. | a different Treatment version |
 
 Trials recorded before fingerprints existed have `fingerprints` missing or
 `null`. The docs site and the latest releases change too and can't be

@@ -20,15 +20,6 @@ sources.
 > `WORKSPACE.md`. Write your findings to `/app/findings.json` in the format
 > described there, citing the page each answer came from.
 
-The [prompt variants](../../reference.md#prompt-variants) in `prompts/`
-replace the first sentence with a use case and are otherwise identical:
-
-| Variant | In place of the first sentence |
-|---|---|
-| `help-chatbot` | We're building a customer-facing help chatbot with Weaviate as the vector database. |
-| `shopping-search` | We're building an e-commerce store with Weaviate as the vector database. |
-| `legal-archive` | We're building a search app to look through a very large archive of legal documents with Weaviate as the vector database. Being cost-effective is important to us. |
-
 ### Workspace
 
 - `WORKSPACE.md`: the `findings.json` format. It has five items
@@ -58,9 +49,7 @@ read through search results without its own fetch is not listed.
 
 ## Checks
 
-Every prompt variant is scored on the checks below;
-`PROMPT_VARIANT_REQUIRED` and `PROMPT_VARIANT_PREFERRED` in `check.py` are
-empty placeholders for checks that differ by use case. `deployment` and
+`deployment` and
 `search` answers are not scored: their expected answers need judgment, and
 the Oracle's came from summaries of single docs pages that baseline Trials
 disagree with.
@@ -80,7 +69,7 @@ classify that as an infrastructure failure.
 
 Variants are in `tests/test_investigate_current_practices_check.py`. The
 Oracle looks up the latest releases at run time and writes the answers below,
-each citing the page it came from, the same for every prompt variant.
+each citing the page it came from.
 `deployment` and `search` are not scored.
 
 | Item | Oracle answer | Source |

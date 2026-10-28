@@ -11,7 +11,7 @@ uv run --env-file .env weval analyse experiment-outputs/<run>
 `weval run` does not analyse: a comparison spans every Agent's runs, so each
 new run would ask the analyst again.
 
-A comparison holds one Task and prompt variant across Agents: the baseline
+A comparison holds one Task across Agents: the baseline
 runs and the Treatment runs of every Agent that ran both arms. Agents with
 runs in one arm only are listed and left out, so both arms cover the same
 models. It gives each arm's required pass count, failed checks, and mean

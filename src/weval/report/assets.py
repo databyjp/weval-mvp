@@ -228,6 +228,12 @@ table.arms tbody th { color: var(--muted); padding-right: 24px; }
 table.arms tr.group th { color: var(--fg); font-weight: 600; padding-top: 10px; white-space: normal; }
 table.arms tbody tr:last-child > * { border-bottom: 0; }
 table.arms .waffle { margin-right: 0; }
+/* A Treatment's prompt with its changes marked: removed words struck
+   through and added words underlined, so the change reads without colour. */
+pre.diff { font-family: inherit; font-size: 14px; background: var(--stripe); border-radius: 6px;
+  padding: 8px 10px; margin: 6px 0 10px; max-width: 110ch; }
+pre.diff ins { color: var(--pass-fg); background: var(--pass-bg); text-decoration: underline; }
+pre.diff del { color: var(--fail-fg); background: var(--fail-bg); text-decoration: line-through; }
 /* Task page runs: one row per Trial and one square per check, its name
    written up the column. A rule sets the preferred checks apart. */
 table.runs td[rowspan] { vertical-align: top; }

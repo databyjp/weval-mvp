@@ -8,6 +8,7 @@ snapshot. All links are relative, so the pages work from ``file://``; view
 state is carried by element anchors.
 """
 
+import difflib
 import json
 import os
 import re
@@ -54,7 +55,7 @@ def render_index(
     analyses: list[tuple[Comparison, dict]],
     groups: list[FailureGroup],
     reliability: list[TaskReliability],
-    earlier: dict[tuple[str, str], list[list[RunSummary]]],
+    earlier: dict[str, list[list[RunSummary]]],
     *,
     index_dir: Path,
     trial_pages: dict[Path, Path],
@@ -65,8 +66,7 @@ def render_index(
     pairs each Comparison with its saved ``analysis.analyse`` result;
     ``earlier`` holds each Task's earlier versions, which the index only
     counts and links to the Task page; ``trial_pages`` maps each Trial
-    directory to its page, and ``task_pages`` each ``(task, prompt variant)``
-    to its Task page. Links are relative to ``index_dir``."""
+    directory to its page, and ``task_pages`` each Task to its Task page. Links are relative to ``index_dir``."""
     links = _Links(index_dir, task_pages)
     trial_count = sum(len(run.trials) for run in runs)
     tasks = sorted({run.task for run in runs})
@@ -95,7 +95,7 @@ Generated {generated:%Y-%m-%d %H:%M}.</span>
 
 def _findings_section(
     groups: list[FailureGroup],
-    earlier: dict[tuple[str, str], list[list[RunSummary]]],
+    earlier: dict[str, list[list[RunSummary]]],
     links: "_Links",
     trial_pages: dict[Path, Path],
 ) -> str:
@@ -114,9 +114,9 @@ def _findings_section(
     heading = f'<h2 id="findings">Findings{_count(groups)}</h2>{_intro(intro)}'
     if not groups:
         return f'{heading}<p class="muted">No failed checks are retained.</p>'
-    by_task: dict[tuple[str, str], list[FailureGroup]] = {}
+    by_task: dict[str, list[FailureGroup]] = {}
     for group in groups:
-        by_task.setdefault((group.task, group.prompt_variant), []).append(group)
+        by_task.setdefault(group.task, []).append(group)
     # Most failing Trials, summed over the Task's checks, first; each Task's
     # findings keep failure_groups' order.
     ordered = sorted(
@@ -124,13 +124,11 @@ def _findings_section(
         key=lambda item: (-sum(len(g.failing) for g in item[1]), item[0]),
     )
     lists = []
-    for (task, prompt_variant), task_groups in ordered:
+    for task, task_groups in ordered:
         rows = "".join(_finding(group, links, trial_pages) for group in task_groups)
         lists.append(
-            f"<h3>{links.task(task, prompt_variant)}{_count(task_groups)}</h3>"
-            + _earlier_note(
-                earlier.get((task, prompt_variant), []), task, prompt_variant, links
-            )
+            f"<h3>{links.task(task)}{_count(task_groups)}</h3>"
+            + _earlier_note(earlier.get(task, []), task, links)
             + _fold_list("findings", ["Check", "Failure rate", "Proposed cause"], rows)
         )
     return heading + "".join(lists)
@@ -157,7 +155,7 @@ def _finding(
 
     # One line per arm across every Agent, naming the Agents that failed,
     # rather than a sentence to parse.
-    facts = [("Task", links.task(group.task, group.prompt_variant))]
+    facts = [("Task", links.task(group.task))]
     if group.description:
         facts.append(("Requires", _inline_markdown(group.description)))
     arm_rows = []
@@ -184,9 +182,7 @@ def _finding(
         )
     body.extend(_note(note, links, show_check=False) for note in group.notes)
     body.append(_failing_trials(group, links, trial_pages))
-    anchor = anchor_prefix + _finding_anchor(
-        group.task, group.prompt_variant, group.check
-    )
+    anchor = anchor_prefix + _finding_anchor(group.task, group.check)
     css = "required" if group.required else "preferred"
     return _fold(anchor, summary, "".join(body), css)
 
@@ -346,9 +342,7 @@ def _comparison(
     if any(failed):
         rows.append(group("Failed required checks"))
         for check in sorted(set(failed[0]) | set(failed[1])):
-            anchor = "#" + _finding_anchor(
-                comparison.task, comparison.prompt_variant, check
-            )
+            anchor = "#" + _finding_anchor(comparison.task, check)
             rows.append(
                 row(
                     f'<a class="mono" href="{anchor}">{escape(check)}</a>',
@@ -398,18 +392,49 @@ def _comparison(
     )
     summary = [
         f'<span class="name mono">{escape(comparison.treatment)}</span>',
-        f"<span>{escape(_task_name(comparison.task))}{_variant_note(comparison.prompt_variant)}</span>",
+        f"<span>{escape(_task_name(comparison.task))}</span>",
         f'<span class="nowrap">{passed[0]}/{len(scored[0])} &rarr; {passed[1]}/{len(scored[1])}</span>',
         f"<span>{_agent_summary(by_agent)}</span>",
     ]
     facts = _facts(
         [
-            ("Task", links.task(comparison.task, comparison.prompt_variant)),
+            ("Task", links.task(comparison.task)),
             ("Versions", versions or "unversioned"),
         ]
     )
     anchor = f"comparison-{escape(comparison.treatment)}-{_slug(comparison.task)}"
-    return _fold(anchor, summary, f"{facts}{table}{_analysis(found, comparison)}")
+    return _fold(
+        anchor,
+        summary,
+        f"{facts}{_prompt_diff(comparison)}{table}{_analysis(found, comparison)}",
+    )
+
+
+def _prompt_diff(comparison: Comparison) -> str:
+    """The Treatment's prompt, its words changed from the baseline's marked:
+    removed words struck through and added words underlined; empty when it
+    kept the Task's prompt."""
+    prompts = comparison.prompts()
+    if prompts is None:
+        return ""
+    # Words with their following whitespace, so a paragraph that gains one
+    # sentence shows that sentence, not the whole paragraph, as changed.
+    before, after = (re.split(r"(?<=\s)(?=\S)", prompt) for prompt in prompts)
+    parts = []
+    matcher = difflib.SequenceMatcher(None, before, after, autojunk=False)
+    for op, i1, i2, j1, j2 in matcher.get_opcodes():
+        if op == "equal":
+            parts.append(escape("".join(before[i1:i2])))
+        if op in ("delete", "replace"):
+            parts.append(f"<del>{escape(''.join(before[i1:i2]))}</del>")
+        if op in ("insert", "replace"):
+            parts.append(f"<ins>{escape(''.join(after[j1:j2]))}</ins>")
+    rendered = "".join(parts)
+    return (
+        '<details class="how" open><summary>Prompt: the Treatment replaces the '
+        "Task's prompt</summary>"
+        f'<pre class="diff">{rendered}</pre></details>'
+    )
 
 
 # How each change reads in a comparison: its label and _delta direction.
@@ -476,7 +501,7 @@ def _analysis(found: dict, comparison: Comparison) -> str:
     rows = [("Result", escape(answer["result"]))]
     if found["disagreements"]:
         items = "".join(
-            f'<li><a class="mono" href="#{_finding_anchor(comparison.task, comparison.prompt_variant, d["check"])}">'
+            f'<li><a class="mono" href="#{_finding_anchor(comparison.task, d["check"])}">'
             f"{escape(d['check'])}</a> in {escape(d['trial'])}: the analyst says "
             f"{escape(d['analyst'])}, the rule says {escape(d['class'])}</li>"
             for d in found["disagreements"]
@@ -494,7 +519,7 @@ def _analysis(found: dict, comparison: Comparison) -> str:
 
 def _reliability_section(
     reliability: list[TaskReliability],
-    earlier: dict[tuple[str, str], list[list[RunSummary]]],
+    earlier: dict[str, list[list[RunSummary]]],
     links: "_Links",
 ) -> str:
     intro = (
@@ -507,8 +532,7 @@ def _reliability_section(
         "definition and every retained run and Trial."
     )
     rows = "".join(
-        _reliability_row(row, earlier.get((row.task, row.prompt_variant), []), links)
-        for row in reliability
+        _reliability_row(row, earlier.get(row.task, []), links) for row in reliability
     )
     return f"""
 <h2 id="reliability">Task reliability{_count(reliability)}</h2>{_intro(intro)}
@@ -530,8 +554,8 @@ def _reliability_row(
     )
     task = (
         f'<td class="task" rowspan="{len(row.arms)}">'
-        f"<div>{links.task(row.task, row.prompt_variant)}</div>{calibrated}"
-        f"{_earlier_note(earlier, row.task, row.prompt_variant, links)}</td>"
+        f"<div>{links.task(row.task)}</div>{calibrated}"
+        f"{_earlier_note(earlier, row.task, links)}</td>"
     )
     anchor = f' id="task-{_slug(row.task)}"'
     rows = []
@@ -611,8 +635,8 @@ def render_task(
     notes: list[Note] = (),
     earlier: list[tuple[TaskReliability, list[FailureGroup], list[Note]]] = (),
 ) -> str:
-    """Return one Task and prompt variant's page: the definition its newest
-    run packaged (prompt, checks, and files) and the current version's runs,
+    """Return one Task's page: the definition its newest baseline run
+    packaged (prompt, checks, and files) and the current version's runs,
     each with its Trials. ``row`` covers the current version, with its
     ``notes`` at the top, and ``earlier`` each earlier version, newest
     first, with its findings and notes; they are listed at the bottom. ``file_pages`` maps packaged files to
@@ -620,9 +644,9 @@ def render_task(
     ``docs`` is the Task's page under ``docs/tasks/``, when one exists.
     Links are relative to ``page_dir``."""
     links = _Links(page_dir)
-    newest = row.runs[0]
-    package = newest.path / "task"
-    version = (newest.fingerprints or {}).get("task")
+    defining = row.definition()
+    package = defining.path / "task"
+    version = (defining.fingerprints or {}).get("task")
     trial_count = sum(len(run.trials) for run in row.runs)
 
     facts = [
@@ -631,7 +655,7 @@ def render_task(
         (
             "Definition",
             "as packaged for "
-            + links.link(newest.path, newest.path.name, css="mono")
+            + links.link(defining.path, defining.path.name, css="mono")
             + (
                 f' <span class="note">Task version {escape(version[:8])}</span>'
                 if version
@@ -651,7 +675,7 @@ def render_task(
             f'<div class="breadcrumb"><a href="{links.href(index)}">&larr; Report</a>'
             ' <span class="muted">/ Task</span></div>'
         ),
-        f"<h1>{LOGO}{escape(_task_name(row.task))}{_variant_note(row.prompt_variant)}</h1>",
+        f"<h1>{LOGO}{escape(_task_name(row.task))}</h1>",
         _facts(facts),
     ]
     if notes:
@@ -671,7 +695,7 @@ def render_task(
     )
     sections.append(
         "<h2>Files</h2>"
-        '<p class="intro">The Task package as the newest run built it.</p>'
+        '<p class="intro">The Task package as the newest baseline run built it.</p>'
         + _package_files(package, links, file_pages)
     )
     sections.append("<h2>Runs</h2>" + _task_runs(row, links, trial_pages))
@@ -772,7 +796,7 @@ def _task_checks(
         )
         title = escape(name)
         if failed:
-            anchor = _finding_anchor(row.task, row.prompt_variant, name)
+            anchor = _finding_anchor(row.task, name)
             title = f'<a href="{links.href(index)}#{anchor}">{title}</a>'
         if name in defined:
             title += (
@@ -937,7 +961,7 @@ def render_trial(
     ``proposals`` maps a failed check to its saved class proposals, each
     ``{"class", "who", "reason"}``; ``notes`` are the notes naming the
     Trial."""
-    links = _Links(page_dir, {(run.task, run.prompt_variant): task_page})
+    links = _Links(page_dir, {run.task: task_page})
     record = trial.record or {}
     agent = record.get("agent") or {}
     usage = record.get("usage") or {}
@@ -952,8 +976,7 @@ def render_trial(
                 else ""
             ),
         ),
-        ("Task", links.task(run.task, run.prompt_variant)),
-        ("Prompt variant", escape(run.prompt_variant)),
+        ("Task", links.task(run.task)),
         (
             "Agent",
             escape(run.agent)
@@ -1394,18 +1417,16 @@ def _tree_node(key: str, value: object, *, open_depth: int, depth: int) -> str:
 
 class _Links:
     """Relative links from pages written in ``page_dir``. ``task_pages`` maps
-    each ``(task, prompt variant)`` to its Task page."""
+    each Task to its Task page."""
 
-    def __init__(
-        self, page_dir: Path, task_pages: dict[tuple[str, str], Path] | None = None
-    ):
+    def __init__(self, page_dir: Path, task_pages: dict[str, Path] | None = None):
         self.page_dir = page_dir
         self.task_pages = task_pages or {}
 
-    def task(self, task: str, prompt_variant: str) -> str:
+    def task(self, task: str) -> str:
         """The Task's name, linked to its page when one was written."""
-        name = f"{escape(_task_name(task))}{_variant_note(prompt_variant)}"
-        page = self.task_pages.get((task, prompt_variant))
+        name = escape(_task_name(task))
+        page = self.task_pages.get(task)
         return f'<a href="{self.href(page)}">{name}</a>' if page else name
 
     def href(self, target: Path) -> str:
@@ -1442,10 +1463,6 @@ def _environment(run: RunSummary) -> str:
 def _class_chip(name: str) -> str:
     css = "class-" + name.replace(" ", "-").lower()
     return f'<span class="chip {css}">{escape(name)}</span>'
-
-
-def _variant_note(prompt_variant: str) -> str:
-    return "" if prompt_variant == "default" else f"@{escape(prompt_variant)}"
 
 
 def _delta(text: str, direction: float) -> str:
@@ -1503,9 +1520,7 @@ def _count(items: list) -> str:
     return f' <span class="count">{len(items)}</span>' if items else ""
 
 
-def _earlier_note(
-    versions: list[list[RunSummary]], task: str, prompt_variant: str, links: "_Links"
-) -> str:
+def _earlier_note(versions: list[list[RunSummary]], task: str, links: "_Links") -> str:
     """A line counting a Task's earlier versions and their runs, linked to
     the Task page section that lists them; empty when there are none."""
     if not versions:
@@ -1517,7 +1532,7 @@ def _earlier_note(
         f"{len(runs)} run{'s' if len(runs) > 1 else ''}"
         + (f", last run {max(dates):%Y-%m-%d}" if dates else "")
     )
-    page = links.task_pages.get((task, prompt_variant))
+    page = links.task_pages.get(task)
     if page:
         text = f'<a href="{links.href(page)}#earlier-versions">{text}</a>'
     return f'<p class="earlier muted">{text}</p>'
@@ -1542,8 +1557,8 @@ def _task_name(task: str) -> str:
     return task.removeprefix("tasks/")
 
 
-def _finding_anchor(task: str, prompt_variant: str, check: str) -> str:
-    return escape(f"finding-{_slug(task)}-{prompt_variant}-{check}")
+def _finding_anchor(task: str, check: str) -> str:
+    return escape(f"finding-{_slug(task)}-{check}")
 
 
 def _slug(task: str) -> str:

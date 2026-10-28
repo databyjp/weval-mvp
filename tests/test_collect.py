@@ -12,7 +12,7 @@ from weval.collect import (
     split_versions,
 )
 
-RUN = "20261020-120000__build__ecommerce-search@terse__pi-glm-5.3-flash"
+RUN = "20261020-120000__build__ecommerce-search__pi-glm-5.3-flash"
 
 
 def write_trial(
@@ -42,7 +42,6 @@ def record(status: str, preferred_passed: bool, cost: float) -> dict:
     return {
         "status": status,
         "task": "tasks/build/ecommerce-search",
-        "prompt_variant": "terse",
         "agent": {"name": "pi-glm-5.3-flash"},
         "checks": [
             {"name": "a", "required": True, "passed": status == "passed"},
@@ -69,11 +68,7 @@ def test_run_row_counts_scored_trials_and_averages_usage(tmp_path):
 
     [run] = collect_runs(tmp_path)
 
-    assert (run.task, run.prompt_variant, run.agent) == (
-        "tasks/build/ecommerce-search",
-        "terse",
-        "pi-glm-5.3-flash",
-    )
+    assert (run.task, run.agent) == ("tasks/build/ecommerce-search", "pi-glm-5.3-flash")
     # The non-result counts toward neither score.
     assert [t.status for t in run.scored] == ["passed", "failed"]
     assert [t.preferred_passed for t in run.scored] == [True, False]
@@ -92,11 +87,7 @@ def test_run_without_records_is_listed_from_its_name(tmp_path):
 
     [run] = collect_runs(tmp_path)
 
-    assert (run.task, run.prompt_variant, run.agent) == (
-        "tasks/build/ecommerce-search",
-        "terse",
-        "pi-glm-5.3-flash",
-    )
+    assert (run.task, run.agent) == ("tasks/build/ecommerce-search", "pi-glm-5.3-flash")
     assert [t.status for t in run.trials] == ["unrecorded"]
     assert run.scored == []
 
@@ -250,7 +241,6 @@ def test_each_task_keeps_the_version_its_newest_run_ran(tmp_path):
             path=tmp_path / name,
             date=None,
             task=task,
-            prompt_variant="default",
             treatment="",
             agent="agent",
             trials=[TrialSummary(tmp_path / name / "t", "passed", record)],
@@ -276,7 +266,7 @@ def test_each_task_keeps_the_version_its_newest_run_ran(tmp_path):
     assert {
         key: [[r.path.name for r in version] for version in versions]
         for key, versions in earlier.items()
-    } == {("tasks/build/x", "default"): [["x-2", "x-0"], ["x-1"]]}
+    } == {"tasks/build/x": [["x-2", "x-0"], ["x-1"]]}
 
 
 def test_uncached_input_leaves_out_cache_reads(tmp_path):

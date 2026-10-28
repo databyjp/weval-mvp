@@ -25,6 +25,7 @@ again. Calls go to OpenRouter's Anthropic-compatible endpoint and need
 repeatability rests on the pinned model, ``PROMPT_VERSION``, and the cache.
 """
 
+import difflib
 import hashlib
 import json
 import os
@@ -41,7 +42,7 @@ API = "https://openrouter.ai/api"
 MODEL = "anthropic/claude-sonnet-5.5"
 KEY_VAR = "OPENROUTER_API_KEY"
 # Raise when SYSTEM, SCHEMA, or the shape of facts() changes meaning.
-PROMPT_VERSION = "3"
+PROMPT_VERSION = "4"
 ATTEMPTS = 3
 DIRECTORY = "_analysis"
 # Check failure messages are capped one by one; the analyst needs what was
@@ -65,7 +66,8 @@ NUMBER = re.compile(r"\d+(?:\.\d+)*")
 
 SYSTEM = """\
 You analyse one comparison from weval, which runs Weaviate coding Tasks against coding agents. A Treatment \
-gives the agent extra skills; the baseline arm runs without one. Several agents, each a harness and a model, \
+gives the agent extra skills, replaces the Task's prompt (treatment_prompt_diff shows the change), or both; \
+the baseline arm runs without one. Several agents, each a harness and a model, \
 ran both arms, so the comparison asks whether the Treatment helps across agents. You get computed facts as \
 JSON: each arm's pass counts and mean usage per Trial over all agents; for each agent, its pass counts in \
 both arms and whether the Treatment helped, hurt, or left its pass rate unchanged; the median of the agents' \
@@ -155,9 +157,9 @@ def facts(comparison: Comparison, expected: dict) -> dict:
         usage_changes[attribute] = None if change is None else round(100 * change)
     return {
         "task": comparison.task,
-        "prompt_variant": comparison.prompt_variant,
         "treatment": comparison.treatment,
         "treatment_readme": readme,
+        "treatment_prompt_diff": _prompt_diff(comparison),
         "versions": {
             "task": comparison.task_version,
             "check": comparison.check_version,
@@ -531,6 +533,17 @@ def _readme(path: Path) -> str:
     return " ".join(paragraphs[0].split()) if paragraphs else ""
 
 
+def _prompt_diff(comparison: Comparison) -> str | None:
+    """The unified diff from the baseline's prompt to the Treatment's, or
+    ``None`` when the Treatment kept the Task's prompt."""
+    prompts = comparison.prompts()
+    if prompts is None:
+        return None
+    before, after = (prompt.splitlines() for prompt in prompts)
+    # Without the "---"/"+++" file headers, which name no files here.
+    return "\n".join(list(difflib.unified_diff(before, after, lineterm=""))[2:])
+
+
 def _name(comparison: Comparison) -> str:
     """A file name unique to the comparison's grouping in ``compare_treatments``."""
     versions = "-".join(
@@ -542,4 +555,4 @@ def _name(comparison: Comparison) -> str:
         )
     )
     task = comparison.task.removeprefix("tasks/").replace("/", "__")
-    return f"{comparison.treatment}__{task}@{comparison.prompt_variant}__{versions}"
+    return f"{comparison.treatment}__{task}__{versions}"

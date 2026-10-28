@@ -9,8 +9,7 @@ Flow: start the submitted Compose stack (unless the Task sets
 or the submitted ``/app`` has no ``docker-compose.yaml``),
 start the submitted app on ``APP_PORT`` when the Task sets
 ``WEVAL_START_APP=1``, call ``snapshot.snapshot(app_url)`` (``None`` without an
-app), add the prompt variant named in ``prompt_variant`` beside this file, then
-score it with ``check.py``. Everything is written to ``/logs/verifier``.
+app), then score it with ``check.py``. Everything is written to ``/logs/verifier``.
 A stack, app, or snapshot failure is recorded in the snapshot (``error`` plus
 ``error_stage``: ``stack``, ``app``, or ``snapshot``) and scored as failing
 checks; it is not a verifier crash.
@@ -41,21 +40,9 @@ def score(check: ModuleType, snapshot: dict) -> list[dict]:
     raising ``AssertionError`` whose message names the constraint. Any other
     exception, such as a missing snapshot section, fails the check with a
     "could not evaluate" note instead of aborting scoring.
-
-    A Task with prompt variants also defines ``PROMPT_VARIANT_REQUIRED`` and
-    ``PROMPT_VARIANT_PREFERRED``, mapping each prompt variant name to more
-    check functions; the snapshot's ``prompt_variant`` picks them. A snapshot
-    without ``prompt_variant`` is the ``default`` prompt variant.
     """
-    prompt_variant = snapshot.get("prompt_variant", "default")
-    required_checks = check.REQUIRED + getattr(
-        check, "PROMPT_VARIANT_REQUIRED", {}
-    ).get(prompt_variant, [])
-    preferred_checks = check.PREFERRED + getattr(
-        check, "PROMPT_VARIANT_PREFERRED", {}
-    ).get(prompt_variant, [])
     results = []
-    for required, functions in ((True, required_checks), (False, preferred_checks)):
+    for required, functions in ((True, check.REQUIRED), (False, check.PREFERRED)):
         for function in functions:
             try:
                 passed, notes = True, function(snapshot) or ""
@@ -166,11 +153,6 @@ def main() -> None:
             except (OSError, subprocess.TimeoutExpired) as error:
                 print(f"stack teardown failed: {error!r}")
 
-    # Recorded even on failure, so the failed snapshot is scored on the
-    # prompt variant's checks too.
-    snapshot["prompt_variant"] = (
-        Path(__file__).with_name("prompt_variant").read_text().strip()
-    )
     (LOG_DIR / "snapshot.json").write_text(json.dumps(snapshot, indent=1))
     results = score(importlib.import_module("check"), snapshot)
     (LOG_DIR / "checks.json").write_text(json.dumps(results, indent=1))

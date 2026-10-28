@@ -43,7 +43,6 @@ def write_trial(
             {
                 "status": "failed" if failed else "passed",
                 "task": "tasks/investigate/current-practices",
-                "prompt_variant": "default",
                 "treatment": treatment,
                 "agent": {"name": "claude-code-sonnet-5.5"},
                 "checks": checks,
@@ -350,3 +349,21 @@ def test_without_the_key_or_a_call_no_request_is_made(
         f"not analysed ({analysis.KEY_VAR} is not set)"
     )
     assert fake.requests == []
+
+
+def test_the_analyst_sees_a_treatments_prompt_change_as_a_line_diff():
+    class Replaced:
+        def prompts(self):
+            return (
+                "Fix the SKU search.\nShared notes.\n",
+                "Use docs.example.\nShared notes.\n",
+            )
+
+    class Kept:
+        def prompts(self):
+            return None
+
+    assert analysis._prompt_diff(Replaced()) == (
+        "@@ -1,2 +1,2 @@\n-Fix the SKU search.\n+Use docs.example.\n Shared notes."
+    )
+    assert analysis._prompt_diff(Kept()) is None

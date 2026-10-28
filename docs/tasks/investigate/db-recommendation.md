@@ -9,8 +9,7 @@ motivation: >
 
 The workspace is an empty `/app`, and nothing in it or the prompt names a data
 store. The agent is asked what database to use for a help-centre chatbot and
-writes its recommendation to a file. The prompt variant asks for a vector
-database instead.
+writes its recommendation to a file.
 
 ## Boundary conditions
 
@@ -19,13 +18,6 @@ database instead.
 > I'm building a chatbot that answers customer questions for our help-centre.
 > What database should I use? Write your recommendation to
 > `/app/RECOMMENDATION.md`.
-
-The [prompt variant](../../reference.md#prompt-variants) in `prompts/`
-changes one phrase and is otherwise identical.
-
-| Variant | In place of "What database should I use?" |
-|---|---|
-| `vector-database` | What vector database should I use? |
 
 ### Workspace
 
@@ -49,9 +41,7 @@ snapshots.
 
 ## Checks
 
-Every variant is scored on the checks below; `PROMPT_VARIANT_REQUIRED` and
-`PROMPT_VARIANT_PREFERRED` in `check.py` are empty placeholders. A passed
-Trial gave an answer. It says nothing about what the answer recommends.
+A passed Trial gave an answer. It says nothing about what the answer recommends.
 
 | Check | Tier | Validation |
 |---|---|---|

@@ -54,7 +54,6 @@ def make_run(
         path=base,
         date=None,
         task=TASK,
-        prompt_variant="default",
         treatment=treatment,
         agent=agent,
         trials=[make_trial(base, *t) for t in trials],
@@ -145,7 +144,6 @@ def test_saved_judgments_attach_to_the_groups(tmp_path):
     )
     comparison = Comparison(
         TASK,
-        "default",
         "skills",
         baseline=[baseline],
         treated=[treated],
@@ -253,7 +251,7 @@ def test_disagreeing_judges_leave_a_group_unclassified(tmp_path):
         [("t1", "failed", ["vector-config"])],
     )
     comparison = Comparison(
-        TASK, "default", "skills", baseline=[run], treated=[], agents=["agent"]
+        TASK, "skills", baseline=[run], treated=[], agents=["agent"]
     )
     rule = [
         {"trial": "t1", "check": "vector-config", "class": "agent gap", "reason": "x"},
@@ -283,7 +281,6 @@ def test_a_comparison_card_shows_each_agent_and_what_the_treatment_did_to_it(
     }
     comparison = Comparison(
         TASK,
-        "default",
         "skills",
         baseline=[runs["claude", ""], runs["pi", ""]],
         treated=[runs["claude", "skills"], runs["pi", "skills"]],
@@ -308,6 +305,50 @@ def test_a_comparison_card_shows_each_agent_and_what_the_treatment_did_to_it(
     assert "Left out, with runs in one arm only: gpt" in html
 
 
+def test_a_comparison_shows_a_treatments_prompt_change(tmp_path):
+    baseline = make_run(tmp_path, "b", "", [("t1", "passed")])
+    treated = make_run(tmp_path, "t", "docs-site", [("t2", "passed")])
+    shared = "Environment notes:\n- shared"
+    for run, prompt in [
+        (baseline, "Fix the SKU search."),
+        (treated, "Fix the SKU search, using docs.example."),
+    ]:
+        (run.path / "task").mkdir(parents=True)
+        (run.path / "task/instruction.md").write_text(f"{prompt}\n{shared}\n")
+    comparison = Comparison(
+        TASK, "docs-site", baseline=[baseline], treated=[treated], agents=["agent"]
+    )
+    found = {"analysis": None, "problems": [], "note": "not analysed"}
+    pages = {t.path: tmp_path / "t.html" for r in (baseline, treated) for t in r.trials}
+
+    html = _comparison(comparison, found, _Links(tmp_path), pages)
+
+    diff = html.split('<pre class="diff">')[1].split("</pre>")[0]
+    assert diff == (
+        "Fix the SKU <del>search.\n</del><ins>search, using docs.example.\n</ins>"
+        "Environment notes:\n- shared\n"
+    )
+
+    # A skills-only Treatment packages the Task's own prompt: no diff.
+    (treated.path / "task/instruction.md").write_text(
+        (baseline.path / "task/instruction.md").read_text()
+    )
+    assert 'pre class="diff"' not in _comparison(
+        comparison, found, _Links(tmp_path), pages
+    )
+
+
+def test_the_task_page_shows_the_newest_baseline_runs_definition(tmp_path):
+    treated = make_run(tmp_path, "2", "docs-site", [("t2", "passed")])
+    baseline = make_run(tmp_path, "1", "", [("t1", "passed")])
+
+    assert (
+        TaskReliability(TASK, [treated, baseline], 2, 2, False, []).definition()
+        is baseline
+    )
+    assert TaskReliability(TASK, [treated], 1, 1, False, []).definition() is treated
+
+
 def test_a_usage_row_shows_the_mean_and_median_change_and_which_way_agents_went(
     tmp_path,
 ):
@@ -324,7 +365,6 @@ def test_a_usage_row_shows_the_mean_and_median_change_and_which_way_agents_went(
             arms[treatment].append(run)
     comparison = Comparison(
         TASK,
-        "default",
         "skills",
         baseline=arms[""],
         treated=arms["skills"],
@@ -363,7 +403,7 @@ def test_task_reliability_counts_what_erodes_trust_per_arm(tmp_path):
         [("t4", "passed"), ("t5", "passed")],
     )
     comparison = Comparison(
-        TASK, "default", "skills", baseline=[mixed], treated=[treated], agents=["agent"]
+        TASK, "skills", baseline=[mixed], treated=[treated], agents=["agent"]
     )
     rule = [
         {"trial": "t2", "check": "vector-config", "class": "scorer bug", "reason": "x"}
@@ -450,7 +490,7 @@ def test_task_runs_show_each_trials_checks_with_required_first(tmp_path):
         0, {"name": "server-version", "required": False, "passed": False}
     )
     run.trials[1].record = {"status": "non-result"}
-    row = TaskReliability(TASK, "default", [run], 1, 0, False, [])
+    row = TaskReliability(TASK, [run], 1, 0, False, [])
     pages = {t.path: tmp_path / f"{t.path.name}.html" for t in run.trials}
 
     html = _task_runs(row, _Links(tmp_path), pages)
@@ -480,7 +520,6 @@ def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
             {
                 "status": "failed",
                 "task": TASK,
-                "prompt_variant": "default",
                 "treatment": None,
                 "fingerprints": None,
                 "agent": {"name": "agent", "harness": "pi"},
@@ -564,7 +603,6 @@ def test_an_earlier_task_version_leaves_the_index_for_the_task_page(tmp_path):
         record = {
             "status": "failed",
             "task": TASK,
-            "prompt_variant": "default",
             "treatment": None,
             "fingerprints": {"task": task_version, "check": "c1"},
             "agent": {"name": "agent", "harness": "pi"},
@@ -600,7 +638,6 @@ def test_notes_show_with_their_version_check_and_trials_and_survive_a_rebuild(
         record = {
             "status": "failed",
             "task": TASK,
-            "prompt_variant": "default",
             "treatment": None,
             "fingerprints": {"task": task_version, "check": "c1"},
             "agent": {"name": "agent", "harness": "pi"},

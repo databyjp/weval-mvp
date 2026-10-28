@@ -41,7 +41,7 @@ class Note:
 
 
 def read_notes(notes_dir: Path, task_page_name: str, task_version: str) -> list[Note]:
-    """The notes for one Task, prompt variant, and Task version, by date and
+    """The notes for one Task and Task version, by date and
     then file name; none when the folder does not exist."""
     folder = notes_dir / task_page_name / task_version
     notes = [_parse(path) for path in sorted(folder.glob("*.md"))]

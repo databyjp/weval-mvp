@@ -1,7 +1,7 @@
 """Group retained failures into findings and rate each Task's reliability.
 
 The skeleton of a finding is deterministic: a ``FailureGroup`` is one check of
-one Task and prompt variant, with per-arm fail counts computed from the
+one Task, with per-arm fail counts computed from the
 retained ``weval.json`` records alone, so the findings section is structurally
 true even where nothing has been analysed. Saved judgments attach to that
 skeleton as annotations with provenance: the analyst's patterns, the rule's
@@ -24,7 +24,7 @@ SCORER_CLASSES = ("scorer bug", "Task defect")
 
 @dataclass
 class FailureGroup:
-    """One failed check of one Task and prompt variant, across every arm.
+    """One failed check of one Task, across every arm.
 
     ``arms`` maps each arm, ``baseline`` or the Treatment name, to
     ``(failing, scored)`` Trial counts across every Agent that ran it;
@@ -42,7 +42,6 @@ class FailureGroup:
     """
 
     task: str
-    prompt_variant: str
     check: str
     required: bool
     description: str = ""
@@ -109,7 +108,7 @@ class ArmReliability:
 
 @dataclass
 class TaskReliability:
-    """How far one Task and prompt variant's numbers can be trusted.
+    """How far one Task's numbers can be trusted.
 
     ``runs`` is every retained run, newest first, and ``scored`` and
     ``passed`` count their Trials; ``arms`` splits the same runs by arm,
@@ -118,12 +117,17 @@ class TaskReliability:
     """
 
     task: str
-    prompt_variant: str
     runs: list[RunSummary]
     scored: int
     passed: int
     calibrated: bool
     arms: list[ArmReliability]
+
+    def definition(self) -> RunSummary:
+        """The run whose package shows the Task's definition: the newest
+        baseline run, since a Treatment can replace the prompt, or the newest
+        run when no baseline ran."""
+        return next((run for run in self.runs if not run.treatment), self.runs[0])
 
 
 def failure_groups(
@@ -133,27 +137,26 @@ def failure_groups(
     ``analyses`` (each Comparison with its saved ``analysis.analyse`` result),
     required first, then by the failure rate of each group's ``headline`` arm,
     baseline failures before Treatment-only ones, then by failing count."""
-    # Keyed by (task, prompt variant, arm).
-    scored_by_arm: dict[tuple[str, str, str], list] = {}
+    # Keyed by (task, arm).
+    scored_by_arm: dict[tuple[str, str], list] = {}
     for run in runs:
         arm = run.treatment or BASELINE
-        key = (run.task, run.prompt_variant, arm)
+        key = (run.task, arm)
         scored_by_arm.setdefault(key, []).extend((run, trial) for trial in run.scored)
 
-    groups: dict[tuple[str, str, str], FailureGroup] = {}
-    fail_counts: dict[tuple[str, str, str], Counter] = {}
+    groups: dict[tuple[str, str], FailureGroup] = {}
+    fail_counts: dict[tuple[str, str], Counter] = {}
     label_cache: dict[Path, dict] = {}
-    for (task, prompt_variant, arm), pairs in scored_by_arm.items():
+    for (task, arm), pairs in scored_by_arm.items():
         for run, trial in pairs:
             for check, required in [(c, True) for c in trial.failed_required] + [
                 (c, False) for c in trial.failed_preferred
             ]:
-                key = (task, prompt_variant, check)
+                key = (task, check)
                 group = groups.setdefault(
                     key,
                     FailureGroup(
                         task=task,
-                        prompt_variant=prompt_variant,
                         check=check,
                         required=required,
                         description=_description(trial, check),
@@ -165,14 +168,14 @@ def failure_groups(
                 answers = _labels(trial, check, label_cache)
                 if answers:
                     group.trial_labels[trial.path.name] = answers
-    # Every arm of the group's Task and prompt variant gets a count, so a
+    # Every arm of the group's Task gets a count, so a
     # check failing in one arm still shows the others' 0 of N.
     for key, group in groups.items():
         group.arm_trials = _baseline_first(
             {
                 arm: pairs
-                for (task, variant, arm), pairs in scored_by_arm.items()
-                if (task, variant) == key[:2]
+                for (task, arm), pairs in scored_by_arm.items()
+                if task == key[0]
             }
         )
         group.arms = {
@@ -187,7 +190,7 @@ def failure_groups(
     for comparison, found in analyses:
         for pattern in ((found.get("analysis") or {}).get("patterns")) or []:
             for check in pattern["checks"]:
-                group = groups.get((comparison.task, comparison.prompt_variant, check))
+                group = groups.get((comparison.task, check))
                 if group is not None:
                     group.patterns.append(
                         {
@@ -201,9 +204,7 @@ def failure_groups(
             ("disputed", found["disagreements"]),
         ):
             for row in rows:
-                group = groups.get(
-                    (comparison.task, comparison.prompt_variant, row["check"])
-                )
+                group = groups.get((comparison.task, row["check"]))
                 if group is not None and row not in getattr(group, name):
                     getattr(group, name).append(row)
 
@@ -228,19 +229,17 @@ def task_reliability(
     analyses: list[tuple[Comparison, dict]],
     fixtures_dir: Path,
 ) -> list[TaskReliability]:
-    """One ``TaskReliability`` per Task and prompt variant in ``runs``,
-    sorted by Task path."""
-    by_task: dict[tuple[str, str], list[RunSummary]] = {}
+    """One ``TaskReliability`` per Task in ``runs``, sorted by Task path."""
+    by_task: dict[str, list[RunSummary]] = {}
     for run in runs:
-        by_task.setdefault((run.task, run.prompt_variant), []).append(run)
+        by_task.setdefault(run.task, []).append(run)
 
-    # Keyed by (task, prompt variant, arm). Rule proposals are per Trial and
+    # Keyed by (task, arm). Rule proposals are per Trial and
     # can repeat when two comparisons share a baseline, so they are collected
     # as a set; each analyst pattern belongs to one comparison.
     flags: Counter = Counter()
-    rule_flags: set[tuple[str, str, str, str, str]] = set()
+    rule_flags: set[tuple[str, str, str, str]] = set()
     for comparison, found in analyses:
-        key = (comparison.task, comparison.prompt_variant)
         arm_of = {
             trial.path.name: run.treatment or BASELINE
             for run in [*comparison.baseline, *comparison.treated]
@@ -251,15 +250,17 @@ def task_reliability(
                 continue
             arms = {arm_of[t] for t in pattern.get("trials") or [] if t in arm_of}
             for arm in arms or {BASELINE, comparison.treatment}:
-                flags[*key, arm] += 1
+                flags[comparison.task, arm] += 1
         for row in found["rule"]:
             if row["class"] in SCORER_CLASSES and row["trial"] in arm_of:
-                rule_flags.add((*key, arm_of[row["trial"]], row["trial"], row["check"]))
-    for task, prompt_variant, arm, _, _ in rule_flags:
-        flags[task, prompt_variant, arm] += 1
+                rule_flags.add(
+                    (comparison.task, arm_of[row["trial"]], row["trial"], row["check"])
+                )
+    for task, arm, _, _ in rule_flags:
+        flags[task, arm] += 1
 
     rows = []
-    for (task, prompt_variant), task_runs in sorted(by_task.items()):
+    for task, task_runs in sorted(by_task.items()):
         by_arm: dict[str, list[RunSummary]] = {}
         for run in task_runs:
             by_arm.setdefault(run.treatment or BASELINE, []).append(run)
@@ -276,7 +277,7 @@ def task_reliability(
                     "passed" in statuses and len(statuses) > 1
                     for statuses in ({t.status for t in run.scored} for run in arm_runs)
                 ),
-                scorer_flags=flags[task, prompt_variant, arm],
+                scorer_flags=flags[task, arm],
             )
             for arm, arm_runs in sorted(
                 by_arm.items(), key=lambda item: (item[0] != BASELINE, item[0])
@@ -289,7 +290,6 @@ def task_reliability(
         rows.append(
             TaskReliability(
                 task=task,
-                prompt_variant=prompt_variant,
                 runs=task_runs,
                 scored=sum(arm.scored for arm in arms),
                 passed=sum(arm.passed for arm in arms),

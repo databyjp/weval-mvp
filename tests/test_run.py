@@ -10,11 +10,13 @@ from pathlib import Path
 
 import pytest
 
+import weval.run
 from weval.harnesses import claude_code, pi
 from weval.rescore import check_versions, rescore
 from weval.run import (
     ROOT,
     SHARED_COMPOSE,
+    SHARED_INSTRUCTIONS,
     WEAVIATE_COMPOSE,
     check_fingerprint,
     compose_overlays,
@@ -24,11 +26,10 @@ from weval.run import (
     fingerprints,
     package_task,
     run,
-    treatment_skills,
+    treatment_files,
 )
 
 TASK_PATH = Path("tasks/resolve/sku-search")
-PROMPT_VARIANT_TASK = ROOT / "tasks/investigate/current-practices"
 ORACLE_SNAPSHOT = ROOT / "tests/fixtures/resolve-sku-search-oracle-snapshot.json"
 
 
@@ -217,21 +218,19 @@ def test_claude_code_cost_covers_the_webfetch_model_and_rejects_unpriced_ones():
     )
 
 
-def test_package_task_uses_the_prompt_variant_and_tells_the_verifier(tmp_path):
-    package_task(PROMPT_VARIANT_TASK, tmp_path / "package", "legal-archive")
+def test_package_task_uses_the_tasks_prompt_or_a_treatments(tmp_path):
+    package_task(ROOT / TASK_PATH, tmp_path / "task")
+    replacement = tmp_path / "prompt.md"
+    replacement.write_text("Fix the SKU search, using the docs at docs.example.\n")
+    package_task(ROOT / TASK_PATH, tmp_path / "treated", replacement)
 
-    prompt = (PROMPT_VARIANT_TASK / "prompts/legal-archive.md").read_text()
-    assert (tmp_path / "package/instruction.md").read_text().startswith(prompt)
-    assert (tmp_path / "package/tests/prompt_variant").read_text() == "legal-archive"
-    assert not (tmp_path / "package/prompts").exists()
-
-
-def test_package_task_default_prompt_variant_uses_instruction_md(tmp_path):
-    package_task(PROMPT_VARIANT_TASK, tmp_path / "package")
-
-    prompt = (PROMPT_VARIANT_TASK / "instruction.md").read_text()
-    assert (tmp_path / "package/instruction.md").read_text().startswith(prompt)
-    assert (tmp_path / "package/tests/prompt_variant").read_text() == "default"
+    shared = SHARED_INSTRUCTIONS.read_text()
+    assert (tmp_path / "task/instruction.md").read_text() == (
+        f"{(ROOT / TASK_PATH / 'instruction.md').read_text()}\n{shared}"
+    )
+    assert (tmp_path / "treated/instruction.md").read_text() == (
+        f"{replacement.read_text()}\n{shared}"
+    )
 
 
 def test_tasks_get_the_weaviate_settings_unless_they_opt_out():
@@ -240,17 +239,22 @@ def test_tasks_get_the_weaviate_settings_unless_they_opt_out():
     assert "WEAVIATE_HTTP_HOST" in WEAVIATE_COMPOSE.read_text()
 
 
-def test_package_task_rejects_an_unknown_prompt_variant(tmp_path):
-    with pytest.raises(FileNotFoundError, match="no-such-prompt-variant"):
-        package_task(
-            PROMPT_VARIANT_TASK, tmp_path / "package", "no-such-prompt-variant"
-        )
-    assert not (tmp_path / "package").exists()
+def test_treatment_files_finds_skills_and_the_tasks_prompt(tmp_path, monkeypatch):
+    monkeypatch.setattr(weval.run, "TREATMENTS", tmp_path)
+    (tmp_path / "skills-only/skills/a").mkdir(parents=True)
+    prompt = tmp_path / "docs-site/prompts/resolve/sku-search.md"
+    prompt.parent.mkdir(parents=True)
+    prompt.write_text("Fix the SKU search.\n")
 
-
-def test_treatment_skills_rejects_an_unknown_treatment():
+    assert treatment_files("skills-only", TASK_PATH) == (
+        tmp_path / "skills-only/skills",
+        None,
+    )
+    assert treatment_files("docs-site", TASK_PATH) == (None, prompt)
+    with pytest.raises(FileNotFoundError, match="no prompt for this Task"):
+        treatment_files("docs-site", Path("tasks/build/ecommerce-search"))
     with pytest.raises(FileNotFoundError, match="no-such-treatment"):
-        treatment_skills("no-such-treatment")
+        treatment_files("no-such-treatment", TASK_PATH)
 
 
 def test_finalize_records_the_treatment(tmp_path):
@@ -269,24 +273,23 @@ def test_finalize_records_the_treatment(tmp_path):
 
 
 def test_fingerprints_version_the_task_and_check_separately(tmp_path):
-    task_dir = tmp_path / "current-practices"
+    task_dir = tmp_path / "sku-search"
     shutil.copytree(
-        PROMPT_VARIANT_TASK, task_dir, ignore=shutil.ignore_patterns("__pycache__")
+        ROOT / TASK_PATH, task_dir, ignore=shutil.ignore_patterns("__pycache__")
     )
-    before = fingerprints(task_dir, None)
+    before = fingerprints(task_dir)
 
-    assert before == fingerprints(PROMPT_VARIANT_TASK, None)
+    assert before == fingerprints(ROOT / TASK_PATH)
     assert before["treatment"] is None
 
     (task_dir / "check.py").write_text("REQUIRED = []\n")
-    after_check = fingerprints(task_dir, None)
+    after_check = fingerprints(task_dir)
     assert after_check["task"] == before["task"]
     assert after_check["check"] != before["check"]
 
-    # One Task version covers every prompt variant.
-    with (task_dir / "prompts/legal-archive.md").open("a") as prompt:
+    with (task_dir / "instruction.md").open("a") as prompt:
         prompt.write("One more sentence.\n")
-    after_prompt = fingerprints(task_dir, None)
+    after_prompt = fingerprints(task_dir)
     assert after_prompt["task"] != before["task"]
     assert after_prompt["check"] == after_check["check"]
 
@@ -302,19 +305,26 @@ def test_a_draft_task_runs_only_with_draft(tmp_path):
         run(tmp_path, "oracle", draft=True)
 
 
-def test_treatment_fingerprint_covers_the_skills_only(tmp_path):
+def test_treatment_fingerprint_covers_the_skills_and_prompt_only(tmp_path):
+    task = ROOT / TASK_PATH
     treatment = tmp_path / "treatment"
     shutil.copytree(ROOT / "treatments/weaviate-best-practices", treatment)
-    versions = fingerprints(PROMPT_VARIANT_TASK, treatment / "skills")
+    skills = treatment / "skills"
+    versions = fingerprints(task, skills)
 
     (treatment / "README.md").write_text("A different question.\n")
-    assert fingerprints(PROMPT_VARIANT_TASK, treatment / "skills") == versions
+    assert fingerprints(task, skills) == versions
 
-    (treatment / "skills/weaviate-best-practices/SKILL.md").write_text("changed\n")
-    assert (
-        fingerprints(PROMPT_VARIANT_TASK, treatment / "skills")["treatment"]
-        != versions["treatment"]
-    )
+    prompt = treatment / "prompts/resolve/sku-search.md"
+    prompt.parent.mkdir(parents=True)
+    prompt.write_text("Fix the SKU search.\n")
+    with_prompt = fingerprints(task, skills, prompt)["treatment"]
+    assert with_prompt != versions["treatment"]
+    prompt.write_text("Fix the SKU search, using docs.example.\n")
+    assert fingerprints(task, skills, prompt)["treatment"] != with_prompt
+
+    (skills / "weaviate-best-practices/SKILL.md").write_text("changed\n")
+    assert fingerprints(task, skills)["treatment"] != versions["treatment"]
 
 
 def test_finalize_records_the_fingerprints(tmp_path):

@@ -61,11 +61,6 @@ def main() -> None:
         help="run on the local Docker daemon instead of Modal",
     )
     run_parser.add_argument(
-        "--prompt-variant",
-        default="default",
-        help="prompt variant: a file name in the Task's prompts/, without .md",
-    )
-    run_parser.add_argument(
         "--treatment",
         help="Treatment: a directory name in treatments/ (default: none, a baseline)",
     )
@@ -118,7 +113,6 @@ def main() -> None:
                 args.agent,
                 args.n,
                 local=args.local,
-                prompt_variant=args.prompt_variant,
                 treatment=args.treatment,
                 draft=args.draft,
             )
