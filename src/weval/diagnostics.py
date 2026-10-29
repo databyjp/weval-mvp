@@ -15,10 +15,33 @@ from pathlib import Path
 # External URLs in a tool call's arguments. A URL's host must contain a dot,
 # which excludes Compose service names such as weaviate:8080 and localhost;
 # loopback addresses are excluded separately. Backslashes end a URL because
-# arguments are matched in their JSON encoding.
+# arguments are matched in their JSON encoding. A trailing ; , or . ends the
+# shell command or sentence, not the URL.
 URL = re.compile(
-    r"https?://(?!127\.0\.0\.1|0\.0\.0\.0)[^\s/'\"`:\\]+\.[^\s/'\"`:\\]+[^\s'\"`<>)\]}\\]*"
+    r"https?://(?!127\.0\.0\.1|0\.0\.0\.0)[^\s/'\"`:\\]+\.[^\s/'\"`:\\]+[^\s'\"`<>)\]}\\]*(?<![;,.])"
 )
+# A shell variable assigned a URL, as in B=https://host/docs; curl $B/page.md
+SHELL_URL_ASSIGNMENT = re.compile(r"\b([A-Za-z_]\w*)=(https?://[^\s;&|'\"`\\]+)")
+
+
+def urls_in(arguments: str) -> list[str]:
+    """Return the external URLs in a tool call's JSON-encoded arguments, in order.
+
+    A shell variable assigned a URL in the same arguments is expanded where
+    it is used (``$B/page.md`` or ``${B}/page.md``), and the assignment alone
+    is not listed. Other variables, such as a loop counter in
+    ``...&page=$page``, stay unexpanded.
+    """
+    values = dict(SHELL_URL_ASSIGNMENT.findall(arguments))
+    arguments = SHELL_URL_ASSIGNMENT.sub(r"\1=", arguments)
+    for name, value in values.items():
+        # A function replacement, so backslashes in the URL are not escapes.
+        arguments = re.sub(
+            rf"\$(?:{name}\b|\{{{name}\}})", lambda _, url=value: url, arguments
+        )
+    return URL.findall(arguments)
+
+
 # The Weaviate Python client numbers its deprecation warnings ("Dep024: ...").
 # Other libraries' warnings (authlib's, in every Trial) are left out.
 DEPRECATION = re.compile(r"\bDep\d{3}:[^\n]*")

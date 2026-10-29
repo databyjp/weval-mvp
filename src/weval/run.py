@@ -513,7 +513,8 @@ def usage(trial_dir: Path, result: dict) -> dict:
     the harness reports none, as for the Oracle. ``finalize()`` replaces them
     with a harness module's ``token_usage(trial_dir)`` when it defines one. ``tool_calls`` counts calls
     by tool name. ``urls`` lists, in first-use order, every external URL in
-    any tool call's arguments, including ``curl`` commands; a page read from
+    any tool call's arguments, including ``curl`` commands and URLs built
+    from a shell variable assigned in the same command; a page read from
     search results without its own fetch is not listed. ``search_queries``
     lists every ``query`` or ``queries`` argument except ``ToolSearch``'s. All three are empty
     without Harbor's ``agent/trajectory.json``.
@@ -529,7 +530,7 @@ def usage(trial_dir: Path, result: dict) -> dict:
         for call in step.get("tool_calls") or []:
             name, arguments = call["function_name"], call.get("arguments") or {}
             tool_calls[name] = tool_calls.get(name, 0) + 1
-            urls.update(dict.fromkeys(diagnostics.URL.findall(json.dumps(arguments))))
+            urls.update(dict.fromkeys(diagnostics.urls_in(json.dumps(arguments))))
             # Claude Code's ToolSearch query selects tools, not web pages.
             query = (
                 []

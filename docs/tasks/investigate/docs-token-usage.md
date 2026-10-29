@@ -37,7 +37,8 @@ Nothing is running.
 
 ## Checks
 
-`deployment` and `search` answers are not scored. Every check is a
+`deployment`, `config_ingestion`, and `search` answers are not scored. Every
+check is a
 `REQUIRED` check of `investigate/current-practices`. Its `PREFERRED`
 `canonical-sources` check is left out: Treatment Trials cite the staging
 site, which is not a Weaviate-owned host, so the check would fail by
@@ -47,8 +48,7 @@ construction and add noise to the Treatment comparison.
 |---|---|---|
 | `findings-file` | REQUIRED | `/app/findings.json` is a JSON object with every documented item, each with an `answer` string and a `sources` list. |
 | `weaviate-version-latest` | REQUIRED | `weaviate_version` names the latest stable Weaviate release at verify time, including its patch. |
-| `python-client-version-latest` | REQUIRED | `client_library_versions` names the latest `weaviate-client` release on PyPI at verify time, including its patch. |
-| `current-vector-config` | REQUIRED | `config_ingestion` names `vector_config`, `Configure.Vectors`, or named vectors. |
+| `python-client-version-latest` | REQUIRED | `client_library_versions` names the latest `weaviate-client` release on PyPI at verify time, as its full version or its minor line (`4.24.x`): pip resolves the patch. |
 
 ## Calibration
 

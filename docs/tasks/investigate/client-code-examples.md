@@ -45,21 +45,18 @@ Nothing is running.
 
 ## Observations
 
-`snapshot.py` records the submitted `findings.json`. The code is checked as
-text; it is not run.
+`snapshot.py` records the submitted `findings.json`. The code is not run.
 
 ## Checks
 
-Prose answers are not scored. Each code check is a detection check: the prompt
-asks for code, not for an API or client version.
+Neither prose answers nor code are scored. The Task records what agents
+answer and which pages they read, for comparing docs-site variants by tokens.
+Text patterns over client syntax were too brittle to score the code: valid
+variants, such as Go v5's hybrid builder, failed them.
 
 | Check | Tier | Validation |
 |---|---|---|
 | `findings-file` | REQUIRED | `/app/findings.json` is a JSON object with every documented item, each with an `answer` string and a `sources` list, and `python`, `typescript`, and `go` code strings for `config_ingestion` and `search`. |
-| `python-current-vector-config` | REQUIRED | `config_ingestion`'s Python code uses `Configure.Vectors` or `vector_config=`. The legacy API is `vectorizer_config=Configure.Vectorizer`, replaced in client 4.16. |
-| `typescript-current-vector-config` | REQUIRED | `config_ingestion`'s TypeScript code calls `vectors.<module>()`. The legacy API is `configure.vectorizer`, replaced in client 3.8. |
-| `go-v6-client` | REQUIRED | `config_ingestion`'s and `search`'s Go code use the v6 collections API (`.Collections.<method>(` or the `weaviate-go-client/v6` module) and no v5 call (`.Schema()`, `.GraphQL()`, `.Batch().ObjectsBatcher(`, or a v4/v5 module). The docs show v5 and v6 tabs side by side. |
-| `hybrid-search-code` | PREFERRED | `search`'s code runs a hybrid query in every language. The docs recommend hybrid search as the starting point. |
 
 ## Calibration
 
@@ -78,10 +75,4 @@ answers:
 |---|---|---|
 | `missing_file` | every check | No `findings.json` was written. |
 | `missing_item` | `findings-file` | `deployment` is absent. |
-| `missing_language` | `findings-file`, `typescript-current-vector-config` | `config_ingestion` has no TypeScript code. |
-| `python_legacy_vectorizer` | `python-current-vector-config` | Uses `vectorizer_config=Configure.Vectorizer`. |
-| `typescript_legacy_vectorizer` | `typescript-current-vector-config` | Uses `configure.vectorizer`. |
-| `go_v5_client` | `go-v6-client` | Creates the collection with `Schema().ClassCreator()`. |
-| `go_mixed_clients` | `go-v6-client` | Creates a v6 collection, then imports with the v5 `ObjectsBatcher`. |
-| `go_rest_calls` | `go-v6-client`, `hybrid-search-code` | Calls the REST API with `net/http` instead of a client. |
-| `typescript_vector_search` | `hybrid-search-code` | Searches with `nearText`. |
+| `missing_language` | `findings-file` | `config_ingestion` has no TypeScript code. |

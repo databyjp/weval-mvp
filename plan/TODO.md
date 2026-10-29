@@ -80,8 +80,9 @@ Task page. Still open:
 - Maintainer: write a canonical solution, the answers a Weaviate expert
   would give for each item, to replace the Oracle's for scoring.
 - Add an LLM-as-a-judge helper that compares an agent's answers with the
-  canonical solution, for items a regex can't score, such as
-  `current-vector-config` and the unscored `deployment` and `search`.
+  canonical solution, for the unscored `deployment`, `config_ingestion`, and
+  `search`, and for `investigate/client-code-examples`' code, whose regex
+  checks were removed as too brittle.
 - Criteria for `deployment` and `search`. Candidate expected answers are in
   the Task page's Calibration table, and need re-checking against the docs
   first.

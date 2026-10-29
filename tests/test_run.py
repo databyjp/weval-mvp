@@ -99,6 +99,14 @@ def test_finalize_records_usage_from_result_and_trajectory(tmp_path):
                 "command": 'curl -s "https://api.github.com/repos/weaviate/weaviate/releases?per_page=15"'
             },
         ),
+        # Claude Code's curl with the base URL in a shell variable.
+        (
+            "Bash",
+            {
+                "command": "B=https://docs.example.io/weaviate; curl -s $B.md | head -80; "
+                "curl -s ${B}/quickstart.md; curl -s https://docs.example.io/deploy.md; echo"
+            },
+        ),
         (
             "bash",
             {
@@ -127,10 +135,19 @@ def test_finalize_records_usage_from_result_and_trajectory(tmp_path):
         "n_cache_tokens": 1023424,
         "n_output_tokens": 33356,
         "cost_usd": 0.028,
-        "tool_calls": {"web_search": 1, "fetch_content": 2, "bash": 2, "ToolSearch": 1},
+        "tool_calls": {
+            "web_search": 1,
+            "fetch_content": 2,
+            "bash": 2,
+            "Bash": 1,
+            "ToolSearch": 1,
+        },
         "urls": [
             "https://docs.weaviate.io/deploy/migration",
             "https://api.github.com/repos/weaviate/weaviate/releases?per_page=15",
+            "https://docs.example.io/weaviate.md",
+            "https://docs.example.io/weaviate/quickstart.md",
+            "https://docs.example.io/deploy.md",
         ],
         "search_queries": ["Weaviate latest stable version", "weaviate-client latest"],
     }

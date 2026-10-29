@@ -3,7 +3,8 @@
 Each check passes by returning and fails by raising ``AssertionError`` whose
 message names the constraint. The check ID is the function name with dashes;
 the docstring is its description. Reward requires every ``REQUIRED`` check.
-``deployment`` and ``search`` answers are not scored; see the Task page.
+``deployment``, ``config_ingestion``, and ``search`` answers are not scored;
+see the Task page.
 ``EXPECTED`` gives the value a check looks for, so diagnostics can report
 whether the agent was shown it.
 """
@@ -17,11 +18,6 @@ ITEMS = (
     "deployment",
     "config_ingestion",
     "search",
-)
-# Current Python client API for vectorizer configuration (client 4.16 and
-# later); the legacy one is vectorizer_config=Configure.Vectorizer.
-CURRENT_VECTOR_CONFIG = re.compile(
-    r"Configure\.Vectors\b|\bvector_config\b|named vectors?", re.IGNORECASE
 )
 # Weaviate-owned sites, and the package registries of the official clients,
 # including the API hosts agents query for versions (registry.npmjs.org,
@@ -110,23 +106,16 @@ def weaviate_version_latest(snapshot: dict) -> None:
 
 
 def python_client_version_latest(snapshot: dict) -> None:
-    """client_library_versions names the latest weaviate-client (Python) release, including its patch."""
+    """client_library_versions names the latest weaviate-client (Python)
+    release, as its full version or as its minor line (4.24.x)."""
+    # The patch is optional because pip resolves it; the Weaviate image tag,
+    # by contrast, pins one, so weaviate-version-latest requires it.
     version = latest(snapshot, "weaviate-client")
+    minor_line = version.rsplit(".", 1)[0] + ".x"
     text = answer(snapshot, "client_library_versions")
-    assert names_version(text, version), (
-        f"client_library_versions names the latest Python client release {version}; got {text[:200]!r}"
-    )
-
-
-def current_vector_config(snapshot: dict) -> None:
-    """config_ingestion recommends the current vector configuration API
-    (vector_config=Configure.Vectors, named vectors), not the legacy
-    vectorizer_config=Configure.Vectorizer."""
-    # Detection: the prompt does not ask for an API. Mentioning the legacy API
-    # as replaced is allowed, so only the current one's presence is checked.
-    text = answer(snapshot, "config_ingestion")
-    assert CURRENT_VECTOR_CONFIG.search(text), (
-        f"config_ingestion names vector_config, Configure.Vectors, or named vectors; got {text[:200]!r}"
+    assert names_version(text, version) or names_version(text, minor_line), (
+        f"client_library_versions names the latest Python client release {version} "
+        f"or {minor_line}; got {text[:200]!r}"
     )
 
 
@@ -157,7 +146,6 @@ REQUIRED = [
     findings_file,
     weaviate_version_latest,
     python_client_version_latest,
-    current_vector_config,
 ]
 PREFERRED = [canonical_sources]
 EXPECTED = {
