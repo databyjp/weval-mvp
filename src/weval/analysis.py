@@ -42,7 +42,7 @@ API = "https://openrouter.ai/api"
 MODEL = "anthropic/claude-sonnet-5.5"
 KEY_VAR = "OPENROUTER_API_KEY"
 # Raise when SYSTEM, SCHEMA, or the shape of facts() changes meaning.
-PROMPT_VERSION = "5"
+PROMPT_VERSION = "6"
 ATTEMPTS = 3
 DIRECTORY = "_analysis"
 # Check failure messages are capped one by one; the analyst needs what was
@@ -71,7 +71,9 @@ the baseline arm runs without one. Several agents, each a harness and a model, \
 ran both arms, so the comparison asks whether the Treatment helps across agents. You get computed facts as \
 JSON: each arm's pass counts and mean usage per Trial over all agents; for each agent, its pass counts in \
 both arms and whether the Treatment helped, hurt, or left its pass rate unchanged; the median of the agents' \
-usage changes; and every failed check of every Trial, with the Trial's agent. A failed check carries its \
+usage changes; and every failed check of every Trial, with the Trial's agent. A Trial with a \
+snapshot_error has no failed checks: its snapshot failed, so none of its checks was evaluated, and it counts \
+only against its arm's pass count. Name such Trials in caveats or open_questions, never in a pattern. A failed check carries its \
 failure message; for some checks, the \
 value the check expected and whether that value appeared in what the agent was shown; and Jev labels, a \
 classifier's reading of the trace steps that bear on the failed choice: why the agent made it (no_lookup, \
@@ -92,9 +94,7 @@ Classes:
 - Weaviate gap: the product or its docs led the agent astray.
 - scorer bug: the check misjudged a correct solution.
 - Task defect: the prompt or workspace hid or contradicted a scored constraint.
-- infrastructure failure: the environment prevented a valid outcome. weval records such a Trial as a \
-non-result, which is not scored. A snapshot error (error_stage) or a timeout is a scored outcome: classify it \
-by why the agent's stack or app was not serving.
+- infrastructure failure: the environment prevented a valid outcome.
 
 A failed check is a finding about the agent or Weaviate, not a defect to remove. Propose scorer bug or Task \
 defect only when the facts show the check or the prompt is wrong. Use only the facts given. Write each \
@@ -206,15 +206,6 @@ def propose_class(failure: dict) -> dict:
         failure["expected"],
         (failure["labels"] or {}).get("answer_source") or {},
     )
-    if failure["error_stage"]:
-        # A snapshot error is graded, so it is classified like any other
-        # failure: by why the stack or app was not serving, which only the
-        # Trial's logs show.
-        return {
-            "class": UNCLASSIFIED,
-            "reason": f"snapshot error at stage {failure['error_stage']}; "
-            "classify by why the stack or app was not serving",
-        }
     if expected is None:
         return {"class": UNCLASSIFIED, "reason": "the check defines no expected value"}
     if expected["value"] is None:
@@ -474,7 +465,11 @@ def _arm(runs: list, expected: dict) -> dict:
                 "id": t.path.name,
                 "agent": agent,
                 "status": t.status,
-                "failed_checks": _failed_checks(t, expected),
+                "snapshot_error": t.snapshot_error,
+                # A failed snapshot evaluated no check.
+                "failed_checks": []
+                if t.snapshot_error
+                else _failed_checks(t, expected),
             }
             for agent, t in trials
         ],
@@ -514,7 +509,6 @@ def _failed_checks(trial: TrialSummary, expected: dict) -> list[dict]:
                 "labels": {question: answers[question] for question in labels.QUESTIONS}
                 if answers
                 else None,
-                "error_stage": record.get("error_stage"),
             }
         )
     return failures

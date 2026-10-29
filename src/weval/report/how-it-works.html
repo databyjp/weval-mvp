@@ -237,6 +237,196 @@ Task defects call for a change to weval.</p>
 </div>
 </div>
 
+<h2>Scoring and analysis</h2>
+<p class="lead">A check decides pass or fail. Everything after it explains the failure, and none
+of it changes the score.</p>
+<p class="intro">Each layer reads less than the one before, so a later answer can be traced
+back to the evidence it was given.</p>
+<div class="card">
+<table class="plain">
+<thead><tr><th>Layer</th><th>Run by</th><th>Reads</th><th>Produces</th></tr></thead>
+<tbody>
+<tr><td><strong>Score</strong></td><td class="wrapping"><code>verify.py</code>, in the Trial; <code>weval check</code></td><td class="wrapping"><code>snapshot.json</code></td><td class="wrapping">Pass or fail per check, with a failure message naming what was observed. A failed snapshot fails every check; the report counts that Trial in the pass rate but in no check's failure rate.</td></tr>
+<tr><td><strong>Diagnose</strong></td><td class="wrapping">Code, whenever a Trial is read</td><td class="wrapping">The trace, <code>application.log</code></td><td class="wrapping">Whether the agent was shown the check's expected value, whether a Treatment skill loaded, and Weaviate deprecation warnings.</td></tr>
+<tr><td><strong>Label</strong></td><td class="wrapping">Two models, after <code>weval run</code> and <code>weval check</code></td><td class="wrapping">The trace</td><td class="wrapping">For each failed check: the step where the agent decided, why, and where its answer came from.</td></tr>
+<tr><td><strong>Analyse</strong></td><td class="wrapping">A model and a rule, in <code>weval analyse</code></td><td class="wrapping">Computed facts for one Treatment comparison, never transcripts</td><td class="wrapping">Failure patterns with a proposed class each, and where the model and the rule disagree.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Labelling a failed check</h3>
+<p class="lead">One model finds the steps that matter. A second model reads only those steps
+and answers two fixed questions.</p>
+<figure class="diagram">
+<div class="scroll">
+<svg viewBox="0 0 1020 272" role="img" aria-label="Labelling a failed check. A step finder reads the whole trace once per Trial and selects, for each failed check, the decision step and the steps that bear on it. Jev reads only the text of those steps, and the sources they showed the agent, and answers why the agent made the choice and which source it took the answer from, each with a confidence.">
+<defs>
+<marker id="label-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="box" x="20" y="64" width="130" height="92" rx="6"/>
+<text class="title" x="85" y="88" text-anchor="middle">Trace</text>
+<text class="sub code" x="85" y="108" text-anchor="middle">trajectory.json</text>
+<text class="sub" x="85" y="124" text-anchor="middle">every step</text>
+<text class="sub" x="85" y="140" text-anchor="middle">long items clipped</text>
+
+<rect class="box" x="217" y="64" width="150" height="92" rx="6"/>
+<text class="title" x="292" y="88" text-anchor="middle">Step finder</text>
+<text class="sub" x="292" y="108" text-anchor="middle">long-context model</text>
+<text class="sub" x="292" y="124" text-anchor="middle">once per Trial</text>
+
+<rect class="box" x="434" y="64" width="170" height="92" rx="6"/>
+<text class="title" x="519" y="88" text-anchor="middle">Selected steps</text>
+<text class="sub" x="519" y="108" text-anchor="middle">the decision step</text>
+<text class="sub" x="519" y="124" text-anchor="middle">plus source, intent,</text>
+<text class="sub" x="519" y="140" text-anchor="middle">trigger, verification</text>
+
+<rect class="box key" x="671" y="64" width="130" height="92" rx="6"/>
+<text class="title" x="736" y="88" text-anchor="middle">Jev</text>
+<text class="sub" x="736" y="108" text-anchor="middle">TypeSafe</text>
+<text class="sub" x="736" y="124" text-anchor="middle">two questions</text>
+
+<rect class="box" x="868" y="64" width="132" height="92" rx="6"/>
+<text class="title" x="934" y="88" text-anchor="middle">Labels</text>
+<text class="sub" x="934" y="108" text-anchor="middle">cause</text>
+<text class="sub" x="934" y="124" text-anchor="middle">answer source</text>
+<text class="sub" x="934" y="140" text-anchor="middle">with confidence</text>
+
+<rect class="box" x="434" y="200" width="170" height="56" rx="6"/>
+<text class="title" x="519" y="224" text-anchor="middle">Sources shown</text>
+<text class="sub" x="519" y="242" text-anchor="middle">URLs, searches, files</text>
+
+<g class="badge"><circle cx="217" cy="64" r="10"/><text x="217" y="68" text-anchor="middle">1</text></g>
+<g class="badge"><circle cx="671" cy="64" r="10"/><text x="671" y="68" text-anchor="middle">2</text></g>
+<g class="badge"><circle cx="868" cy="64" r="10"/><text x="868" y="68" text-anchor="middle">3</text></g>
+
+<line class="edge" x1="150" y1="110" x2="215" y2="110" marker-end="url(#label-arrow)"/>
+<text class="edge-label" x="183" y="102" text-anchor="middle">all steps</text>
+<line class="edge" x1="367" y1="110" x2="432" y2="110" marker-end="url(#label-arrow)"/>
+<text class="edge-label" x="400" y="102" text-anchor="middle">per check</text>
+<line class="edge" x1="604" y1="110" x2="669" y2="110" marker-end="url(#label-arrow)"/>
+<text class="edge-label" x="637" y="102" text-anchor="middle">text only</text>
+<line class="edge" x1="801" y1="110" x2="866" y2="110" marker-end="url(#label-arrow)"/>
+<text class="edge-label" x="834" y="102" text-anchor="middle">answers</text>
+<line class="edge" x1="519" y1="156" x2="519" y2="198" marker-end="url(#label-arrow)"/>
+<text class="edge-label" x="527" y="182">named in</text>
+<polyline class="edge" points="604,228 736,228 736,158" marker-end="url(#label-arrow)"/>
+<text class="edge-label" x="614" y="220">answer options</text>
+</svg>
+</div>
+<figcaption>Jev sees each selected step's text and kind, but not the step finder's reasons,
+so a wrong reason cannot steer the label.</figcaption>
+</figure>
+<div class="card">
+<ol class="run-steps">
+<li><span class="step-num">1</span><div><strong>Step finder</strong>: pick the steps behind each failed check.
+<p>A long-context model (<code>STEPS_MODEL</code> in <code>labels.py</code>) reads the whole
+trace once per Trial. For each failed check it names the decision step, where the agent made
+the choice the check found, and every other step that bears on it, each tagged
+<em>source</em>, <em>intent</em>, <em>trigger</em>, or <em>verification</em>. Finding no
+relevant steps is a valid answer.</p></div></li>
+<li><span class="step-num">2</span><div><strong>Jev</strong>: answer two Choice questions from those steps alone.
+<p><em>Cause</em> asks why the agent made the choice (table below). <em>Answer source</em> asks
+where the value came from. The options are each URL, search, or Treatment file that the
+selected steps showed the agent, plus the agent's own knowledge.</p></div></li>
+<li><span class="step-num">3</span><div><strong>Labels</strong>: saved per Trial and reused.
+<p>Each answer carries Jev's confidence from 0 to 1. Treat one below about 0.5 as "check by
+hand". Labels are saved in <code>&lt;run&gt;/labels/&lt;trial&gt;.json</code>, keyed by a hash
+of the request, so they are asked again only when the failed checks, the trace, or the prompts
+change. A Trial whose snapshot failed is not labelled, because no value was observed to
+trace.</p></div></li>
+</ol>
+</div>
+<div class="card">
+<table class="plain">
+<thead><tr><th>Cause</th><th>The agent...</th></tr></thead>
+<tbody>
+<tr><td><code>no_lookup</code></td><td class="wrapping">chose without looking anything up.</td></tr>
+<tr><td><code>followed_source</code></td><td class="wrapping">took the choice from something it was shown, such as a docs page, a search result, a skill file, or example code.</td></tr>
+<tr><td><code>ignored_current_practice</code></td><td class="wrapping">was shown the current practice the check looks for and chose otherwise without saying why.</td></tr>
+<tr><td><code>considered_and_rejected</code></td><td class="wrapping">weighed the option the check looks for and chose otherwise, giving a reason.</td></tr>
+<tr><td><code>environment_forced</code></td><td class="wrapping">was pushed to the choice by an observation, such as an error or a failed health check.</td></tr>
+<tr><td><code>no_trace_evidence</code></td><td class="wrapping">left no explanation in the steps shown.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Proposing a class</h3>
+<p class="lead">A model and a hand-coded rule each propose a class from the same facts. Where
+they disagree, a person decides.</p>
+<figure class="diagram">
+<div class="scroll">
+<svg viewBox="0 0 1020 244" role="img" aria-label="Proposing a class. The analyst model reads one Treatment comparison's computed facts and proposes failure patterns, each with a class. verify() rejects an answer that cites unknown Trials or checks, invents numbers, or leaves a failed required check out, and the analyst is asked again. A hand-coded rule proposes a class per Trial from the same facts. Where the two differ, the disagreement is listed for a person.">
+<defs>
+<marker id="class-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="box" x="20" y="86" width="180" height="92" rx="6"/>
+<text class="title" x="110" y="110" text-anchor="middle">Comparison facts</text>
+<text class="sub" x="110" y="130" text-anchor="middle">pass counts, usage</text>
+<text class="sub" x="110" y="146" text-anchor="middle">failed checks, labels</text>
+<text class="sub" x="110" y="162" text-anchor="middle">expected value seen</text>
+
+<rect class="box" x="270" y="40" width="150" height="64" rx="6"/>
+<text class="title" x="345" y="66" text-anchor="middle">Analyst</text>
+<text class="sub" x="345" y="86" text-anchor="middle">model, facts only</text>
+
+<rect class="box" x="490" y="40" width="150" height="64" rx="6"/>
+<text class="title code" x="565" y="66" text-anchor="middle">verify()</text>
+<text class="sub" x="565" y="86" text-anchor="middle">checks every citation</text>
+
+<rect class="box" x="710" y="40" width="150" height="64" rx="6"/>
+<text class="title" x="785" y="66" text-anchor="middle">Patterns</text>
+<text class="sub" x="785" y="86" text-anchor="middle">a class each</text>
+
+<rect class="box" x="270" y="164" width="150" height="64" rx="6"/>
+<text class="title" x="345" y="190" text-anchor="middle">Rule</text>
+<text class="sub code" x="345" y="210" text-anchor="middle">propose_class()</text>
+
+<rect class="box" x="710" y="164" width="150" height="64" rx="6"/>
+<text class="title" x="785" y="190" text-anchor="middle">Proposals</text>
+<text class="sub" x="785" y="210" text-anchor="middle">a class per Trial</text>
+
+<rect class="box key" x="890" y="102" width="120" height="64" rx="6"/>
+<text class="title" x="950" y="128" text-anchor="middle">Disagreements</text>
+<text class="sub" x="950" y="148" text-anchor="middle">for a person</text>
+
+<polyline class="edge" points="200,132 235,132 235,72 268,72" marker-end="url(#class-arrow)"/>
+<polyline class="edge" points="235,132 235,196 268,196" marker-end="url(#class-arrow)"/>
+<line class="edge" x1="420" y1="72" x2="488" y2="72" marker-end="url(#class-arrow)"/>
+<text class="edge-label" x="454" y="64" text-anchor="middle">answer</text>
+<polyline class="edge" points="565,40 565,20 345,20 345,38" marker-end="url(#class-arrow)"/>
+<text class="edge-label" x="455" y="14" text-anchor="middle">rejected: ask again, 3 attempts in all</text>
+<line class="edge" x1="640" y1="72" x2="708" y2="72" marker-end="url(#class-arrow)"/>
+<text class="edge-label" x="674" y="64" text-anchor="middle">accepted</text>
+<line class="edge" x1="420" y1="196" x2="708" y2="196" marker-end="url(#class-arrow)"/>
+<text class="edge-label" x="564" y="188" text-anchor="middle">same facts, no model</text>
+<polyline class="edge" points="860,72 950,72 950,100" marker-end="url(#class-arrow)"/>
+<text class="edge-label" x="905" y="64" text-anchor="middle">compare</text>
+<polyline class="edge" points="860,196 950,196 950,168" marker-end="url(#class-arrow)"/>
+<text class="edge-label" x="905" y="188" text-anchor="middle">compare</text>
+</svg>
+</div>
+<figcaption>The analyst (<code>MODEL</code> in <code>analysis.py</code>) never reads a
+transcript. <code>verify()</code> rejects an answer that cites a Trial or check that did not
+fail, states a number missing from the facts, or leaves a failed required check out of every
+pattern. An answer still rejected after three attempts is saved as rejected, not edited.</figcaption>
+</figure>
+<div class="card">
+<table class="plain">
+<thead><tr><th>The rule, first match wins</th><th>Proposed class</th></tr></thead>
+<tbody>
+<tr><td class="wrapping">The check defines no expected value</td><td class="wrapping">unclassified</td></tr>
+<tr><td class="wrapping">The snapshot did not record the expected value</td><td><span class="chip">infrastructure failure</span></td></tr>
+<tr><td class="wrapping">No trace to say what the agent was shown</td><td class="wrapping">unclassified</td></tr>
+<tr><td class="wrapping">The agent was shown the expected value</td><td><span class="chip class-agent-gap">agent gap</span></td></tr>
+<tr><td class="wrapping">It was not, and Jev's answer source is a Weaviate page</td><td><span class="chip class-weaviate-gap">Weaviate gap</span></td></tr>
+<tr><td class="wrapping">Otherwise</td><td class="wrapping">unclassified</td></tr>
+</tbody>
+</table>
+</div>
+<p class="intro">Each finding in the report shows the analyst's patterns, the rule's
+proposals, any disagreement, and the labels for each failing Trial. The report renders these
+as saved; it never calls a model.</p>
+
 <h2>Further reading</h2>
 <ul>
 <li><a href="$repo/docs/concepts/task-runs.md">Task runs</a>: the run sequence and how snapshot errors are scored.</li>

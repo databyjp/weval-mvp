@@ -188,6 +188,7 @@ details.fold[open] > summary { background: var(--band); border-bottom: 1px solid
 details.fold .name { font-weight: 600; overflow-wrap: anywhere; }
 details.fold .nowrap { white-space: nowrap; }
 p.earlier { margin: -4px 0 8px; font-size: 12px; }
+p.snapshot-failures { margin: -8px 0 16px; font-size: 13px; color: var(--muted); max-width: 130ch; }
 td.task p.earlier { margin: 4px 0 0; }
 details.fold .tier { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--preferred-fg); }
 .card.inset { border: 0; border-radius: 0; box-shadow: none; margin: 0; max-width: none; }

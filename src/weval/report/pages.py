@@ -29,7 +29,12 @@ from weval.collect import (
 from weval.diagnostics import diagnose
 from weval.labels import QUESTIONS, label
 from weval.report.assets import LOGO, STYLE
-from weval.report.findings import BASELINE, FailureGroup, TaskReliability
+from weval.report.findings import (
+    BASELINE,
+    FailureGroup,
+    TaskReliability,
+    snapshot_failures,
+)
 from weval.report.notes import Note
 
 # A JSON array longer than this shows its first items and points to the raw file.
@@ -87,7 +92,7 @@ def render_index(
 Generated {generated:%Y-%m-%d %H:%M}.</span>
 <nav class="sections"><a href="#findings">Findings</a><a href="#comparisons">Treatment comparisons</a>
 <a href="#reliability">Task reliability</a>{links.link(how_it_works, "How weval works")}</nav></header>
-{_findings_section(groups, earlier, links, trial_pages)}
+{_findings_section(groups, runs, earlier, links, trial_pages)}
 {_comparisons_section(analyses, links, trial_pages)}
 {_reliability_section(reliability, earlier, links)}"""
     return _page("Weaviate AX Evaluation", body)
@@ -114,6 +119,7 @@ def render_how_it_works(*, page_dir: Path, index: Path, repo: Path) -> str:
 
 def _findings_section(
     groups: list[FailureGroup],
+    runs: list[RunSummary],
     earlier: dict[str, list[list[RunSummary]]],
     links: "_Links",
     trial_pages: dict[Path, Path],
@@ -128,12 +134,17 @@ def _findings_section(
         "baseline failures. Open a row for the rate in every arm, the agents that failed, and "
         "the saved opinions about why. The counts come straight from the retained records; "
         "each opinion names its judge: the LLM analyst, a hand-coded rule, or the Jev "
-        "labeller. Open a failing Trial to see the evidence; the final call on a class is yours."
+        "labeller. Open a failing Trial to see the evidence; the final call on a class is yours. "
+        "A Trial whose snapshot failed evaluated no check: it counts against the pass rate, "
+        "is listed under its Task, and is left out of every check's rate."
     )
     heading = f'<h2 id="findings">Findings{_count(groups)}</h2>{_intro(intro)}'
-    if not groups:
+    failed_snapshots = snapshot_failures(runs)
+    if not groups and not failed_snapshots:
         return f'{heading}<p class="muted">No failed checks are retained.</p>'
-    by_task: dict[str, list[FailureGroup]] = {}
+    by_task: dict[str, list[FailureGroup]] = {
+        run.task: [] for run, _ in failed_snapshots
+    }
     for group in groups:
         by_task.setdefault(group.task, []).append(group)
     # Most failing Trials, summed over the Task's checks, first; each Task's
@@ -145,12 +156,35 @@ def _findings_section(
     lists = []
     for task, task_groups in ordered:
         rows = "".join(_finding(group, links, trial_pages) for group in task_groups)
+        task_runs = [run for run in runs if run.task == task]
         lists.append(
             f"<h3>{links.task(task)}{_count(task_groups)}</h3>"
             + _earlier_note(earlier.get(task, []), task, links)
-            + _fold_list("findings", ["Check", "Failure rate"], rows)
+            + (_fold_list("findings", ["Check", "Failure rate"], rows) if rows else "")
+            + _snapshot_failures(task_runs, links, trial_pages)
         )
     return heading + "".join(lists)
+
+
+def _snapshot_failures(
+    runs: list[RunSummary], links: "_Links", trial_pages: dict[Path, Path]
+) -> str:
+    """One line naming the Trials in ``runs`` whose snapshot failed, each
+    with its Agent, arm, status, and error stage; empty when there are none."""
+    failed = snapshot_failures(runs)
+    if not failed:
+        return ""
+    trials = "; ".join(
+        f"{links.link(trial_pages[trial.path], trial.path.name, css='mono')} "
+        f"({escape(run.agent)}, {f'+ {escape(run.treatment)}' if run.treatment else BASELINE}, "
+        f"{escape(trial.status)} at {escape(trial.snapshot_error)})"
+        for run, trial in failed
+    )
+    count = f"{len(failed)} Trial{'s' if len(failed) > 1 else ''}"
+    return (
+        f'<p class="snapshot-failures">Snapshot failed in {count}, counted in the pass rate and in '
+        f"no check's rate: {trials}</p>"
+    )
 
 
 def _finding(
@@ -759,7 +793,7 @@ def _earlier_versions(
             )
             if groups
             else '<p class="muted">No failed checks.</p>'
-        )
+        ) + _snapshot_failures(version.runs, links, trial_pages)
         body = (
             (f"<h3>Notes{_count(notes)}</h3>{_notes(notes, links)}" if notes else "")
             + f"<h3>Findings{_count(groups)}</h3>{findings}"
@@ -798,7 +832,7 @@ def _task_checks(
     )
     if not newest:
         return '<p class="muted">No checks recorded.</p>'
-    scored = [t for run in row.runs for t in run.scored]
+    scored = [t for run in row.runs for t in run.scored if not t.snapshot_error]
     check_page = file_pages.get(check_file)
     defined = _definition_lines(check_file) if check_page else {}
     rows = []
@@ -937,7 +971,8 @@ def _check_columns(runs: list[RunSummary]) -> list[tuple[str, bool]]:
 
 def _check_cells(trial: TrialSummary, checks: list[tuple[str, bool]], href: str) -> str:
     """One square per check column, each linking to the Trial at ``href``.
-    A check the Trial did not record, as in a ``non-result``, is not scored."""
+    A check the Trial did not record, as in a ``non-result``, or did not
+    evaluate because its snapshot failed, is not scored."""
     results = {
         check["name"]: check.get("passed")
         for check in (trial.record or {}).get("checks") or []
@@ -945,7 +980,12 @@ def _check_cells(trial: TrialSummary, checks: list[tuple[str, bool]], href: str)
     cells = []
     for name, is_required in checks:
         passed = results.get(name)
-        if passed is None:
+        if trial.snapshot_error:
+            state, result = (
+                "unscored",
+                f"not evaluated (snapshot failed at {trial.snapshot_error})",
+            )
+        elif passed is None:
             state, result = "unscored", f"not scored ({trial.status})"
         elif passed:
             state, result = "passed", "passed"

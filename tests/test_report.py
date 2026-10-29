@@ -217,6 +217,35 @@ def test_findings_order_by_tier_then_baseline_rate_then_count(tmp_path):
     assert groups[3].headline() == ("skills", 1, 1)
 
 
+def test_a_failed_snapshot_counts_in_the_pass_rate_but_in_no_checks_rate(tmp_path):
+    run = make_run(
+        tmp_path,
+        "20260101-000001__build__x__agent",
+        "",
+        [("t1", "failed", ["vector-config"]), ("t2", "timed-out")],
+    )
+    run.trials[1].snapshot_error = "snapshot"
+    pages = {t.path: tmp_path / f"{t.path.name}.html" for t in run.trials}
+    groups = failure_groups([run], [])
+
+    # t2 is still scored, so it counts against the pass rate.
+    assert [t.path.name for t in run.scored] == ["t1", "t2"]
+    assert [(g.check, g.arms) for g in groups] == [
+        ("vector-config", {"baseline": (1, 1)})
+    ]
+    html = _findings_section(groups, [run], {}, _Links(tmp_path), pages)
+    line = html.split('<p class="snapshot-failures">')[1]
+    assert line.startswith("Snapshot failed in 1 Trial,")
+    assert "t2</a> (agent, baseline, timed-out at snapshot)" in line
+    row = TaskReliability(TASK, [run], 2, 0, False, [])
+    assert (
+        re.findall(
+            r'title="t2: [\w-]+ ([^"]+)"', _task_runs(row, _Links(tmp_path), pages)
+        )
+        == ["not evaluated (snapshot failed at snapshot)"] * 2
+    )
+
+
 def test_findings_group_by_task_with_the_most_failures_first(tmp_path):
     # tasks/build/x fails 1 check in 1 Trial; tasks/build/y fails 2 checks
     # in 1 Trial and a preferred check in another, so it leads.
@@ -232,7 +261,7 @@ def test_findings_group_by_task_with_the_most_failures_first(tmp_path):
     groups = failure_groups([x, y], [])
     pages = {t.path: tmp_path / f"{t.path.name}.html" for r in (x, y) for t in r.trials}
 
-    html = _findings_section(groups, {}, _Links(tmp_path), pages)
+    html = _findings_section(groups, [x, y], {}, _Links(tmp_path), pages)
 
     headings = re.findall(r"<h3>([^< ]+)", html)
     assert headings == ["build/y", "build/x"]

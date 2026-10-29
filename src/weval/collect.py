@@ -20,9 +20,12 @@ class TrialSummary:
 
     ``status`` is ``weval.json``'s status, or ``unrecorded`` when the Trial
     has no ``weval.json``, in which case ``record`` is ``None``.
-    ``preferred_passed`` is ``None`` when the Trial records no preferred
-    checks. ``failed_required`` and ``failed_preferred`` list failed check
-    IDs. Usage fields are ``None`` when not reported. ``uncached_input``
+    ``snapshot_error`` is the ``error_stage`` of a Trial whose snapshot
+    failed, else ``None``. Such a Trial keeps its status, so it counts
+    against its arm's pass rate, but its checks were never evaluated:
+    ``failed_required`` and ``failed_preferred``, which otherwise list failed
+    check IDs, are empty, and ``preferred_passed`` is ``None``, as for a Trial
+    that records no preferred checks. Usage fields are ``None`` when not reported. ``uncached_input``
     is input tokens not read from the prompt cache (Harbor's and Claude
     Code's input counts include cache reads).
     """
@@ -30,6 +33,7 @@ class TrialSummary:
     path: Path
     status: str
     record: dict | None = None
+    snapshot_error: str | None = None
     preferred_passed: bool | None = None
     failed_required: list[str] = field(default_factory=list)
     failed_preferred: list[str] = field(default_factory=list)
@@ -306,7 +310,9 @@ def summarise_trial(trial_dir: Path, record: dict | None) -> TrialSummary:
     if record is None:
         return TrialSummary(path=trial_dir, status="unrecorded")
 
-    checks = record.get("checks") or []
+    snapshot_error = record.get("error_stage")
+    # A failed snapshot fails every check without evaluating any.
+    checks = [] if snapshot_error else record.get("checks") or []
     preferred = [check["passed"] for check in checks if not check["required"]]
     usage = record.get("usage") or {}
     token_counts = [
@@ -320,6 +326,7 @@ def summarise_trial(trial_dir: Path, record: dict | None) -> TrialSummary:
         path=trial_dir,
         status=record["status"],
         record=record,
+        snapshot_error=snapshot_error,
         preferred_passed=all(preferred) if preferred else None,
         failed_required=[
             c["name"] for c in checks if c["required"] and not c["passed"]

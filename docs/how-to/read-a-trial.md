@@ -29,6 +29,13 @@ recorded before fingerprints existed are pooled with each other, so after a
 check versions of its newest run; earlier versions and their findings are at
 the bottom of the Task's page.
 
+A Trial whose snapshot failed (`error_stage` set) evaluated none of its
+checks. It counts against its arm's pass rate, but in no check's failure
+rate: the report lists it under its Task's findings instead, and the analyst
+gets it as a Trial with a `snapshot_error` and no failed checks. Read its
+logs to see why the stack or app was not serving, and record the cause in a
+[note](#write-a-note).
+
 An LLM analyst (`MODEL` in `src/weval/analysis.py`) reads the comparison's
 computed facts, never the transcripts: pass counts, each Agent's change,
 mean usage, and each failed check's Agent, failure message,
@@ -46,7 +53,7 @@ proposes a class for each failed check from the same facts:
 - the expected value was shown to the agent: agent gap;
 - it was not, and the labelled source is a Weaviate page: Weaviate gap;
 - the snapshot gave no expected value: infrastructure failure;
-- otherwise unclassified, including a failed snapshot (`error_stage` set), which is graded and classified by why the stack or app was not serving.
+- otherwise unclassified.
 
 Where the rule and the analyst name different classes for the same failed
 check, the disagreement is listed for you to decide. The analysis knows

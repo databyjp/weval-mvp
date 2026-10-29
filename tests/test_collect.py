@@ -284,3 +284,19 @@ def test_uncached_input_leaves_out_cache_reads(tmp_path):
     [run] = collect_runs(tmp_path)
 
     assert run.trials[0].uncached_input == 30_000
+
+
+def test_a_failed_snapshot_lists_no_failed_checks(tmp_path):
+    failed = record("timed-out", preferred_passed=False, cost=0.1)
+    failed["error_stage"] = "snapshot"
+    write_trial(tmp_path / RUN, "t1", failed)
+
+    [run] = collect_runs(tmp_path)
+
+    [trial] = run.scored
+    assert trial.snapshot_error == "snapshot"
+    assert (trial.failed_required, trial.failed_preferred, trial.preferred_passed) == (
+        [],
+        [],
+        None,
+    )

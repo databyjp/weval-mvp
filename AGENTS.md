@@ -73,8 +73,10 @@ Classify each failure before acting on it:
   constraint;
 - infrastructure failure: the environment or Harbor prevented a valid
   outcome. Recorded as a `non-result`, not a finding. A snapshot error
-  (`error_stage` `stack`, `app`, or `snapshot`) is graded and scores `failed`;
-  classify it like any other failure.
+  (`error_stage` `stack`, `app`, or `snapshot`) is graded and scores `failed`
+  (or `timed-out`), but no check was evaluated: it counts against the pass
+  rate and in no check's failure rate. Classify the Trial, not its checks,
+  from its logs.
 
 Only scorer bugs and Task defects call for a weval change. Do not loosen a
 check, reword a prompt, or demote a check to make agent Trials pass. Do not

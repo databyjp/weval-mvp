@@ -199,32 +199,27 @@ RELEASE_NOTES = {
 
 
 @pytest.mark.parametrize(
-    ("expected", "source", "error_stage", "proposed"),
+    ("expected", "source", "proposed"),
     [
-        ({"value": "4.24.1", "seen": False}, RELEASE_NOTES, None, "Weaviate gap"),
-        ({"value": "4.24.1", "seen": True}, RELEASE_NOTES, None, "agent gap"),
-        ({"value": None, "seen": None}, None, None, "infrastructure failure"),
+        ({"value": "4.24.1", "seen": False}, RELEASE_NOTES, "Weaviate gap"),
+        ({"value": "4.24.1", "seen": True}, RELEASE_NOTES, "agent gap"),
+        ({"value": None, "seen": None}, None, "infrastructure failure"),
         (
             {"value": "4.24.1", "seen": False},
             {"choice": "own-knowledge", "confidence": 0.9},
-            None,
             "unclassified",
         ),
         # A Treatment file copied from the docs is weval's content, not a Weaviate page.
         (
             {"value": "4.24.1", "seen": False},
             {"choice": "weaviate-docs/pages/release-notes.md", "confidence": 0.5},
-            None,
             "unclassified",
         ),
-        (None, RELEASE_NOTES, None, "unclassified"),
-        # A snapshot error is graded: the logs, not the rule, say why.
-        ({"value": None, "seen": None}, None, "app", "unclassified"),
-        (None, None, "stack", "unclassified"),
+        (None, RELEASE_NOTES, "unclassified"),
     ],
 )
 def test_the_rule_proposes_a_class_only_where_its_evidence_decides_one(
-    expected, source, error_stage, proposed
+    expected, source, proposed
 ):
     failure = {
         "check": VERSION,
@@ -232,7 +227,6 @@ def test_the_rule_proposes_a_class_only_where_its_evidence_decides_one(
         "notes": "",
         "expected": expected,
         "labels": {"answer_source": source} if source else None,
-        "error_stage": error_stage,
     }
 
     assert analysis.propose_class(failure)["class"] == proposed

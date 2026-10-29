@@ -123,13 +123,18 @@ def failure_groups(
     """Every failed check across ``runs``, grouped and annotated from
     ``analyses`` (each Comparison with its saved ``analysis.analyse`` result),
     required first, then by the failure rate of each group's ``headline`` arm,
-    baseline failures before Treatment-only ones, then by failing count."""
+    baseline failures before Treatment-only ones, then by failing count. A
+    Trial whose snapshot failed evaluated no check, so it counts in no
+    group's rates; ``snapshot_failures`` lists it."""
     # Keyed by (task, arm).
     scored_by_arm: dict[tuple[str, str], list] = {}
     for run in runs:
         arm = run.treatment or BASELINE
         key = (run.task, arm)
-        scored_by_arm.setdefault(key, []).extend((run, trial) for trial in run.scored)
+        # Each check's rate covers the Trials whose checks were evaluated.
+        scored_by_arm.setdefault(key, []).extend(
+            (run, trial) for trial in run.scored if not trial.snapshot_error
+        )
 
     groups: dict[tuple[str, str], FailureGroup] = {}
     fail_counts: dict[tuple[str, str], Counter] = {}
@@ -209,6 +214,14 @@ def failure_groups(
     for group in groups.values():
         group.failing.sort(key=lambda pair: pair[0].path.name, reverse=True)
     return sorted(groups.values(), key=order)
+
+
+def snapshot_failures(runs: list[RunSummary]) -> list[tuple[RunSummary, TrialSummary]]:
+    """The scored Trials in ``runs`` whose snapshot failed, newest run first.
+    They count against their arm's pass rate but in no check's rate."""
+    return [
+        (run, trial) for run in runs for trial in run.scored if trial.snapshot_error
+    ]
 
 
 def task_reliability(
