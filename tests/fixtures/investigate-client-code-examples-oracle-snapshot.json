@@ -1,0 +1,38 @@
+{
+ "findings": {
+  "text": "{\n  \"deployment\": {\n    \"answer\": \"Docker for local development; Kubernetes or Weaviate Cloud for production.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/deploy\"\n    ]\n  },\n  \"config_ingestion\": {\n    \"answer\": \"Define each collection with a named vector from Configure.Vectors (configure.vectors in TypeScript, the Vectors map in Go v6); import objects with server-side batching.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/manage-collections/vector-config\",\n      \"https://docs.weaviate.io/weaviate/manage-objects/import\"\n    ],\n    \"code\": {\n      \"python\": \"from weaviate.classes.config import Configure, Property, DataType\\n\\nclient.collections.create(\\n    \\\"Article\\\",\\n    vector_config=Configure.Vectors.text2vec_openai(),\\n    properties=[\\n        Property(name=\\\"title\\\", data_type=DataType.TEXT),\\n        Property(name=\\\"body\\\", data_type=DataType.TEXT),\\n    ],\\n)\\n\\ncollection = client.collections.use(\\\"Article\\\")\\nwith collection.batch.stream() as batch:\\n    for row in rows:\\n        batch.add_object(properties=row)\\n\",\n      \"typescript\": \"import { vectors, dataType } from 'weaviate-client';\\n\\nawait client.collections.create({\\n  name: 'Article',\\n  vectorizers: vectors.text2VecOpenAI(),\\n  properties: [\\n    { name: 'title', dataType: dataType.TEXT },\\n    { name: 'body', dataType: dataType.TEXT },\\n  ],\\n})\\n\\nconst articles = client.collections.use('Article')\\nconst result = await articles.data.ingest(rows.map((properties) => ({ properties })))\\n\",\n      \"go\": \"_, err := client.Collections.Create(ctx, collections.Collection{\\n  Name: \\\"Article\\\",\\n  Properties: []collections.Property{\\n    {Name: \\\"title\\\", DataType: collections.DataTypeText},\\n    {Name: \\\"body\\\", DataType: collections.DataTypeText},\\n  },\\n  Vectors: map[string]collections.VectorConfig{\\n    \\\"default\\\": {Vectorizer: openai.Text2Vec{}},\\n  },\\n})\\n\\narticles := client.Collections.Use(\\\"Article\\\")\\nb := articles.Batch(ctx, batch.WithRetryTimes(1))\\nfor _, row := range rows {\\n  if _, err := b.Object(ctx, &data.Object{Properties: row}); err != nil {\\n    panic(err)\\n  }\\n}\\nif err := b.Close(); err != nil {\\n  panic(err)\\n}\\n\"\n    }\n  },\n  \"search\": {\n    \"answer\": \"Hybrid search as the starting point.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/concepts/search\",\n      \"https://docs.weaviate.io/weaviate/search/hybrid\"\n    ],\n    \"code\": {\n      \"python\": \"articles = client.collections.use(\\\"Article\\\")\\nresponse = articles.query.hybrid(query=\\\"food\\\", limit=3)\\n\",\n      \"typescript\": \"const articles = client.collections.use('Article');\\nconst result = await articles.query.hybrid('food', { limit: 3 })\\n\",\n      \"go\": \"articles := client.Collections.Use(\\\"Article\\\")\\nresponse, err := articles.Query.Hybrid(ctx, query.Hybrid{\\n  Query: \\\"food\\\",\\n  Limit: 3,\\n})\\n\"\n    }\n  }\n}",
+  "parsed": {
+   "deployment": {
+    "answer": "Docker for local development; Kubernetes or Weaviate Cloud for production.",
+    "sources": [
+     "https://docs.weaviate.io/deploy"
+    ]
+   },
+   "config_ingestion": {
+    "answer": "Define each collection with a named vector from Configure.Vectors (configure.vectors in TypeScript, the Vectors map in Go v6); import objects with server-side batching.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/manage-collections/vector-config",
+     "https://docs.weaviate.io/weaviate/manage-objects/import"
+    ],
+    "code": {
+     "python": "from weaviate.classes.config import Configure, Property, DataType\n\nclient.collections.create(\n    \"Article\",\n    vector_config=Configure.Vectors.text2vec_openai(),\n    properties=[\n        Property(name=\"title\", data_type=DataType.TEXT),\n        Property(name=\"body\", data_type=DataType.TEXT),\n    ],\n)\n\ncollection = client.collections.use(\"Article\")\nwith collection.batch.stream() as batch:\n    for row in rows:\n        batch.add_object(properties=row)\n",
+     "typescript": "import { vectors, dataType } from 'weaviate-client';\n\nawait client.collections.create({\n  name: 'Article',\n  vectorizers: vectors.text2VecOpenAI(),\n  properties: [\n    { name: 'title', dataType: dataType.TEXT },\n    { name: 'body', dataType: dataType.TEXT },\n  ],\n})\n\nconst articles = client.collections.use('Article')\nconst result = await articles.data.ingest(rows.map((properties) => ({ properties })))\n",
+     "go": "_, err := client.Collections.Create(ctx, collections.Collection{\n  Name: \"Article\",\n  Properties: []collections.Property{\n    {Name: \"title\", DataType: collections.DataTypeText},\n    {Name: \"body\", DataType: collections.DataTypeText},\n  },\n  Vectors: map[string]collections.VectorConfig{\n    \"default\": {Vectorizer: openai.Text2Vec{}},\n  },\n})\n\narticles := client.Collections.Use(\"Article\")\nb := articles.Batch(ctx, batch.WithRetryTimes(1))\nfor _, row := range rows {\n  if _, err := b.Object(ctx, &data.Object{Properties: row}); err != nil {\n    panic(err)\n  }\n}\nif err := b.Close(); err != nil {\n  panic(err)\n}\n"
+    }
+   },
+   "search": {
+    "answer": "Hybrid search as the starting point.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/concepts/search",
+     "https://docs.weaviate.io/weaviate/search/hybrid"
+    ],
+    "code": {
+     "python": "articles = client.collections.use(\"Article\")\nresponse = articles.query.hybrid(query=\"food\", limit=3)\n",
+     "typescript": "const articles = client.collections.use('Article');\nconst result = await articles.query.hybrid('food', { limit: 3 })\n",
+     "go": "articles := client.Collections.Use(\"Article\")\nresponse, err := articles.Query.Hybrid(ctx, query.Hybrid{\n  Query: \"food\",\n  Limit: 3,\n})\n"
+    }
+   }
+  },
+  "error": null
+ }
+}
