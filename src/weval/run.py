@@ -36,10 +36,11 @@ HARNESSES: dict[str, ModuleType] = {
     "pi": pi,
     "claude-code": claude_code,
 }
-# Appended to every packaged prompt: facts about the Trial environment that no
-# single Task owns.
+# Appended to every packaged prompt of a Task that uses Docker: facts about the
+# Trial environment that no single Task owns.
 SHARED_INSTRUCTIONS = Path(__file__).with_name("shared-instructions.md")
-# Applied to every Trial environment: the workspace contract no single Task owns.
+# Applied to every Trial environment of a Task that uses Docker: the workspace
+# contract no single Task owns, including the Docker socket.
 SHARED_COMPOSE = Path(__file__).with_name("shared-compose.yaml")
 # Applied after it unless the Task opts out (see compose_overlays).
 WEAVIATE_COMPOSE = Path(__file__).with_name("weaviate-compose.yaml")
@@ -78,7 +79,8 @@ def package_task(task_dir: Path, destination: Path, prompt: Path | None = None) 
     """Build a Harbor task package: the Task directory plus ``tests/``, which
     holds the shared verifier with the Task's snapshot and check. The packaged
     ``instruction.md`` is ``prompt``, a Treatment's replacement for the Task's
-    own ``instruction.md`` (the default), followed by the shared instructions."""
+    own ``instruction.md`` (the default), followed by the shared instructions
+    unless the Task has no Docker (``uses_docker``)."""
     prompt = prompt or task_dir / "instruction.md"
     shutil.copytree(
         task_dir,
@@ -86,7 +88,8 @@ def package_task(task_dir: Path, destination: Path, prompt: Path | None = None) 
         ignore=shutil.ignore_patterns("__pycache__", "snapshot.py", "check.py"),
     )
     instruction = destination / "instruction.md"
-    instruction.write_text(f"{prompt.read_text()}\n{SHARED_INSTRUCTIONS.read_text()}")
+    notes = f"\n{SHARED_INSTRUCTIONS.read_text()}" if uses_docker(task_dir) else ""
+    instruction.write_text(prompt.read_text() + notes)
     tests = destination / "tests"
     tests.mkdir()
     shutil.copy(Path(verify.__file__), tests / "verify.py")
@@ -105,13 +108,16 @@ def run(
     local: bool = False,
     treatment: str | None = None,
     draft: bool = False,
+    unsafe_local: bool = False,
 ) -> Path:
     """Run ``attempts`` Trials of one Task by one Agent on Modal, or on the
     local Docker daemon when ``local``; return the run directory. With
     ``treatment``, the Agent gets that Treatment's skills, its prompt for the
     Task, or both (``treatment_files``). A draft Task (``task.toml`` sets ``[metadata]
     draft = true``) raises ``ValueError`` unless ``draft``, before anything
-    runs or is written.
+    runs or is written. So does a local run of a non-Oracle Agent on a Task
+    that uses Docker, unless ``unsafe_local``: the agent's container would
+    hold the host's Docker socket, which is root on the host.
 
     Harbor failures inside a Trial are recorded as Non-results in ``weval.json``,
     not raised. Retained files are scrubbed of credential values afterwards,
@@ -123,12 +129,19 @@ def run(
             f"{task_dir.name} is a draft Task ([metadata] draft = true in its "
             "task.toml); pass --draft to run it anyway"
         )
-    # weval.json records the Task path relative to the repo, so a Task outside
-    # it fails here rather than after the Trials have run.
-    task_path = task_dir.relative_to(ROOT)
     agents = tomllib.loads((ROOT / "agents.toml").read_text())
     agent = {"name": agent_name, **agents[agent_name]}
     harness = HARNESSES[agent["harness"]]
+    if local and harness is not oracle and uses_docker(task_dir) and not unsafe_local:
+        raise ValueError(
+            f"{task_dir.name} uses Docker, so a local Trial would give "
+            f"{agent_name}'s container the host's Docker socket, which is root on "
+            "the host and reaches the credentials in .env; run it on Modal, or "
+            "pass --unsafe-local to accept that"
+        )
+    # weval.json records the Task path relative to the repo, so a Task outside
+    # it fails here rather than after the Trials have run.
+    task_path = task_dir.relative_to(ROOT)
     skills, prompt = (
         treatment_files(treatment, task_path) if treatment else (None, None)
     )
@@ -231,7 +244,11 @@ def fingerprints(
         for path in _tree(task_dir)
         if path != check
     }
-    added = [SHARED_INSTRUCTIONS, Path(verify.__file__), *compose_overlays(task_dir)]
+    added = [
+        *([SHARED_INSTRUCTIONS] if uses_docker(task_dir) else []),
+        Path(verify.__file__),
+        *compose_overlays(task_dir),
+    ]
     task_files |= {f"weval/{path.name}": path for path in added}
     return {
         "task": _digest(task_files),
@@ -278,14 +295,24 @@ def _digest(files: dict[str, Path]) -> str:
 
 def compose_overlays(task_dir: Path) -> list[Path]:
     """The Compose overlays weval adds to the Task's Trial environment, in
-    the order Harbor applies them. The Weaviate settings are left out when
-    ``task.toml`` sets ``[metadata] weaviate_workspace = false``, for a Task
-    whose workspace must not suggest a data store."""
-    return [SHARED_COMPOSE] + (
+    the order Harbor applies them. The shared overlay, which mounts the
+    Docker socket, is left out for a Task without Docker (``uses_docker``).
+    The Weaviate settings are left out when ``task.toml`` sets ``[metadata]
+    weaviate_workspace = false``, for a Task whose workspace must not suggest
+    a data store."""
+    return ([SHARED_COMPOSE] if uses_docker(task_dir) else []) + (
         [WEAVIATE_COMPOSE]
         if task_metadata(task_dir).get("weaviate_workspace", True)
         else []
     )
+
+
+def uses_docker(task_dir: Path) -> bool:
+    """Whether the Task's agent gets the host's Docker daemon and the
+    environment notes about it. ``task.toml`` sets ``[metadata] docker =
+    false`` for a Task that runs no stack, so that any Agent can run it
+    locally (``run``'s ``unsafe_local``)."""
+    return task_metadata(task_dir).get("docker", True)
 
 
 def task_metadata(task_dir: Path) -> dict:

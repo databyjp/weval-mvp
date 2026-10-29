@@ -61,6 +61,12 @@ def main() -> None:
         help="run on the local Docker daemon instead of Modal",
     )
     run_parser.add_argument(
+        "--unsafe-local",
+        action="store_true",
+        help="with --local, run a non-Oracle Agent on a Task that uses Docker, "
+        "which gives the agent the host's Docker socket",
+    )
+    run_parser.add_argument(
         "--treatment",
         help="Treatment: a directory name in treatments/ (default: none, a baseline)",
     )
@@ -115,6 +121,7 @@ def main() -> None:
                 local=args.local,
                 treatment=args.treatment,
                 draft=args.draft,
+                unsafe_local=args.unsafe_local,
             )
         )
     else:

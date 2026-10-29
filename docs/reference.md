@@ -22,6 +22,7 @@ leaves free-form:
 | `draft = true` | The Task is not run for now. `weval run` refuses it unless you pass `--draft`; its tests still run. |
 | `motivation = "..."` | The Task's question, in place of a Task page ([how to define a Task](how-to/define-a-task.md#task-page)). Every check then needs a docstring. |
 | `weaviate_workspace = false` | Leaves out the Weaviate settings ([Trial environment](#trial-environment)). |
+| `docker = false` | The Task runs no stack: its agent gets no Docker socket and its prompt no environment notes ([Trial environment](#trial-environment)), and any Agent can run it with `--local`. |
 
 ### Verifier flags
 
@@ -81,7 +82,10 @@ and `treatment` is `null`.
 ## Trial environment
 
 Every Trial environment's `main` service, where the agent works, gets these
-settings from `src/weval/shared-compose.yaml`:
+settings from `src/weval/shared-compose.yaml`, unless the Task's `task.toml`
+sets `[metadata] docker = false`. Packaging also appends
+`src/weval/shared-instructions.md`, notes about the shared Docker daemon and a
+running application, to the prompt of every Task that uses Docker.
 
 | Setting | Value |
 |---|---|
@@ -145,7 +149,7 @@ hex digits of a SHA-256 over file paths and contents:
 
 | Key | Covers | A change means |
 |---|---|---|
-| `task` | The Task directory without `check.py`, plus `shared-instructions.md`, `verify.py`, and the Compose overlays | the Trials must be re-run |
+| `task` | The Task directory without `check.py`, plus `verify.py`, the Compose overlays, and `shared-instructions.md` when the Task uses Docker | the Trials must be re-run |
 | `check` | The Task's `check.py` | the Trials can be re-scored with `weval check` |
 | `treatment` | What the Treatment gives the Agent on this Task: its `skills/` and its prompt for the Task; `null` for a baseline. Its `README.md` and its prompts for other Tasks are not covered. | a different Treatment version |
 

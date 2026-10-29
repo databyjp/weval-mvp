@@ -305,6 +305,41 @@ def test_a_draft_task_runs_only_with_draft(tmp_path):
         run(tmp_path, "oracle", draft=True)
 
 
+def test_a_local_agent_run_on_a_docker_task_needs_unsafe_local(tmp_path):
+    docker_task = tmp_path / "docker"
+    docker_task.mkdir()
+    (docker_task / "task.toml").write_text("")
+    no_docker_task = tmp_path / "no-docker"
+    no_docker_task.mkdir()
+    (no_docker_task / "task.toml").write_text("[metadata]\ndocker = false\n")
+
+    with pytest.raises(ValueError, match="pass --unsafe-local"):
+        run(docker_task, "pi-glm-5.3-flash", local=True)
+    # Each of these gets past the gate and fails later, on the Task sitting
+    # outside the repo.
+    allowed = [
+        (docker_task, "pi-glm-5.3-flash", True),
+        (docker_task, "oracle", False),
+        (no_docker_task, "pi-glm-5.3-flash", False),
+    ]
+    for task, agent, unsafe_local in allowed:
+        with pytest.raises(ValueError, match="is not in the subpath"):
+            run(task, agent, local=True, unsafe_local=unsafe_local)
+    with pytest.raises(ValueError, match="is not in the subpath"):
+        run(docker_task, "pi-glm-5.3-flash")
+
+
+def test_a_task_without_docker_gets_no_socket_or_environment_notes(tmp_path):
+    task = ROOT / "tasks/investigate/docs-token-usage"
+    assert compose_overlays(task) == [WEAVIATE_COMPOSE]
+    assert "docker.sock" in SHARED_COMPOSE.read_text()
+
+    package_task(task, tmp_path / "task")
+    assert (tmp_path / "task/instruction.md").read_text() == (
+        (task / "instruction.md").read_text()
+    )
+
+
 def test_treatment_fingerprint_covers_the_skills_and_prompt_only(tmp_path):
     task = ROOT / TASK_PATH
     treatment = tmp_path / "treatment"
