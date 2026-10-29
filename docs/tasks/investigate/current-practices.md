@@ -75,7 +75,7 @@ each citing the page it came from.
 | Item | Oracle answer | Source |
 |---|---|---|
 | `deployment` | Docker for local development; Kubernetes or Weaviate Cloud for production. | `docs.weaviate.io/deploy` |
-| `config_ingestion` | `vector_config=Configure.Vectors.<module>()` (Python client 4.16 and later) and an HNSW index, starting with rotational quantization (RQ) for compression; client-side batch import. | `docs.weaviate.io/weaviate/manage-collections/vector-config`, `.../best-practices`, `.../manage-objects/import` |
+| `config_ingestion` | `vector_config=Configure.Vectors.<module>()` (Python client 4.16 and later) and an HNSW index, starting with rotational quantization (RQ) for compression; server-side batch import. | `docs.weaviate.io/weaviate/manage-collections/vector-config`, `.../best-practices`, `.../manage-objects/import` |
 | `search` | Hybrid search as the starting point. | `docs.weaviate.io/weaviate/concepts/search` |
 
 | Variant | Fails | Models |

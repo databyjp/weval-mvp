@@ -47,7 +47,7 @@ findings = {
     "config_ingestion": {
         "answer": "Define each collection with vector_config=Configure.Vectors.<module>() (Python "
         "client 4.16 and later) and an HNSW index, starting with rotational quantization (RQ) "
-        "for compression; import objects with client-side batching.",
+        "for compression; import objects with server-side batching.",
         "sources": [
             f"{DOCS}/weaviate/manage-collections/vector-config",
             f"{DOCS}/weaviate/best-practices",
