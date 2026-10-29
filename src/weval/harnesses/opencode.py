@@ -44,14 +44,16 @@ def agent_record(agent: dict) -> dict:
 
 
 def token_usage(trial_dir: Path) -> dict:
-    """Return ``n_output_tokens`` with reasoning tokens counted as output.
+    """Return token counts summed from OpenCode's ``step_finish`` events.
 
-    OpenCode's ``step_finish`` events in ``agent/opencode.txt`` split
-    completion tokens into ``output`` and ``reasoning``, and Harbor keeps
-    only ``output``. Pi and Claude Code count reasoning inside output, so
-    this keeps OpenCode's figure comparable with theirs. Harbor's input,
-    cache, and cost figures already match OpenCode's and are kept. Returns
-    ``{}`` when there is no ``step_finish`` event.
+    Field names match ``weval.json``'s: ``n_input_tokens`` includes cache
+    reads and cache writes, which ``n_cache_tokens`` and
+    ``n_cache_creation_tokens`` break out, and ``n_output_tokens`` includes
+    reasoning tokens. Pi and Claude Code count both that way. Harbor's
+    figures drop cache writes from input and reasoning from output, which
+    OpenCode reports separately in ``agent/opencode.txt``. Harbor's
+    ``cost_usd`` is OpenCode's own and is kept. Returns ``{}`` when there is
+    no ``step_finish`` event.
     """
     log = trial_dir / "agent/opencode.txt"
     lines = log.read_text().splitlines() if log.exists() else []
@@ -59,4 +61,11 @@ def token_usage(trial_dir: Path) -> dict:
     steps = [e["part"]["tokens"] for e in events if e.get("type") == "step_finish"]
     if not steps:
         return {}
-    return {"n_output_tokens": sum(t["output"] + t["reasoning"] for t in steps)}
+    cache_read = sum(t["cache"]["read"] for t in steps)
+    cache_write = sum(t["cache"]["write"] for t in steps)
+    return {
+        "n_input_tokens": sum(t["input"] for t in steps) + cache_read + cache_write,
+        "n_cache_tokens": cache_read,
+        "n_cache_creation_tokens": cache_write,
+        "n_output_tokens": sum(t["output"] + t["reasoning"] for t in steps),
+    }
