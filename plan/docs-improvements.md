@@ -109,6 +109,48 @@ cost, not main-model input alone.
   - Answer quality: the open-ended Tasks, compared between HTML and
     Markdown on the facts each answer should contain, not on tokens.
 
+### Fixed-page reading: index-import-pages (iteration 1 build)
+
+- Task: `investigate/index-import-pages`, which names five pages and
+  forbids others. Treatment: `markdown-docs-iter1` against the HTML
+  baseline. One Trial per arm, run locally on 2026-10-29. Claude Code and
+  OpenCode only. The Pi Trials from the same batch are retained but left
+  out, since OpenCode replaces Pi for open harnesses. Token counts for
+  OpenCode include cache writes and reasoning (`harnesses/opencode.py`'s
+  `token_usage`).
+- Result: all 14 Trials passed. Every Trial chose HNSW with 8-bit RQ and
+  server-side batching for Python and TypeScript, and none read a sixth
+  docs page.
+
+  | Agent | Total input | Uncached input | Cost | Tool calls | Go import |
+  |---|---|---|---|---|---|
+  | claude-code-haiku-5.5 | 3.30M → 315k | 121k → 73k | $0.118 → $0.086 | 56 → 16 | v6 Batch, v6 Batch |
+  | claude-code-opus-5.5 | 682k → 370k | 162k → 66k | $0.828 → $0.625 | 22 → 11 | v6 Batch, v6 Batch |
+  | claude-code-sonnet-5.5 | 123k → 113k | 56k → 47k | $0.163 → $0.149 | 8 → 8 | v6 Batch, v5 |
+  | opencode-claude-sonnet-5.5 | 390k → 131k | 68k → 65k | $0.319 → $0.273 | 10 → 7 | v6 Batch, v6 Batch |
+  | opencode-deepseek-v4.1-flash-1017 | 165k → 141k | 60k → 32k | $0.015 → $0.010 | 8 → 9 | v5, v5 |
+  | opencode-glm-5.3-flash | 216k → 200k | 54k → 64k | $0.002 → $0.021 | 9 → 10 | v6 Batch, v6 Batch |
+  | opencode-gpt-6.1-terra | 683k → 1.46M | 53k → 64k | $0.151 → $0.214 | 32 → 58 | REST, v5 |
+
+  "v5" is the v5 client's `ObjectsBatcher`, and "REST" is hand-written
+  client-side batches against `/v1/batch/objects`.
+
+  - Page format shows in tokens where the harness keeps the whole page.
+    OpenCode's `webfetch` with `format: markdown` returns every code tab of
+    an HTML page (25–41k characters each), and OpenCode Sonnet's total
+    input fell by two thirds on the same five pages. Agents that read only
+    the five pages otherwise changed by 10–15%.
+  - The largest drops came from work beyond reading. Claude Code Haiku's
+    baseline downloaded the Go v6 module and a Go toolchain; its Markdown
+    Trial did not. GPT 6.1 Terra installed the Python and TypeScript
+    clients and type-checked its code in both arms, more in the Markdown
+    one. Neither is attributable to the page format at n=1.
+  - The C6 contradiction split the Go answers: 9 of 14 used v6
+    `collection.Batch`, 4 the v5 `ObjectsBatcher`, and 1 REST batches. Each
+    of those 5 answers repeats the concepts page's claim that Go lacks
+    server-side batching, and both GPT answers name the conflict. GLM 5.3 Flash wrote v5 in both Pi Trials and v6 in both OpenCode
+    Trials, so the harness's page extraction may decide which page wins.
+
 ## Proposals
 
 Each item says what to change, where, the evidence from iteration 0, and how
@@ -285,7 +327,9 @@ them, not only tokens.
   says only the Go v5 client lacks it. Name Go v6 among the supported
   clients, and Go v5 as the exception.
 - Evidence: found while building `investigate/index-import-pages`, whose
-  fixed pages include both. docs.weaviate.io has the same sentence.
+  fixed pages include both. docs.weaviate.io has the same sentence. In that
+  Task's first batch, 5 of 14 Go import answers used client-side batching
+  and each repeated this sentence's claim (log, "Fixed-page reading").
 - Evaluation: that Task's Go `batch_import` answers.
 
 ### Evaluating them
