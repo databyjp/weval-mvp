@@ -27,7 +27,7 @@ from harbor.models.job.config import JobConfig
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig
 
 from weval import diagnostics, labels, verify
-from weval.harnesses import claude_code, oracle, pi
+from weval.harnesses import claude_code, opencode, oracle, pi
 
 ROOT = Path(__file__).resolve().parents[2]
 TREATMENTS = ROOT / "treatments"
@@ -35,6 +35,7 @@ HARNESSES: dict[str, ModuleType] = {
     "oracle": oracle,
     "pi": pi,
     "claude-code": claude_code,
+    "opencode": opencode,
 }
 # Appended to every packaged prompt of a Task that uses Docker: facts about the
 # Trial environment that no single Task owns.

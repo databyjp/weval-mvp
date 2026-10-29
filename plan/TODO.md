@@ -176,9 +176,9 @@ supports both: `harbor/agents/installed/opencode.py` (`websearch` and
 `disabled`, `cached`, or `live`; `CODEX_API_KEY` and `OPENAI_BASE_URL`).
 Both write an ATIF `trajectory.json`, which `weval.json`'s `usage` reads.
 
-- Add `src/weval/harnesses/opencode.py` with the module contract in
-  `harnesses/__init__.py`, and `agents.toml` entries for the five OpenRouter
-  models on Pi, so the same model runs on both harnesses.
+- Add `agents.toml` OpenCode entries for the other four OpenRouter models on
+  Pi, so the same model runs on both harnesses. `harnesses/opencode.py` and
+  the DeepSeek entry exist.
 - Add `src/weval/harnesses/codex.py`. Decide the models and auth (OpenRouter
   through `OPENAI_BASE_URL`, an OpenAI key, or a ChatGPT subscription). Use
   `web_search = "live"` unless a Trial shows `cached` reaches the staging
