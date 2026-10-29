@@ -50,7 +50,7 @@ A passed Trial gave an answer. It says nothing about what the answer recommends.
 ## Calibration
 
 Variants are in `tests/test_investigate_db_recommendation_check.py`. The
-Oracle writes a fixed, short recommendation that names no product. The same
+Oracle writes a fixed, short recommendation that names no database product. The same
 test checks that the prompts, shared instructions, and environment files do
 not name Weaviate, and that the Task gets only the shared Compose overlay.
 

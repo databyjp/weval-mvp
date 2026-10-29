@@ -4,8 +4,9 @@
 with the findings (every failed check with its saved judgments), then each
 Treatment comparison, then each Task's reliability, plus one page per Task
 under ``_report/tasks/`` (with one syntax-highlighted
-page per packaged Task file beside it) and one page per Trial under
-``_report/<run>/<trial>.html``. The index covers each Task's current
+page per packaged Task file beside it), one page per Trial under
+``_report/<run>/<trial>.html``, and ``_report/how-it-works.html``, which
+explains the pipeline for a reader new to weval. The index covers each Task's current
 version only (``collect.split_versions``); its earlier versions, with their
 findings, are at the bottom of its Task page. Notes written under
 ``_report/notes/`` (``weval.report.notes``) show beside the findings, Task
@@ -29,7 +30,13 @@ from weval.collect import (
 from weval.report.findings import FailureGroup, failure_groups, task_reliability
 from weval.report.notes import DIRECTORY as NOTES_DIR
 from weval.report.notes import Note, read_notes
-from weval.report.pages import _task_name, render_index, render_task, render_trial
+from weval.report.pages import (
+    _task_name,
+    render_how_it_works,
+    render_index,
+    render_task,
+    render_trial,
+)
 from weval.report.source import render_source
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -136,9 +143,19 @@ def write_report(outputs_dir: Path) -> Path:
                     notes=trial_notes.get(trial.path, []),
                 )
             )
+    how_it_works = pages_dir / "how-it-works.html"
+    how_it_works.parent.mkdir(parents=True, exist_ok=True)
+    how_it_works.write_text(
+        render_how_it_works(page_dir=pages_dir, index=index, repo=ROOT)
+    )
     _remove_stale_pages(
         pages_dir,
-        {*trial_pages.values(), *task_pages.values(), *file_pages.values()},
+        {
+            *trial_pages.values(),
+            *task_pages.values(),
+            *file_pages.values(),
+            how_it_works,
+        },
     )
 
     groups = failure_groups(current, current_analyses)
@@ -154,6 +171,7 @@ def write_report(outputs_dir: Path) -> Path:
             index_dir=outputs_dir,
             trial_pages=trial_pages,
             task_pages=task_pages,
+            how_it_works=how_it_works,
             generated=datetime.now(),
         )
     )

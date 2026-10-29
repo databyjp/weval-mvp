@@ -218,8 +218,9 @@ RELEASE_NOTES = {
             "unclassified",
         ),
         (None, RELEASE_NOTES, None, "unclassified"),
-        ({"value": None, "seen": None}, None, "app", "infrastructure failure"),
-        (None, None, "stack", "infrastructure failure"),
+        # A snapshot error is graded: the logs, not the rule, say why.
+        ({"value": None, "seen": None}, None, "app", "unclassified"),
+        (None, None, "stack", "unclassified"),
     ],
 )
 def test_the_rule_proposes_a_class_only_where_its_evidence_decides_one(

@@ -42,7 +42,7 @@ API = "https://openrouter.ai/api"
 MODEL = "anthropic/claude-sonnet-5.5"
 KEY_VAR = "OPENROUTER_API_KEY"
 # Raise when SYSTEM, SCHEMA, or the shape of facts() changes meaning.
-PROMPT_VERSION = "4"
+PROMPT_VERSION = "5"
 ATTEMPTS = 3
 DIRECTORY = "_analysis"
 # Check failure messages are capped one by one; the analyst needs what was
@@ -92,7 +92,9 @@ Classes:
 - Weaviate gap: the product or its docs led the agent astray.
 - scorer bug: the check misjudged a correct solution.
 - Task defect: the prompt or workspace hid or contradicted a scored constraint.
-- infrastructure failure: the environment prevented a valid outcome.
+- infrastructure failure: the environment prevented a valid outcome. weval records such a Trial as a \
+non-result, which is not scored. A snapshot error (error_stage) or a timeout is a scored outcome: classify it \
+by why the agent's stack or app was not serving.
 
 A failed check is a finding about the agent or Weaviate, not a defect to remove. Propose scorer bug or Task \
 defect only when the facts show the check or the prompt is wrong. Use only the facts given. Write each \
@@ -205,9 +207,13 @@ def propose_class(failure: dict) -> dict:
         (failure["labels"] or {}).get("answer_source") or {},
     )
     if failure["error_stage"]:
+        # A snapshot error is graded, so it is classified like any other
+        # failure: by why the stack or app was not serving, which only the
+        # Trial's logs show.
         return {
-            "class": "infrastructure failure",
-            "reason": f"snapshot error at stage {failure['error_stage']}",
+            "class": UNCLASSIFIED,
+            "reason": f"snapshot error at stage {failure['error_stage']}; "
+            "classify by why the stack or app was not serving",
         }
     if expected is None:
         return {"class": UNCLASSIFIED, "reason": "the check defines no expected value"}

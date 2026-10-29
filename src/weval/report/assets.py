@@ -171,7 +171,7 @@ details.fold.preferred .rate.failed .fill { background: var(--cell-preferred); }
    because every row and the column header use the list's --columns. */
 .fold-list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 0 0 16px;
   max-width: 130ch; box-shadow: 0 1px 3px rgba(19, 12, 73, 0.08); overflow: hidden; }
-.fold-list.findings { --columns: 1em minmax(14em, 1fr) 15em 11em; }
+.fold-list.findings { --columns: 1em minmax(14em, 1fr) 15em; }
 .fold-list.comparisons { --columns: 1em minmax(14em, 1.2fr) minmax(12em, 1fr) 9em minmax(14em, 1.2fr); }
 .fold-list.versions { --columns: 1em minmax(14em, 1fr) 10em 17em 12em; }
 .fold-list > .columns, details.fold > summary { display: grid; align-items: center; gap: 12px;
@@ -308,4 +308,44 @@ li.step details > pre { margin: 2px 0 6px; padding: 6px 10px; background: var(--
 .tree .number { color: var(--link); }
 .tree .literal { color: var(--warn-fg); }
 .tree pre.string { margin: 2px 0 4px; padding: 6px 10px; background: var(--stripe); border-radius: 6px; color: var(--fg); }
+
+/* Diagrams on the How weval works page draw with the page's tokens, so they
+   follow the theme. A narrow screen scrolls the figure, not the page. */
+figure.diagram { margin: 0 0 16px; max-width: 130ch; }
+figure.diagram .scroll { overflow-x: auto; }
+figure.diagram svg { display: block; width: 100%; min-width: 760px; height: auto; }
+figure.diagram figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 95ch; }
+.diagram .lane { fill: var(--panel); stroke: var(--line-strong); }
+.diagram .lane.trial { fill: var(--band); stroke-dasharray: 6 4; }
+.diagram .box { fill: var(--surface); stroke: var(--line-strong); }
+.diagram .box.key { stroke: var(--link); stroke-width: 2; }
+.diagram text { fill: var(--fg); font: 11.5px Inter, system-ui, sans-serif; }
+.diagram text.title { font: 600 13px "Plus Jakarta Sans", Inter, system-ui, sans-serif; }
+.diagram text.code { font-family: Menlo, ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; }
+.diagram text.title.code { font-size: 12.5px; }
+.diagram text.sub, .diagram text.lane-label, .diagram text.edge-label { fill: var(--muted); }
+.diagram text.key-text { fill: var(--link); font-weight: 600; }
+.diagram .edge { fill: none; stroke: var(--fg); stroke-width: 1.4; }
+.diagram .head { fill: var(--fg); }
+.diagram .badge circle { fill: var(--pill-bg); }
+.diagram .badge text { fill: var(--pill-fg); font: 600 11px Inter, system-ui, sans-serif; }
+
+/* The page reads in three levels: a lead sentence per section, then each
+   item's name and one-line summary, then muted detail. */
+.lead { font-size: 15px; line-height: 1.55; max-width: 80ch; margin: 0 0 8px; }
+.takeaways, .pair { display: grid; gap: 12px; max-width: 130ch; margin: 16px 0 12px; }
+.takeaways { grid-template-columns: repeat(auto-fit, minmax(15em, 1fr)); }
+.pair { grid-template-columns: repeat(auto-fit, minmax(24em, 1fr)); }
+.takeaways .card, .pair .card { margin: 0; max-width: none; }
+.takeaways .card { border-left: 3px solid var(--link); }
+.takeaways h3, .pair h3 { margin: 12px 0 4px; }
+.takeaways p { color: var(--muted); font-size: 13px; margin: 0; }
+.pair .intro { margin: 10px 0 0; }
+ol.run-steps { list-style: none; padding: 0; margin: 0; max-width: 100ch; }
+ol.run-steps > li { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; padding: 10px 0; }
+ol.run-steps > li + li { border-top: 1px solid var(--line); }
+ol.run-steps strong { font-family: "Plus Jakarta Sans", Inter, system-ui, sans-serif; }
+ol.run-steps p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.step-num { width: 22px; height: 22px; border-radius: 50%; text-align: center;
+  font: 600 12px/22px Inter, system-ui, sans-serif; color: var(--pill-fg); background: var(--pill-bg); }
 """

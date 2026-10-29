@@ -1,0 +1,245 @@
+<div class="breadcrumb"><a href="$index">&larr; Weaviate AX Evaluation</a></div>
+<h1>${logo}How weval works</h1>
+<p class="lead">weval gives a coding Agent a real Weaviate job, scores what it leaves behind,
+and keeps enough of each Trial to explain the score later.</p>
+<div class="takeaways">
+<div class="card"><h3>Scores come from a snapshot</h3>
+<p><code>verify.py</code> captures the live stack before the Trial environment is torn down,
+so any Trial can be re-scored later.</p></div>
+<div class="card"><h3>Runs are kept, then read</h3>
+<p><code>weval check</code>, <code>analyse</code>, and <code>report</code> read retained runs.
+None of them starts a Trial or changes a recorded score.</p></div>
+<div class="card"><h3>Like is compared with like</h3>
+<p>Fingerprints keep a Treatment's Trials beside baseline Trials of the same Task and check
+versions.</p></div>
+</div>
+<p class="intro">Terms such as Task, Agent, Treatment, and Trial are defined in the
+<a href="$repo/GLOSSARY.md">glossary</a>.</p>
+
+<h2>One run</h2>
+<p class="lead"><code>weval run</code> runs one Task with one Agent, with or without a
+Treatment, for <em>n</em> Trials.</p>
+<p class="intro">weval runs on your machine. Harbor starts one Trial environment per Trial, on
+Modal or, with <code>--local</code>, on the local Docker daemon.</p>
+<figure class="diagram">
+<div class="scroll">
+<svg viewBox="0 0 1020 324" role="img" aria-label="One weval run. On the host, weval packages the Task and starts a Harbor Job. Harbor starts each Trial environment, where the Agent works in /app and verify.py snapshots and scores the stack. Back on the host, weval records weval.json, redacts credentials, and labels failed checks.">
+<defs>
+<marker id="run-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="lane" x="8" y="8" width="1004" height="128" rx="10"/>
+<text class="lane-label" x="20" y="30">Host: weval</text>
+<rect class="lane trial" x="8" y="176" width="1004" height="140" rx="10"/>
+<text class="lane-label" x="20" y="198">Trial environment, one per Trial</text>
+<text class="lane-label" x="20" y="214">Modal sandbox or local Docker</text>
+
+<rect class="box" x="20" y="48" width="120" height="72" rx="6"/>
+<text class="title" x="80" y="72" text-anchor="middle">Package</text>
+<text class="sub" x="80" y="92" text-anchor="middle">prompt, tests/</text>
+<text class="sub" x="80" y="108" text-anchor="middle">fingerprints</text>
+
+<rect class="box" x="192" y="48" width="120" height="72" rx="6"/>
+<text class="title" x="252" y="72" text-anchor="middle">Harbor Job</text>
+<text class="sub" x="252" y="92" text-anchor="middle">one Agent</text>
+<text class="sub" x="252" y="108" text-anchor="middle">n Trials at once</text>
+
+<rect class="box" x="364" y="216" width="120" height="72" rx="6"/>
+<text class="title" x="424" y="240" text-anchor="middle">Agent</text>
+<text class="sub" x="424" y="260" text-anchor="middle">works in /app</text>
+<text class="sub" x="424" y="276" text-anchor="middle">beside Weaviate</text>
+
+<rect class="box key" x="536" y="216" width="120" height="72" rx="6"/>
+<text class="title" x="596" y="240" text-anchor="middle">verify.py</text>
+<text class="sub code" x="596" y="260" text-anchor="middle">snapshot.py</text>
+<text class="sub" x="596" y="276" text-anchor="middle">then check.py</text>
+
+<rect class="box" x="708" y="48" width="120" height="72" rx="6"/>
+<text class="title" x="768" y="72" text-anchor="middle">Record</text>
+<text class="sub code" x="768" y="92" text-anchor="middle">weval.json</text>
+<text class="sub" x="768" y="108" text-anchor="middle">status, checks</text>
+
+<rect class="box" x="880" y="48" width="120" height="72" rx="6"/>
+<text class="title" x="940" y="72" text-anchor="middle">Redact, label</text>
+<text class="sub" x="940" y="92" text-anchor="middle">scrub credentials</text>
+<text class="sub" x="940" y="108" text-anchor="middle">label failures</text>
+
+<g class="badge"><circle cx="20" cy="48" r="10"/><text x="20" y="52" text-anchor="middle">1</text></g>
+<g class="badge"><circle cx="192" cy="48" r="10"/><text x="192" y="52" text-anchor="middle">2</text></g>
+<g class="badge"><circle cx="364" cy="216" r="10"/><text x="364" y="220" text-anchor="middle">3</text></g>
+<g class="badge"><circle cx="536" cy="216" r="10"/><text x="536" y="220" text-anchor="middle">4</text></g>
+<g class="badge"><circle cx="708" cy="48" r="10"/><text x="708" y="52" text-anchor="middle">5</text></g>
+<g class="badge"><circle cx="880" cy="48" r="10"/><text x="880" y="52" text-anchor="middle">6</text></g>
+
+<line class="edge" x1="140" y1="84" x2="190" y2="84" marker-end="url(#run-arrow)"/>
+<text class="edge-label code" x="166" y="76" text-anchor="middle">task/</text>
+<polyline class="edge" points="252,120 252,252 362,252" marker-end="url(#run-arrow)"/>
+<text class="edge-label" x="260" y="160">starts each Trial</text>
+<line class="edge" x1="484" y1="252" x2="534" y2="252" marker-end="url(#run-arrow)"/>
+<text class="edge-label code" x="510" y="244" text-anchor="middle">/app</text>
+<polyline class="edge" points="656,252 768,252 768,122" marker-end="url(#run-arrow)"/>
+<text class="edge-label" x="776" y="152">reward,</text>
+<text class="edge-label code" x="776" y="166">snapshot.json</text>
+<line class="edge" x1="828" y1="84" x2="878" y2="84" marker-end="url(#run-arrow)"/>
+</svg>
+</div>
+<figcaption>The verifier scores a snapshot of the live stack, taken inside the Trial
+environment before it is torn down. The host keeps that snapshot, so a Trial can be
+re-scored after its environment is gone.</figcaption>
+</figure>
+<div class="card">
+<ol class="run-steps">
+<li><span class="step-num">1</span><div><strong>Package</strong>: build the Task package and fingerprint it.
+<p>The packaged prompt is the Task's <code>instruction.md</code>, or the Treatment's replacement
+prompt, followed by the shared Trial-environment notes. <code>tests/</code> gets the shared
+<code>verify.py</code> and the Task's <code>snapshot.py</code> and <code>check.py</code>. A
+Treatment's skills are installed for the Agent.</p></div></li>
+<li><span class="step-num">2</span><div><strong>Harbor Job</strong>: start <em>n</em> Trials of one Agent at once.
+<p>Each Trial gets its own environment, built from the Task's <code>environment/</code> and
+weval's Compose overlays.</p></div></li>
+<li><span class="step-num">3</span><div><strong>Agent</strong>: work in <code>/app</code> until done or out of time.
+<p>The Agent works beside a Weaviate stack until it stops or hits the Task's time limit.
+Harbor then copies <code>/app</code> to <code>artifacts/submission/</code>.</p></div></li>
+<li><span class="step-num">4</span><div><strong>verify.py</strong>: snapshot the live stack, then score the snapshot.
+<p>It starts the submitted Compose stack, and the application when the Task has one, then
+calls the Task's <code>snapshot()</code> and scores the result with <code>check.py</code>. The
+reward is 1 only when every required check passes; preferred checks are reported but do not
+affect it.</p></div></li>
+<li><span class="step-num">5</span><div><strong>Record</strong>: write <code>weval.json</code> for each Trial.
+<p>It holds the Trial's status, each check's result, the Agent's token use and cost, and the
+fingerprints described below.</p></div></li>
+<li><span class="step-num">6</span><div><strong>Redact, label</strong>: scrub credentials, then explain each failed check.
+<p>weval replaces credential values in every retained file. A step finder picks the transcript
+steps behind each failed check, and Jev labels why the Agent made that choice and where its
+answer came from. Labels never change a score.</p></div></li>
+</ol>
+</div>
+
+<h2>After the runs</h2>
+<p class="lead">Re-score, compare, and publish retained runs without running new Trials.</p>
+<figure class="diagram">
+<div class="scroll">
+<svg viewBox="0 0 1020 268" role="img" aria-label="Commands over retained runs. weval check re-scores a Trial's snapshot.json with the Task's current check.py. weval analyse asks an LLM to read each Treatment comparison and saves the answer under _analysis. weval report reads every retained file, saved analysis, label, and note, and writes index.html and the _report pages.">
+<defs>
+<marker id="read-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="lane" x="8" y="8" width="296" height="252" rx="10"/>
+<text class="lane-label code" x="20" y="30">experiment-outputs/</text>
+<text class="code" x="24" y="58">&lt;run&gt;/job/&lt;trial&gt;/</text>
+<text class="code" x="40" y="78">weval.json</text>
+<text class="code key-text" x="40" y="98">verifier/snapshot.json</text>
+<text class="code" x="40" y="118">agent/ transcript</text>
+<text class="code" x="40" y="138">artifacts/submission/</text>
+<text class="code" x="24" y="166">&lt;run&gt;/labels/</text>
+<text class="code" x="24" y="194">_analysis/</text>
+<text class="code" x="24" y="222">_report/notes/</text>
+<text class="sub" x="24" y="244">notes you write</text>
+
+<rect class="box" x="420" y="28" width="168" height="56" rx="6"/>
+<text class="title code" x="504" y="52" text-anchor="middle">weval check</text>
+<text class="sub" x="504" y="70" text-anchor="middle">re-score one Trial</text>
+
+<rect class="box" x="420" y="106" width="168" height="56" rx="6"/>
+<text class="title code" x="504" y="130" text-anchor="middle">weval analyse</text>
+<text class="sub" x="504" y="148" text-anchor="middle">LLM reads comparisons</text>
+
+<rect class="box" x="420" y="184" width="168" height="56" rx="6"/>
+<text class="title code" x="504" y="208" text-anchor="middle">weval report</text>
+<text class="sub" x="504" y="226" text-anchor="middle">static pages</text>
+
+<rect class="box" x="712" y="28" width="296" height="56" rx="6"/>
+<text class="title" x="728" y="52">Printed check results</text>
+<text class="sub" x="728" y="70">with the current check.py, plus labels</text>
+
+<rect class="box" x="712" y="106" width="296" height="56" rx="6"/>
+<text class="title code" x="728" y="130">_analysis/&lt;comparison&gt;.json</text>
+<text class="sub" x="728" y="148">failure patterns, proposed classes</text>
+
+<rect class="box" x="712" y="184" width="296" height="56" rx="6"/>
+<text class="title code" x="728" y="208">index.html, _report/</text>
+<text class="sub" x="728" y="226">findings, Task pages, Trial pages</text>
+
+<line class="edge" x1="304" y1="56" x2="418" y2="56" marker-end="url(#read-arrow)"/>
+<text class="edge-label code" x="362" y="48" text-anchor="middle">snapshot.json</text>
+<line class="edge" x1="304" y1="134" x2="418" y2="134" marker-end="url(#read-arrow)"/>
+<text class="edge-label" x="362" y="126" text-anchor="middle">all Trials</text>
+<line class="edge" x1="304" y1="212" x2="418" y2="212" marker-end="url(#read-arrow)"/>
+<text class="edge-label" x="362" y="204" text-anchor="middle">everything</text>
+<line class="edge" x1="588" y1="56" x2="710" y2="56" marker-end="url(#read-arrow)"/>
+<text class="edge-label" x="650" y="48" text-anchor="middle">prints</text>
+<line class="edge" x1="588" y1="134" x2="710" y2="134" marker-end="url(#read-arrow)"/>
+<text class="edge-label" x="650" y="126" text-anchor="middle">saves</text>
+<line class="edge" x1="588" y1="212" x2="710" y2="212" marker-end="url(#read-arrow)"/>
+<text class="edge-label" x="650" y="204" text-anchor="middle">writes</text>
+</svg>
+</div>
+<figcaption><code>weval analyse</code> saves into <code>_analysis/</code>, which
+<code>weval report</code> then reads. The report only renders what is saved: it never calls
+the analyst or Jev. Each saved analysis and label is reused until its inputs change.</figcaption>
+</figure>
+<div class="card">
+<table class="plain">
+<thead><tr><th>Command</th><th>Use it when</th></tr></thead>
+<tbody>
+<tr><td><code>weval check</code></td><td class="wrapping">You changed a Task's <code>check.py</code>, or want one Trial's diagnostics and labels.</td></tr>
+<tr><td><code>weval analyse</code></td><td class="wrapping">A batch of baseline and Treatment runs has finished.</td></tr>
+<tr><td><code>weval report</code></td><td class="wrapping">You want to read the results. Rebuild it after any run, analysis, or note.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>Versions and comparisons</h2>
+<p class="lead">A change to <code>check.py</code> needs only a re-score. Any other change to a
+Task or Treatment needs new Trials.</p>
+<p class="intro">Each Trial records three fingerprints, content hashes of what it was given.
+They decide what a change costs and which Trials are compared.</p>
+<div class="card">
+<table class="plain">
+<thead><tr><th>Fingerprint</th><th>Covers</th><th>After a change</th></tr></thead>
+<tbody>
+<tr><td><code>task</code></td><td class="wrapping">The Task directory except <code>check.py</code>, plus the shared notes, <code>verify.py</code>, and Compose overlays</td><td class="wrapping">Run new Trials. The index shows only each Task's current version; earlier versions move to the bottom of the Task page.</td></tr>
+<tr><td><code>check</code></td><td class="wrapping">The Task's <code>check.py</code></td><td class="wrapping">Re-score retained Trials with <code>weval check</code>.</td></tr>
+<tr><td><code>treatment</code></td><td class="wrapping">The Treatment's skills and its replacement prompt for this Task</td><td class="wrapping">Run new Treatment Trials.</td></tr>
+</tbody>
+</table>
+</div>
+<p class="intro">A Treatment comparison pairs Treatment Trials with baseline Trials of the same
+Task, Task version, and check version, so a Treatment is never compared against Trials scored
+by a different <code>check.py</code>.</p>
+
+<h2>Reading a result</h2>
+<p class="lead">A status says whether a Trial produced a scored outcome. A class says what a
+failed check means.</p>
+<div class="pair">
+<div class="card">
+<h3>Trial status</h3>
+<table class="plain">
+<tbody>
+<tr><td><span class="chip status-passed">passed</span></td><td class="wrapping">Every required check passed.</td></tr>
+<tr><td><span class="chip status-failed">failed</span></td><td class="wrapping">The verifier scored the Trial and a required check failed, including when the snapshot itself failed.</td></tr>
+<tr><td><span class="chip status-timed-out">timed-out</span></td><td class="wrapping">The Agent hit a Harbor limit, but the verifier still scored the submission. It does not count as passed.</td></tr>
+<tr><td><span class="chip status-non-result">non-result</span></td><td class="wrapping">Infrastructure, or a failed model request, prevented a valid outcome. Not a finding.</td></tr>
+<tr><td><span class="chip status-incomplete">incomplete</span></td><td class="wrapping">An expected log or the submission is missing. Not a scored result.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="card">
+<h3>Failure class</h3>
+<table class="plain">
+<tbody>
+<tr><td><span class="chip class-agent-gap">agent gap</span></td><td class="wrapping">The Agent missed something it could have discovered.</td></tr>
+<tr><td><span class="chip class-weaviate-gap">Weaviate gap</span></td><td class="wrapping">The product or its docs led the Agent astray.</td></tr>
+<tr><td><span class="chip class-scorer-bug">scorer bug</span></td><td class="wrapping"><code>snapshot.py</code> or <code>check.py</code> misjudged a correct solution.</td></tr>
+<tr><td><span class="chip class-task-defect">Task defect</span></td><td class="wrapping">The prompt or workspace hid or contradicted a scored constraint.</td></tr>
+</tbody>
+</table>
+<p class="intro">A failed check is a finding, not a defect to remove. Only scorer bugs and
+Task defects call for a change to weval.</p>
+</div>
+</div>
+
+<h2>Further reading</h2>
+<ul>
+<li><a href="$repo/docs/concepts/task-runs.md">Task runs</a>: the run sequence and how snapshot errors are scored.</li>
+<li><a href="$repo/docs/how-to/define-a-task.md">How to define a Task</a> and <a href="$repo/docs/how-to/read-a-trial.md">how to read a Trial</a>.</li>
+<li><a href="$repo/docs/reference.md">Reference</a>: <code>task.toml</code>, Treatments, the Trial environment, and every file in a Trial directory.</li>
+</ul>

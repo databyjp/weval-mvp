@@ -1,6 +1,6 @@
 # How to define a Task
 
-Each task is defined as a unique directory under `tasks/<stage>/<scenario>/`. The stage is `build`, `deploy`, `resolve`, or `investigate`; [`AGENTS.md`](../../AGENTS.md#writing-a-task) defines each.
+Each task is defined as a unique directory under `tasks/<stage>/<scenario>/`. The stage is `build`, `deploy`, `resolve`, or `investigate`; [`AGENTS.md`](../../AGENTS.md#task-definition) defines each.
 
 A task consists of `instruction.md` (the prompt), `environment/` (what the agent is provided), `task.toml` (task meta-parameters such as timeouts, used directly by Harbor), `snapshot.py` (what to capture from the live stack after the agent finishes), `check.py` (what to check for scoring), and `solution/solve.sh` (the Oracle solution).
 
@@ -8,10 +8,14 @@ See the [reference](../reference.md) for details on each parameter.
 
 ## Task page
 
-Each Task also needs a page at `docs/tasks/<stage>/<scenario>.md`, shaped like [resolve/sku-search](../tasks/resolve/sku-search.md). `tests/test_task_pages.py` fails unless the page has:
+Each Task states its motivation in one of two places, and `tests/test_task_pages.py` enforces whichever it uses.
+
+A page at `docs/tasks/<stage>/<scenario>.md`, shaped like [resolve/sku-search](../tasks/resolve/sku-search.md), must have:
 
 - a `motivation` in its YAML frontmatter;
 - a checks table whose rows, such as ``| `check-id` | REQUIRED | ... |``, list exactly the checks and tiers in `check.py`.
+
+Alternatively, `task.toml` sets `[metadata] motivation`, as `build/ecommerce-search` does. Every check function then needs a docstring, and the Task must have no page.
 
 ## Oracle and calibration
 

@@ -57,19 +57,6 @@ class FailureGroup:
     trial_labels: dict[str, dict] = field(default_factory=dict)
     notes: list[Note] = field(default_factory=list)
 
-    @property
-    def proposed_class(self) -> str:
-        """The class the group presents first: the analyst's where one
-        pattern covers the check, else the rule's where its proposals agree,
-        else ``unclassified``. Always a proposal, never a verdict."""
-        analyst = {p["class"] for p in self.patterns}
-        if len(analyst) == 1:
-            return next(iter(analyst))
-        rule = {p["class"] for p in self.proposals}
-        if not analyst and len(rule) == 1:
-            return next(iter(rule))
-        return "unclassified"
-
     def headline(self) -> tuple[str, int, int]:
         """The arm whose failure rate leads the finding, with its
         ``(failing, scored)`` counts: the baseline when the check failed

@@ -17,6 +17,7 @@ from datetime import datetime
 from html import escape
 from pathlib import Path
 from statistics import median
+from string import Template
 
 from weval.collect import (
     Comparison,
@@ -59,14 +60,16 @@ def render_index(
     *,
     index_dir: Path,
     trial_pages: dict[Path, Path],
-    task_pages: dict[tuple[str, str], Path],
+    task_pages: dict[str, Path],
+    how_it_works: Path,
     generated: datetime,
 ) -> str:
     """Return ``index.html`` over each Task's current version. ``analyses``
     pairs each Comparison with its saved ``analysis.analyse`` result;
     ``earlier`` holds each Task's earlier versions, which the index only
     counts and links to the Task page; ``trial_pages`` maps each Trial
-    directory to its page, and ``task_pages`` each Task to its Task page. Links are relative to ``index_dir``."""
+    directory to its page, ``task_pages`` each Task to its Task page, and
+    ``how_it_works`` is the explainer page. Links are relative to ``index_dir``."""
     links = _Links(index_dir, task_pages)
     trial_count = sum(len(run.trials) for run in runs)
     tasks = sorted({run.task for run in runs})
@@ -83,11 +86,27 @@ def render_index(
 <span class="meta">{len(tasks)} Tasks, {len(runs)} runs, {trial_count} Trials, {len(groups)} findings.
 Generated {generated:%Y-%m-%d %H:%M}.</span>
 <nav class="sections"><a href="#findings">Findings</a><a href="#comparisons">Treatment comparisons</a>
-<a href="#reliability">Task reliability</a></nav></header>
+<a href="#reliability">Task reliability</a>{links.link(how_it_works, "How weval works")}</nav></header>
 {_findings_section(groups, earlier, links, trial_pages)}
 {_comparisons_section(analyses, links, trial_pages)}
 {_reliability_section(reliability, earlier, links)}"""
     return _page("Weaviate AX Evaluation", body)
+
+
+# The explainer's body is static HTML with ``string.Template`` placeholders
+# for its links, so it can be edited and previewed as HTML.
+HOW_IT_WORKS = Path(__file__).with_name("how-it-works.html")
+
+
+def render_how_it_works(*, page_dir: Path, index: Path, repo: Path) -> str:
+    """Return the page that explains how weval runs, scores, and reports
+    Trials, with diagrams. It links back to ``index`` and to the docs in
+    ``repo``; links are relative to ``page_dir``."""
+    links = _Links(page_dir)
+    body = Template(HOW_IT_WORKS.read_text()).substitute(
+        logo=LOGO, index=links.href(index), repo=links.href(repo)
+    )
+    return _page("How weval works", body)
 
 
 # --- Findings ----------------------------------------------------------------
@@ -129,7 +148,7 @@ def _findings_section(
         lists.append(
             f"<h3>{links.task(task)}{_count(task_groups)}</h3>"
             + _earlier_note(earlier.get(task, []), task, links)
-            + _fold_list("findings", ["Check", "Failure rate", "Proposed cause"], rows)
+            + _fold_list("findings", ["Check", "Failure rate"], rows)
         )
     return heading + "".join(lists)
 
@@ -150,7 +169,6 @@ def _finding(
     summary = [
         f'<span class="name"><span class="mono">{escape(group.check)}</span>{tier}</span>',
         f'<span class="nowrap">{_rate(failed, scored, "failed")}{arm_note}</span>',
-        f"<span>{_class_chip(group.proposed_class)}</span>",
     ]
 
     # One line per arm across every Agent, naming the Agents that failed,
@@ -736,7 +754,7 @@ def _earlier_versions(
         findings = (
             _fold_list(
                 "findings",
-                ["Check", "Failure rate", "Proposed cause"],
+                ["Check", "Failure rate"],
                 "".join(_finding(g, links, trial_pages, prefix) for g in groups),
             )
             if groups

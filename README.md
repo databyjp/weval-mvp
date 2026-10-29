@@ -8,10 +8,10 @@
 
 A basic unit of work is a **Trial**.
 
-A Trial is defined through an agent, a task, and one or more treatments:
+A Trial is defined through an agent, a task, and optionally a treatment:
 - **agent**: A harness + model
 - **task**: What an agent will be asked to do
-- **treatment(s)**: Any additional resources or help given
+- **treatment**: Any additional resources or help given
 
 A **task** consists of instructions (i.e. prompt), an environment definition (for the agent to run in), snapshot instructions (define what to capture), and checks (how to assess whether the agent was successful).
 
@@ -21,7 +21,7 @@ This forms the basic feedback loop:
 flowchart LR
     task["Task<br/>prompt, environment,<br/>snapshot.py, check.py"]
     agent["Agent<br/>harness + model"]
-    treatment["Treatment<br/>skills, MCP servers, docs"]
+    treatment["Treatment<br/>skills, replacement prompt"]
     run["Run Trial"]
     score["Score"]
 
@@ -69,6 +69,7 @@ PROBES: dict[str, dict] = {
 
     return {
         "weaviate_version": meta.get("version"),
+        "weaviate_client_version": client_version(),
         "schema": schema,
         "objects": {COLLECTION: objects(COLLECTION)},
         "probes": probes,
@@ -143,13 +144,17 @@ uv run --env-file .env weval run tasks/build/ecommerce-search --agent oracle
 uv run --env-file .env weval run tasks/build/ecommerce-search --agent pi-glm-5.3-flash -n 3
 
 # Re-score a retained Trial with the Task's current check.py
-uv run weval check experiment-outputs/<run>/job/<trial>
+uv run --env-file .env weval check experiment-outputs/<run>/job/<trial>
 
 # Analyse the Treatment comparisons that include a retained run, with an LLM
 uv run --env-file .env weval analyse experiment-outputs/<run>
+
+# Rebuild the static report: experiment-outputs/index.html and _report/
+uv run weval report
 ```
 
-Each run writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/`. Each
+Each run writes `experiment-outputs/<timestamp>__<stage>__<scenario>__<agent>/`,
+with `<agent>+<treatment>` for a Treatment run. Each
 Trial in `job/` has a `weval.json` with its status, Agent, and per-check
 results.
 

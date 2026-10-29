@@ -20,6 +20,7 @@ leaves free-form:
 | Key | Function (weval-defined) |
 |---|---|
 | `draft = true` | The Task is not run for now. `weval run` refuses it unless you pass `--draft`; its tests still run. |
+| `motivation = "..."` | The Task's question, in place of a Task page ([how to define a Task](how-to/define-a-task.md#task-page)). Every check then needs a docstring. |
 | `weaviate_workspace = false` | Leaves out the Weaviate settings ([Trial environment](#trial-environment)). |
 
 ### Verifier flags

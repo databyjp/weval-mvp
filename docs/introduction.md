@@ -15,11 +15,11 @@ Domain terms (e.g. Task, Agent, Trial, Non-result) are defined in [`GLOSSARY.md`
 
 Each "Task" is defined in `tasks/<stage>/<scenario>`.
 
-A Task comprises Harbor definition (`task.toml`) and an instruction (`instruction.md`), to be carried out by an agent in a provided environment `/environment`. Each run's outputs are captured through `snapshot.py`, and reviewed through criteria in `check.py`
+A Task comprises Harbor definition (`task.toml`) and an instruction (`instruction.md`), to be carried out by an agent in the environment defined by the Task's `environment/` directory. Each run's outputs are captured through `snapshot.py`, and reviewed through criteria in `check.py`
 
-The outputs from a task are captured in `experiment-outputs`, under `<YYYYMMDD>-<HHMMSS>__<stage>__<scenario>@<variant>__<model>` (*note: `@variant` is optional).
+The outputs from a task are captured in `experiment-outputs`, under `<YYYYMMDD>-<HHMMSS>__<stage>__<scenario>__<agent>`, with `<agent>+<treatment>` for a Treatment run. `weval report` renders the retained runs as a static site at `experiment-outputs/index.html`; its "How weval works" page diagrams each step.
 
-A "Trial" is an attempt at a Task. Thus it requires an agent definition. An "Experiment" defines a plan comprising one or more Trials. An Experiment may also include "Treatments", such as additional agent skills, MCPs or other tools to be given to the agent.
+A "Trial" is an attempt at a Task. Thus it requires an agent definition. An "Experiment" defines a plan comprising one or more Trials. An Experiment may also include "Treatments", which give the agent extra skills, a replacement prompt, or both.
 
 [Task runs](concepts/task-runs.md) describes how a run moves between `weval`, Harbor, and the verifier.
 

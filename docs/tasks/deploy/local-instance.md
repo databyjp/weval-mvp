@@ -6,7 +6,7 @@ motivation: >
 
 # deploy/local-instance
 
-The workspace has Docker and the Weaviate Python client, and nothing is
+The workspace has Docker and Python, and nothing is
 running. The agent is asked to stand up Weaviate and create a `DocumentChunk`
 collection that Weaviate vectorizes.
 
@@ -24,7 +24,8 @@ collection that Weaviate vectorizes.
 - `WORKSPACE.md`: the Compose rules (`/app/docker-compose.yaml`, a service
   named `weaviate`, the `TRIAL_NETWORK` network) and the Weaviate connection
   variables.
-- Python 3.13 with weaviate-client 4.23.1.
+- Python 3.13 with `uv`, Docker, and Docker Compose. The Weaviate client is
+  not installed.
 
 ### Initial state
 

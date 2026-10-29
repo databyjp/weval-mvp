@@ -1,6 +1,6 @@
 # How to run a Trial
 
-Trials run on Modal unless you pass `--local`. Pi Agents use OpenRouter for inference; the Oracle uses no model.
+Trials run on Modal unless you pass `--local`. Pi Agents use OpenRouter for inference. Claude Code Agents use OpenRouter or, with `auth = "subscription"`, a Claude subscription. The Oracle uses no model.
 
 Run a trial by specifying an env file, task, agent definition, and the number of trials to run (1 by default; pass `-n` for a higher sample size). The env file must define the credentials listed in the [README](../../README.md#setup). The `-n` Trials run concurrently, each in its own Modal sandbox.
 

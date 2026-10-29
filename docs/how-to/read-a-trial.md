@@ -32,19 +32,21 @@ the bottom of the Task's page.
 An LLM analyst (`MODEL` in `src/weval/analysis.py`) reads the comparison's
 computed facts, never the transcripts: pass counts, each Agent's change,
 mean usage, and each failed check's Agent, failure message,
-[expected value](define-a-task.md#expected-values), and labels. It answers
+[expected value](define-a-task.md#expected-values), and labels. It also gets
+the first paragraph of the Treatment's `README.md` and, for a Treatment that
+replaces the prompt, the diff from the baseline prompt. It answers
 with a one-sentence result, failure patterns with their Trials, evidence,
 and a proposed [failure class](../../AGENTS.md#failed-checks-are-extremely-useful-findings),
 caveats, and open questions. weval rejects an answer that cites a Trial or
 check that did not fail, states a number missing from the facts, or leaves a
 failed required check out of every pattern. It asks again with the problems,
-up to three times, and shows a last rejection as rejected. A hand-coded rule
+making up to three attempts in all, and shows a last rejection as rejected. A hand-coded rule
 proposes a class for each failed check from the same facts:
 
 - the expected value was shown to the agent: agent gap;
 - it was not, and the labelled source is a Weaviate page: Weaviate gap;
-- the snapshot failed (`error_stage` set) or gave no expected value: infrastructure failure;
-- otherwise unclassified.
+- the snapshot gave no expected value: infrastructure failure;
+- otherwise unclassified, including a failed snapshot (`error_stage` set), which is graded and classified by why the stack or app was not serving.
 
 Where the rule and the analyst name different classes for the same failed
 check, the disagreement is listed for you to decide. The analysis knows
@@ -75,7 +77,7 @@ scored result.
 Re-score a retained Trial offline from its snapshot (e.g. after changing the check):
 
 ```sh
-uv run weval check experiment-outputs/<run>/job/<trial>
+uv run --env-file .env weval check experiment-outputs/<run>/job/<trial>
 ```
 
 `weval check` loads the Task's current `check.py` from the Task path recorded in `weval.json`. If the Task has moved since the run, pass `--task tasks/<stage>/<scenario>`. Its first line gives that `check.py`'s fingerprint beside the one the Trial recorded; when they differ, the scores may differ from `weval.json`.
@@ -83,7 +85,7 @@ uv run weval check experiment-outputs/<run>/job/<trial>
 After the check results, `weval check` prints diagnostics from the Trial's logs. They explain results and don't change them:
 
 - under a failed check with an [expected value](define-a-task.md#expected-values), whether the agent was shown that value;
-- for a Treatment Trial, whether the skill loaded and which Treatment files a tool call named (a glob such as `*.md` reads files without naming them);
+- for a Treatment Trial with skills, whether the skill loaded and which Treatment files a tool call named (a glob such as `*.md` reads files without naming them);
 - Weaviate deprecation warnings (`Dep024: ...`) the agent was shown, and those in `verifier/application.log`.
 
 `weval run` and `weval check` also label each failed check, given `OPENROUTER_API_KEY` and `TYPESAFEAI_API_KEY`, in two steps:

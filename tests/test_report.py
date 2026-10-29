@@ -173,10 +173,9 @@ def test_saved_judgments_attach_to_the_groups(tmp_path):
         )
     }
 
-    assert groups["vector-config"].proposed_class == "Weaviate gap"
+    assert groups["vector-config"].patterns[0]["class"] == "Weaviate gap"
     assert groups["vector-config"].patterns[0]["model"] == "analyst-model"
-    # No analyst pattern covers other-check: the rule's agreed class stands in.
-    assert groups["other-check"].proposed_class == "agent gap"
+    assert groups["other-check"].patterns == []
     assert groups["other-check"].proposals == [rule[1]]
 
 
@@ -241,29 +240,6 @@ def test_findings_group_by_task_with_the_most_failures_first(tmp_path):
     assert style, "a preferred check's row carries the preferred class"
     assert '<span class="tier">preferred</span>' in html
     assert html.count('class="fold required"') == 3
-
-
-def test_disagreeing_judges_leave_a_group_unclassified(tmp_path):
-    run = make_run(
-        tmp_path,
-        "20260101-000001__build__x__agent",
-        "",
-        [("t1", "failed", ["vector-config"])],
-    )
-    comparison = Comparison(
-        TASK, "skills", baseline=[run], treated=[], agents=["agent"]
-    )
-    rule = [
-        {"trial": "t1", "check": "vector-config", "class": "agent gap", "reason": "x"},
-        {
-            "trial": "t2",
-            "check": "vector-config",
-            "class": "Weaviate gap",
-            "reason": "y",
-        },
-    ]
-    (group,) = failure_groups([run], [analysed(comparison, [], rule)])
-    assert group.proposed_class == "unclassified"
 
 
 def test_a_comparison_card_shows_each_agent_and_what_the_treatment_did_to_it(
@@ -594,6 +570,21 @@ def test_write_report_renders_a_retained_run_and_removes_stale_pages(tmp_path):
     assert '<span class="k">def</span>' in check_page.read_text()
     assert 'href="build-x/tests/check.py.html#L-4">source</a>' in task_html
     assert f"../{run_dir.name}/task/environment/data.bin" in task_html
+
+
+def test_the_how_it_works_page_links_back_to_the_index_and_to_the_docs(tmp_path):
+    index = write_report(tmp_path)
+
+    page = tmp_path / "_report" / "how-it-works.html"
+    assert 'href="_report/how-it-works.html"' in index.read_text()
+    html = page.read_text()
+    hrefs = re.findall(r'href="([^"#]+)"', html)
+    assert "../index.html" in hrefs
+    assert any(href.endswith("docs/concepts/task-runs.md") for href in hrefs)
+    # The page is static, so a doc renamed or moved shows up here as a dead link.
+    for href in hrefs:
+        if not href.startswith("http"):
+            assert (page.parent / href).exists(), href
 
 
 def test_an_earlier_task_version_leaves_the_index_for_the_task_page(tmp_path):
