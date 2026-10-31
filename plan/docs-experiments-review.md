@@ -281,6 +281,14 @@ Safe as they stand (deterministic, or visible in every Trial):
   "use only" Trials and named the conflict in 9.
 - Open-ended research Tasks were too noisy to measure format. Fixing the
   pages made it measurable. Present this as method.
+- How a docs site hides inactive code tabs decides whether a
+  Readability-based reader sees them. Inline `display:none`,
+  `aria-hidden`, or a class name containing "hidden" each gets a panel
+  removed. With Pi on five fixed pages, current TypeScript and Go answers
+  went from 7/15 and 3/15 on docs.weaviate.io to 15/15 and 14/15 when the
+  same content hid tabs with a stylesheet class instead, about the same as
+  Markdown (15/15, 15/15). One harness and one Task family; name pi-web-access
+  0.30.0. See the log's "HTML with extractable code tabs".
 
 Safe with hedging:
 

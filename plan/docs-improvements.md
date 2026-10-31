@@ -415,6 +415,50 @@ cost, not main-model input alone.
   on docs.weaviate.io Pi needs either the `.md` URL or HTML whose inactive
   tabs survive extraction.
 
+### HTML with extractable code tabs (`html-code-tabs-extractable`)
+
+- Change: the docs repo's `fix/code-tabs-extractable` (from `main` at
+  8d1d02d2, after #587, so the same content as the previous entry's arms)
+  hides inactive tab panels with a stylesheet class, `tabPanelInactive`, and
+  a `data-tab-inactive` attribute instead of inline `display:none`,
+  `aria-hidden="true"` and the class `tabPanelHidden`. Readability removes
+  all three: it drops hidden elements, and its junk-class pattern matches
+  "hidden". Three files change: `src/theme/Tabs/index.js`, its
+  `styles.module.css`, and the Copy page button's strip selector in
+  `src/components/ContextualMenu/index.js`. Pi's extraction pipeline
+  (pi-web-access 0.30.0) returns 116,450 characters from the five pages
+  instead of 86,629, with TypeScript and Go code on every page. In a
+  browser, one panel per group shows and switching to Go (v6) works. The
+  Copy page button is not checked.
+- Run: index-import-pages, Pi with Sonnet, DeepSeek and GLM against the
+  Netlify draft (`fix-code-tabs-extractable--docs-weaviate-io.netlify.app`),
+  five Trials per arm, local, 2026-10-31. 15 launched, 15 graded, all passed;
+  every fetch went to the draft host. $0.81. Runs:
+  `experiment-outputs/20261031-1532*`, `-1535*` and `-1538*`. The first
+  attempts (`20261031-144017*` to `-145342*`) were non-results in agent
+  setup (nvm download failures and a 360 s setup timeout). These Trials
+  installed Pi from the Trial image instead, and setup took 1–2 s. Scored
+  as in the previous entry.
+
+  | Pi arm | Python | TypeScript | Go |
+  |---|---|---|---|
+  | docs.weaviate.io HTML (previous entry) | 15/15 | 7/15 | 3/15 |
+  | Markdown, iter1-main (previous entry) | 15/15 | 15/15 | 15/15 |
+  | Draft HTML, extractable tabs | 15/15 | 15/15 | 14/15 |
+
+  - Draft against live HTML: TypeScript p = 0.002, Go p = 0.0001 (Fisher's
+    exact).
+  - The miss is GLM `task__tbLS6Es`: v6 Go names (`.Collections.Use`,
+    `batch.Task`, `path:v6`) with a call shape the pages don't show
+    (`batch.WithRetryTimes`). The pages carry the Go code, so this is an
+    agent gap.
+- Conclusion: for Pi, the TypeScript and Go loss on HTML came from the tab
+  markup alone. With inactive tabs that survive extraction, HTML matches
+  Markdown on this Task, and Pi needs no `.md` URL. The fix helps any
+  Readability-based reader, and the Markdown export is still worth shipping
+  for its smaller pages and for harnesses that negotiate. Untested: Claude
+  Code on the draft (its HTML Go was 3/5), and the Copy page button.
+
 ## Proposals
 
 Each item says what to change, where, the evidence from iteration 0, and how
