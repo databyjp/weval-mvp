@@ -28,6 +28,7 @@ from harbor.models.trial.config import EnvironmentConfig, TaskConfig
 
 from weval import diagnostics, labels, verify
 from weval.harnesses import claude_code, opencode, oracle, pi
+from weval.harnesses.preinstall import ImageLayer
 
 ROOT = Path(__file__).resolve().parents[2]
 TREATMENTS = ROOT / "treatments"
@@ -76,12 +77,18 @@ LOCAL = EnvironmentConfig(
 )
 
 
-def package_task(task_dir: Path, destination: Path, prompt: Path | None = None) -> None:
+def package_task(
+    task_dir: Path,
+    destination: Path,
+    prompt: Path | None = None,
+    image_layer: ImageLayer | None = None,
+) -> None:
     """Build a Harbor task package: the Task directory plus ``tests/``, which
     holds the shared verifier with the Task's snapshot and check. The packaged
     ``instruction.md`` is ``prompt``, a Treatment's replacement for the Task's
     own ``instruction.md`` (the default), followed by the shared instructions
-    unless the Task has no Docker (``uses_docker``)."""
+    unless the Task has no Docker (``uses_docker``). ``image_layer``, when
+    given, is appended to the packaged environment's ``Dockerfile``."""
     prompt = prompt or task_dir / "instruction.md"
     shutil.copytree(
         task_dir,
@@ -100,6 +107,8 @@ def package_task(task_dir: Path, destination: Path, prompt: Path | None = None) 
         "#!/bin/sh\nexport PYTHONDONTWRITEBYTECODE=1\nexec python3 /tests/verify.py\n"
     )
     (tests / "test.sh").chmod(0o755)
+    if image_layer:
+        image_layer.add_to(destination / "environment")
 
 
 def run(
@@ -157,7 +166,15 @@ def run(
     # Before the run directory exists, so a failed preparation leaves no empty run.
     if not local and hasattr(harness, "modal_environment"):
         environment = harness.modal_environment(agent, environment)
-    package_task(task_dir, run_dir / "task", prompt)
+    # Local runs only. On Modal, a Task that uses Docker builds its image inside
+    # each Trial's sandbox, so the layer saves nothing; Modal's image cache for
+    # the other Tasks is untested.
+    image_layer = (
+        harness.image_layer(agent)
+        if local and hasattr(harness, "image_layer")
+        else None
+    )
+    package_task(task_dir, run_dir / "task", prompt, image_layer)
     agent_config = harness.agent_config(agent)
     if treatment:
         # Harbor installs the retained copy, so the run keeps the skills its Trials had.

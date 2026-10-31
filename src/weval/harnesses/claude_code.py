@@ -11,7 +11,9 @@ Harbor sets every model alias, including the subagent model, to the Agent's
 
 Claude Code is installed from a binary the host downloads once per version and
 platform (``CachedClaudeCode``), not by Harbor's per-Trial download. Modal
-Trials read it from a Modal Volume (``modal_environment``).
+Trials read it from a Modal Volume (``modal_environment``). For ``--local``
+runs, the system packages its install needs are in the Trial image
+(``image_layer``).
 
 Harness protocol members are documented in ``weval.harnesses``.
 """
@@ -36,6 +38,8 @@ import modal
 from harbor.agents.installed.claude_code import ClaudeCode
 from harbor.environments.base import BaseEnvironment
 from harbor.models.trial.config import AgentConfig, EnvironmentConfig
+
+from weval.harnesses.preinstall import ImageLayer, apt_install
 
 # Relative to the Harbor Trial directory. A missing match marks the Trial incomplete.
 EXPECTED_LOGS = (
@@ -100,6 +104,16 @@ def agent_config(agent: dict) -> AgentConfig:
     )
 
 
+# Harbor's ClaudeCode.install needs the same ones.
+SYSTEM_DEPENDENCIES = ("curl", "bash", "nodejs", "npm", "procps")
+
+
+def image_layer(agent: dict) -> ImageLayer:
+    """Install ``SYSTEM_DEPENDENCIES``, so ``CachedClaudeCode.install``
+    finds them; the binary itself comes from the host cache."""
+    return ImageLayer(apt_install(SYSTEM_DEPENDENCIES))
+
+
 RELEASES = "https://downloads.claude.ai/claude-code-releases"
 # One gzipped binary per version and platform, kept across runs.
 CACHE_DIR = (
@@ -137,9 +151,7 @@ class CachedClaudeCode(ClaudeCode):
             raise ValueError(
                 "a Claude Code Agent needs a version to install from the cache"
             )
-        await self.ensure_system_dependencies(
-            environment, ("curl", "bash", "nodejs", "npm", "procps")
-        )
+        await self.ensure_system_dependencies(environment, SYSTEM_DEPENDENCIES)
         platform = (await environment.exec(command=PLATFORM_COMMAND)).stdout.strip()
         archive = f"{VOLUME_MOUNT}/{shlex.quote(self._version)}/claude-{platform}.gz"
         if (await environment.exec(command=f"test -f {archive}")).return_code != 0:

@@ -1,5 +1,6 @@
 """The OpenCode harness builds a Harbor config that resolves to Harbor's
-OpenCode agent, for every OpenCode Agent in agents.toml."""
+OpenCode agent, or its preinstalled subclass, for every OpenCode Agent in
+agents.toml."""
 
 import importlib
 import json
@@ -26,7 +27,7 @@ def test_config_resolves_to_harbor_opencode_with_the_pinned_version():
         config = opencode.agent_config(agent)
         module, _, name = config.import_path.partition(":")
 
-        assert getattr(importlib.import_module(module), name) is OpenCode
+        assert issubclass(getattr(importlib.import_module(module), name), OpenCode)
         assert config.kwargs == {
             "version": agent["version"],
             "opencode_config": {"snapshot": False},

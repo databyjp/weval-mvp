@@ -4,7 +4,8 @@
 installs ``pi-web-access`` with ``npm ci`` from the pinned lockfile in
 ``pi_web_access/`` and fails setup unless the exact pinned version resolved.
 Copies of the lockfile, search config, and provenance go to ``/logs/agent`` so
-each Trial records the web tooling it ran with.
+each Trial records the web tooling it ran with. For ``--local`` runs, Pi and
+the extension are installed into the Trial image instead (``image_layer``).
 
 Harness protocol members are documented in ``weval.harnesses``.
 """
@@ -14,10 +15,19 @@ import shlex
 from pathlib import Path, PurePosixPath
 from typing import Annotated, override
 
+from harbor.agents.installed.node_install import nvm_node_install_snippet
 from harbor.agents.installed.pi import Pi, PiOptions
 from harbor.agents.options import Cli
 from harbor.environments.base import BaseEnvironment
 from harbor.models.trial.config import AgentConfig
+
+from weval.harnesses.preinstall import (
+    CONTEXT_DIR,
+    ImageLayer,
+    apt_install,
+    bash,
+    is_preinstalled,
+)
 
 ASSETS = Path(__file__).with_name("pi_web_access")
 WEB_ACCESS_VERSION: str = json.loads((ASSETS / "package.json").read_text())[
@@ -29,6 +39,24 @@ _PACKAGE_DIR = PurePosixPath("/tmp/harbor-pi-web-access")
 _CONFIG_DIR = PurePosixPath("/tmp/harbor-pi-agent")
 _EXTENSION = _PACKAGE_DIR / "node_modules/pi-web-access/dist/index.js"
 _AGENT_LOGS = PurePosixPath("/logs/agent")
+# Harbor's Pi package name from Pi 0.74.0.
+_PI_PACKAGE = "@earendil-works/pi-coding-agent"
+
+# npm ci enforces the lockfile; --ignore-scripts skips package install hooks.
+_INSTALL_WEB_ACCESS = (
+    ". ~/.nvm/nvm.sh && npm ci --ignore-scripts --omit=dev --omit=peer "
+    f"--legacy-peer-deps --no-audit --no-fund --prefix {shlex.quote(str(_PACKAGE_DIR))}"
+)
+_manifest = _PACKAGE_DIR / "node_modules/pi-web-access/package.json"
+_version_check = (
+    f"if(require({json.dumps(str(_manifest))}).version!=={json.dumps(WEB_ACCESS_VERSION)})"
+    "process.exit(1)"
+)
+# Exits non-zero unless the pinned pi-web-access version is installed.
+_CHECK_WEB_ACCESS = (
+    f". ~/.nvm/nvm.sh && test -f {shlex.quote(str(_EXTENSION))} "
+    f"&& node -e {shlex.quote(_version_check)}"
+)
 
 # Relative to the Harbor Trial directory. A missing match marks the Trial incomplete.
 EXPECTED_LOGS = (
@@ -77,6 +105,29 @@ def model_error(trial_dir: Path) -> str | None:
     return last.get("errorMessage") or "model request failed"
 
 
+def image_layer(agent: dict) -> ImageLayer:
+    """Install Pi as Harbor's ``Pi.install`` does, then the pinned extension
+    as ``WebAccessPi.install`` does."""
+    package = shlex.quote(f"{_PI_PACKAGE}@{agent['version']}")
+    return ImageLayer(
+        "\n".join(
+            [
+                apt_install(("curl",)),
+                bash(
+                    f"set -euo pipefail; {nvm_node_install_snippet()} && "
+                    f"npm install -g --ignore-scripts {package} && pi --version"
+                ),
+                f"COPY {CONTEXT_DIR}/pi-web-access/ {_PACKAGE_DIR}/",
+                bash(f"{_INSTALL_WEB_ACCESS} && {_CHECK_WEB_ACCESS}"),
+            ]
+        ),
+        files={
+            f"pi-web-access/{name}": ASSETS / name
+            for name in ("package.json", "package-lock.json")
+        },
+    )
+
+
 def agent_record(agent: dict) -> dict:
     """Return the Agent plus the web tooling it ran with, for ``weval.json``."""
     return {**agent, "web_access": json.loads((ASSETS / "provenance.json").read_text())}
@@ -93,8 +144,11 @@ class WebAccessPi(Pi):
 
     @override
     async def install(self, environment: BaseEnvironment) -> None:
-        """Install Pi and the pinned extension; fail if the version does not match."""
-        await super().install(environment)
+        """Install Pi and the pinned extension, each unless the Trial image
+        already has it (``image_layer``); fail if the extension version does
+        not match."""
+        if not await is_preinstalled(self, environment):
+            await super().install(environment)
         dirs = " ".join(
             shlex.quote(str(d)) for d in (_PACKAGE_DIR, _CONFIG_DIR, _AGENT_LOGS)
         )
@@ -113,23 +167,6 @@ class WebAccessPi(Pi):
                 remote_path=remote.as_posix(),
                 filename=name,
             )
-        # npm ci enforces the lockfile; --ignore-scripts skips package install hooks.
-        await self.exec_as_agent(
-            environment,
-            command=(
-                ". ~/.nvm/nvm.sh && npm ci --ignore-scripts --omit=dev --omit=peer "
-                f"--legacy-peer-deps --no-audit --no-fund --prefix {shlex.quote(str(_PACKAGE_DIR))}"
-            ),
-        )
-        manifest = _PACKAGE_DIR / "node_modules/pi-web-access/package.json"
-        version_check = (
-            f"if(require({json.dumps(str(manifest))}).version!=={json.dumps(WEB_ACCESS_VERSION)})"
-            "process.exit(1)"
-        )
-        await self.exec_as_agent(
-            environment,
-            command=(
-                f". ~/.nvm/nvm.sh && test -f {shlex.quote(str(_EXTENSION))} "
-                f"&& node -e {shlex.quote(version_check)}"
-            ),
-        )
+        if (await environment.exec(command=_CHECK_WEB_ACCESS)).return_code != 0:
+            await self.exec_as_agent(environment, command=_INSTALL_WEB_ACCESS)
+        await self.exec_as_agent(environment, command=_CHECK_WEB_ACCESS)
