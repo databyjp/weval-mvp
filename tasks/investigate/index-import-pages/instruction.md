@@ -8,4 +8,6 @@ Read these pages of the Weaviate docs, and no others:
 - https://docs.weaviate.io/weaviate/configuration/compression/rq-compression
 - https://docs.weaviate.io/weaviate/manage-objects/import
 
+Use only these pages: don't fetch other URLs, install packages, or run code to check your answer.
+
 From them, recommend the vector index, compression, and import method for this project, and write the code in each language. Write your findings to `/app/findings.json` in the format described in `WORKSPACE.md`, citing the page each answer came from.

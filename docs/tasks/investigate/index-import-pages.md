@@ -22,6 +22,9 @@ syntax, with the TypeScript and Go code in tabs that the HTML hides. The
 and [`markdown-docs-iter1`](../../../treatments/markdown-docs-iter1/README.md)
 Treatments replace the prompt with the same pages' Markdown versions on their
 staging builds.
+[`markdown-docs-iter2`](../../../treatments/markdown-docs-iter2/README.md)
+moves the non-Python examples to linked per-language code pages, and its
+prompt also allows those pages.
 
 ## Boundary conditions
 
@@ -42,6 +45,9 @@ staging builds.
 > - https://docs.weaviate.io/weaviate/concepts/data-import
 > - https://docs.weaviate.io/weaviate/configuration/compression/rq-compression
 > - https://docs.weaviate.io/weaviate/manage-objects/import
+>
+> Use only these pages: don't fetch other URLs, install packages, or run
+> code to check your answer.
 >
 > From them, recommend the vector index, compression, and import method for
 > this project, and write the code in each language. Write your findings to
