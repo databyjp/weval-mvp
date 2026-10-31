@@ -9,7 +9,8 @@ the docs repo's `feat/markdown-export-iter1` branch (980bd35a):
   values, with a sentence after the block that says so.
 
 Question, for `investigate/docs-token-usage`,
-`investigate/client-code-examples`, and `investigate/index-import-pages`:
+`investigate/client-code-examples`, `investigate/index-import-pages`, and
+`investigate/index-import-pages-python`:
 against `markdown-docs-staging`, do these changes reduce the tokens an Agent
 spends, at the same check results? Run
 the baseline and `markdown-docs-staging` in the same batch, since both Tasks
