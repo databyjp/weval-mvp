@@ -69,16 +69,9 @@ def client_version_behind(s: dict) -> None:
     )
 
 
-def legacy_vectorizer_config(s: dict) -> None:
-    s["findings"]["parsed"]["config_ingestion"]["answer"] = (
-        "Create the collection with vectorizer_config=Configure.Vectorizer.text2vec_openai(); "
-        "import with client-side batching."
-    )
-
-
-def prose_without_api(s: dict) -> None:
-    s["findings"]["parsed"]["config_ingestion"]["answer"] = (
-        "Define the collection up front with a vectorizer and properties; import with batching."
+def client_previous_minor_line(s: dict) -> None:
+    s["findings"]["parsed"]["client_library_versions"]["answer"] = (
+        "Python weaviate-client 4.23.x"
     )
 
 
@@ -108,6 +101,15 @@ def test_versions_match_with_a_v_prefix_and_trailing_punctuation():
     assert failures(check, snapshot) == {}
 
 
+def test_python_client_minor_line_passes():
+    # pip resolves the patch, so the release-notes table's "4.24.x" is enough.
+    snapshot = copy.deepcopy(ORACLE)
+    snapshot["findings"]["parsed"]["client_library_versions"]["answer"] = (
+        "Python weaviate-client 4.24.x"
+    )
+    assert failures(check, snapshot) == {}
+
+
 def test_registry_and_github_api_sources_are_canonical():
     # Endpoints retained baseline Trials cited for versions.
     snapshot = copy.deepcopy(ORACLE)
@@ -130,12 +132,7 @@ def test_missing_file_fails_every_check():
     ("break_snapshot", "failing_checks", "reason"),
     [
         (missing_item, ["findings-file"], "missing ['search']"),
-        # The malformed answer also cannot be searched for the vector API.
-        (
-            answer_not_string,
-            ["findings-file", "current-vector-config"],
-            "malformed ['config_ingestion']",
-        ),
+        (answer_not_string, ["findings-file"], "malformed ['config_ingestion']"),
         (
             server_patch_behind,
             ["weaviate-version-latest"],
@@ -161,8 +158,11 @@ def test_missing_file_fails_every_check():
             ["python-client-version-latest"],
             "latest Python client release 4.24.1",
         ),
-        (legacy_vectorizer_config, ["current-vector-config"], "Configure.Vectorizer"),
-        (prose_without_api, ["current-vector-config"], "names vector_config"),
+        (
+            client_previous_minor_line,
+            ["python-client-version-latest"],
+            "release 4.24.1 or 4.24.x",
+        ),
         (uncited_answer, ["canonical-sources"], "uncited ['search']"),
         (
             blog_source,

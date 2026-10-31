@@ -25,10 +25,12 @@ If subagents are available, use them to run tests or searches unless there is a 
   page per Task with a syntax-highlighted page per packaged file, and one
   page per Trial.
 - `src/weval/verify.py`: shared verifier that runs inside the Trial environment.
-- `src/weval/shared-instructions.md`: Trial-environment notes appended to every
-  Task's prompt when it is packaged.
+- `src/weval/shared-instructions.md`: Trial-environment notes appended to the
+  prompt of every Task that uses Docker when it is packaged.
 - `src/weval/shared-compose.yaml`: Compose overlay applied to every Trial
-  environment: the Trial network and Docker socket.
+  environment of a Task that uses Docker: the Trial network and Docker socket.
+  A Task that runs no stack sets `[metadata] docker = false` in `task.toml`
+  and can run any Agent with `--local`.
 - `src/weval/weaviate-compose.yaml`: the `WEAVIATE_*` settings, applied unless
   the Task's `task.toml` sets `[metadata] weaviate_workspace = false`.
 - `src/weval/harnesses/<harness>.py`: Harbor agent config, expected logs, and
@@ -99,7 +101,7 @@ A Task is a directory that runs without framework changes:
 
 | File | Purpose |
 |---|---|
-| `instruction.md` | What the agent is told (Harbor's file name for the prompt). Packaging appends `src/weval/shared-instructions.md`. |
+| `instruction.md` | What the agent is told (Harbor's file name for the prompt). Packaging appends `src/weval/shared-instructions.md` unless the Task sets `[metadata] docker = false`. |
 | `task.toml` | Harbor task config: timeouts, `/app` artifact, healthcheck, verifier env. |
 | `environment/` | Harbor environment: `Dockerfile`, starter app, fixtures, and an optional Compose overlay for Task-specific settings such as a healthcheck. |
 | `solution/solve.sh` | The Oracle solution. It must pass every check. |

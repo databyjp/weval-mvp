@@ -80,8 +80,9 @@ Task page. Still open:
 - Maintainer: write a canonical solution, the answers a Weaviate expert
   would give for each item, to replace the Oracle's for scoring.
 - Add an LLM-as-a-judge helper that compares an agent's answers with the
-  canonical solution, for items a regex can't score, such as
-  `current-vector-config` and the unscored `deployment` and `search`.
+  canonical solution, for the unscored `deployment`, `config_ingestion`, and
+  `search`, and for `investigate/client-code-examples`' code, whose regex
+  checks were removed as too brittle.
 - Criteria for `deployment` and `search`. Candidate expected answers are in
   the Task page's Calibration table, and need re-checking against the docs
   first.
@@ -161,6 +162,33 @@ queued last, so stopping the baselines early would have dropped them too.
 Run Tasks against different versions of the docs site to see whether changes
 reduce token use. Needs the `usage` metrics in `weval.json` and a way to point
 the agent's fetches at a site variant.
+
+## Add OpenCode and Codex harnesses
+
+Pi's results on the investigate Tasks mostly describe the `pi-web-access`
+plugin weval pins: its 30,000-character `fetch_content` cap, readability
+extraction that keeps only the visible docs tab, and the
+`get_search_content` index (notes under
+`experiment-outputs/_report/notes/investigate-*`). OpenCode would represent
+open harnesses with built-in web tools; Codex adds OpenAI's harness. Harbor
+supports both: `harbor/agents/installed/opencode.py` (`websearch` and
+`webfetch` tools, `provider/model` names) and `codex.py` (`web_search` of
+`disabled`, `cached`, or `live`; `CODEX_API_KEY` and `OPENAI_BASE_URL`).
+Both write an ATIF `trajectory.json`, which `weval.json`'s `usage` reads.
+
+- Add `agents.toml` OpenCode entries for the other four OpenRouter models on
+  Pi, so the same model runs on both harnesses. `harnesses/opencode.py` and
+  the DeepSeek entry exist.
+- Add `src/weval/harnesses/codex.py`. Decide the models and auth (OpenRouter
+  through `OPENAI_BASE_URL`, an OpenAI key, or a ChatGPT subscription). Use
+  `web_search = "live"` unless a Trial shows `cached` reaches the staging
+  docs and current releases.
+- Pin each harness's version in `agents.toml`.
+- Run one smoke Trial per harness on `investigate/docs-token-usage` before
+  any matrix, and record what `webfetch` and Codex's page-open action return
+  for a tabbed docs page and a page over 30,000 characters.
+- Decide whether to drop Pi once OpenCode has baselines on the investigate
+  Tasks, or keep one cheap Pi Agent for continuity with the retained runs.
 
 ## Smaller items
 

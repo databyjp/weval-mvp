@@ -29,6 +29,27 @@ harness = "pi"
 version = "0.85.1"
 model = "openrouter/openai/gpt-6.1-terra"
 
+["opencode-deepseek-v4.1-flash-1017"]
+harness = "opencode"
+# opencode-ai 1.19.4 (2026-10-22); 1.19.5 was a day old. Same model as the Pi Agent.
+version = "1.19.4"
+model = "openrouter/deepseek/deepseek-v4.1-flash-1017"
+
+["opencode-glm-5.3-flash"]
+harness = "opencode"
+version = "1.19.4"
+model = "openrouter/z-ai/glm-5.3-flash"
+
+["opencode-gpt-6.1-terra"]
+harness = "opencode"
+version = "1.19.4"
+model = "openrouter/openai/gpt-6.1-terra"
+
+["opencode-claude-sonnet-5.5"]
+harness = "opencode"
+version = "1.19.4"
+model = "openrouter/anthropic/claude-sonnet-5.5"
+
 ["pi-claude-sonnet-5.5"]
 harness = "pi"
 version = "0.85.1"

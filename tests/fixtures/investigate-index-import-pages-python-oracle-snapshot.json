@@ -1,0 +1,35 @@
+{
+ "findings": {
+  "text": "{\n  \"vector_index\": {\n    \"answer\": \"HNSW: the docs recommend it for large collections that need high query throughput and low latency, which 5 million products at high QPS are. Keep the defaults, including dynamic ef (ef = -1), and reduce memory with compression rather than a flat or dynamic index.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/concepts/vector-index\",\n      \"https://docs.weaviate.io/weaviate/configuration/compression/rq-compression\"\n    ],\n    \"code\": {\n      \"python\": \"from weaviate.classes.config import Configure, Property, DataType\\n\\n# HNSW is the default index; 8-bit RQ is the default rq() quantizer.\\nclient.collections.create(\\n    name=\\\"Product\\\",\\n    vector_config=Configure.Vectors.text2vec_openai(\\n        model=\\\"text-embedding-3-small\\\",\\n        quantizer=Configure.VectorIndex.Quantizer.rq(),\\n    ),\\n    properties=[\\n        Property(name=\\\"title\\\", data_type=DataType.TEXT),\\n        Property(name=\\\"description\\\", data_type=DataType.TEXT),\\n    ],\\n)\\n\"\n    }\n  },\n  \"compression\": {\n    \"answer\": \"8-bit rotational quantization (RQ): recommended for most use cases, about 4x compression with 98-99% recall, and no training step, so it is enabled when the collection is created.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/concepts/vector-quantization\",\n      \"https://docs.weaviate.io/weaviate/configuration/compression/rq-compression\"\n    ]\n  },\n  \"batch_import\": {\n    \"answer\": \"Server-side batching, the recommended import: the server sets the rate the client sends at, so there are no batch sizes to tune. The Python client's data.ingest() takes a generator, so the file is read one line at a time.\",\n    \"sources\": [\n      \"https://docs.weaviate.io/weaviate/concepts/data-import\",\n      \"https://docs.weaviate.io/weaviate/manage-objects/import\"\n    ],\n    \"code\": {\n      \"python\": \"import json\\n\\ndef read_products(path):\\n    with open(path) as f:\\n        for line in f:\\n            line = line.strip()\\n            if not line:\\n                continue\\n            record = json.loads(line)\\n            yield {\\\"title\\\": record[\\\"title\\\"], \\\"description\\\": record[\\\"description\\\"]}\\n\\nproducts = client.collections.use(\\\"Product\\\")\\n\\n# `ingest` uses server-side batching and pulls objects from the generator.\\nresult = products.data.ingest(read_products(\\\"products.jsonl\\\"))\\nif result.errors:\\n    print(f\\\"Number of failed imports: {len(result.errors)}\\\")\\n\"\n    }\n  }\n}",
+  "parsed": {
+   "vector_index": {
+    "answer": "HNSW: the docs recommend it for large collections that need high query throughput and low latency, which 5 million products at high QPS are. Keep the defaults, including dynamic ef (ef = -1), and reduce memory with compression rather than a flat or dynamic index.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/concepts/vector-index",
+     "https://docs.weaviate.io/weaviate/configuration/compression/rq-compression"
+    ],
+    "code": {
+     "python": "from weaviate.classes.config import Configure, Property, DataType\n\n# HNSW is the default index; 8-bit RQ is the default rq() quantizer.\nclient.collections.create(\n    name=\"Product\",\n    vector_config=Configure.Vectors.text2vec_openai(\n        model=\"text-embedding-3-small\",\n        quantizer=Configure.VectorIndex.Quantizer.rq(),\n    ),\n    properties=[\n        Property(name=\"title\", data_type=DataType.TEXT),\n        Property(name=\"description\", data_type=DataType.TEXT),\n    ],\n)\n"
+    }
+   },
+   "compression": {
+    "answer": "8-bit rotational quantization (RQ): recommended for most use cases, about 4x compression with 98-99% recall, and no training step, so it is enabled when the collection is created.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/concepts/vector-quantization",
+     "https://docs.weaviate.io/weaviate/configuration/compression/rq-compression"
+    ]
+   },
+   "batch_import": {
+    "answer": "Server-side batching, the recommended import: the server sets the rate the client sends at, so there are no batch sizes to tune. The Python client's data.ingest() takes a generator, so the file is read one line at a time.",
+    "sources": [
+     "https://docs.weaviate.io/weaviate/concepts/data-import",
+     "https://docs.weaviate.io/weaviate/manage-objects/import"
+    ],
+    "code": {
+     "python": "import json\n\ndef read_products(path):\n    with open(path) as f:\n        for line in f:\n            line = line.strip()\n            if not line:\n                continue\n            record = json.loads(line)\n            yield {\"title\": record[\"title\"], \"description\": record[\"description\"]}\n\nproducts = client.collections.use(\"Product\")\n\n# `ingest` uses server-side batching and pulls objects from the generator.\nresult = products.data.ingest(read_products(\"products.jsonl\"))\nif result.errors:\n    print(f\"Number of failed imports: {len(result.errors)}\")\n"
+    }
+   }
+  },
+  "error": null
+ }
+}

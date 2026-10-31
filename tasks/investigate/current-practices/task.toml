@@ -1,6 +1,10 @@
 # Harbor task config. weval adds tests/.
 artifacts = [{ source = "/app", destination = "submission" }]
 
+[metadata]
+# No stack: the agent gets no Docker socket, and any Agent can run it locally.
+docker = false
+
 [agent]
 timeout_sec = 1200.0
 

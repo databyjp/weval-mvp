@@ -22,6 +22,7 @@ leaves free-form:
 | `draft = true` | The Task is not run for now. `weval run` refuses it unless you pass `--draft`; its tests still run. |
 | `motivation = "..."` | The Task's question, in place of a Task page ([how to define a Task](how-to/define-a-task.md#task-page)). Every check then needs a docstring. |
 | `weaviate_workspace = false` | Leaves out the Weaviate settings ([Trial environment](#trial-environment)). |
+| `docker = false` | The Task runs no stack: its agent gets no Docker socket and its prompt no environment notes ([Trial environment](#trial-environment)), and any Agent can run it with `--local`. |
 
 ### Verifier flags
 
@@ -81,7 +82,10 @@ and `treatment` is `null`.
 ## Trial environment
 
 Every Trial environment's `main` service, where the agent works, gets these
-settings from `src/weval/shared-compose.yaml`:
+settings from `src/weval/shared-compose.yaml`, unless the Task's `task.toml`
+sets `[metadata] docker = false`. Packaging also appends
+`src/weval/shared-instructions.md`, notes about the shared Docker daemon and a
+running application, to the prompt of every Task that uses Docker.
 
 | Setting | Value |
 |---|---|
@@ -123,9 +127,9 @@ Each retained Trial directory is Harbor's own output plus weval's
 
 | Path | Contents |
 |---|---|
-| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the Treatment, `fingerprints` (below), missing logs, the model error that ended the session (if any), per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
+| `weval.json` | Status (`passed`, `failed`, `incomplete`, `timed-out`, `non-result`), the Agent, the Treatment, `fingerprints` (below), missing logs, the model error that ended the session (if any), per-check results, and `usage`: the Agent's tokens and cost, tool-call counts, external URLs in tool-call arguments, and search queries. Tokens and cost come from Harbor, except for Claude Code, whose own counts include the requests in which `WebFetch` summarises pages. OpenCode's counts are summed from its `step_finish` events, so that `n_input_tokens` includes cache writes and `n_output_tokens` includes reasoning, as Pi and Claude Code count them. Claude Code's `cost_usd` is an estimate from the OpenRouter prices in `harnesses/claude_code.py`'s `PRICES`, and `null` for a model missing there. |
 | `verifier/` | `snapshot.json`, `checks.json`, `test-stdout.txt`, `application.log`, `docker-compose.log`. |
-| `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. Harbor converts both to `trajectory.json`. |
+| `agent/` | The harness transcript and stdout. Pi writes `pi/sessions/*.jsonl` and `pi.txt`, plus the web-access lockfile, search config, and provenance. Claude Code writes `claude-code.txt` (stream JSON) and `sessions/projects/-app/*.jsonl`. OpenCode writes `opencode.txt` (`run --format=json` events) and its session database and log under `opencode/xdg-data`. Harbor converts each to `trajectory.json`. |
 | `artifacts/submission/` | The agent's final `/app`. |
 | `result.json`, `config.json`, `trial.log` | Harbor's record, including the harness version and timings. |
 
@@ -145,7 +149,7 @@ hex digits of a SHA-256 over file paths and contents:
 
 | Key | Covers | A change means |
 |---|---|---|
-| `task` | The Task directory without `check.py`, plus `shared-instructions.md`, `verify.py`, and the Compose overlays | the Trials must be re-run |
+| `task` | The Task directory without `check.py`, plus `verify.py`, the Compose overlays, and `shared-instructions.md` when the Task uses Docker | the Trials must be re-run |
 | `check` | The Task's `check.py` | the Trials can be re-scored with `weval check` |
 | `treatment` | What the Treatment gives the Agent on this Task: its `skills/` and its prompt for the Task; `null` for a baseline. Its `README.md` and its prompts for other Tasks are not covered. | a different Treatment version |
 

@@ -29,7 +29,7 @@ from pathlib import Path
 
 import httpx
 
-from weval.diagnostics import URL
+from weval.diagnostics import urls_in
 
 API = "https://api.typesafe.ai/v1/systemone"
 MODEL = "jev-latest"
@@ -224,7 +224,7 @@ def _source_names(steps: dict[int, dict], skills: Path) -> dict[int, list[str]]:
             if len(content) < MIN_SHOWN_CHARS:
                 continue
             arguments = json.dumps(call.get("arguments"))
-            found = URL.findall(arguments)
+            found = urls_in(arguments)
             # Web search tools (Claude Code's WebSearch, Pi's web_search), not ToolSearch.
             if (
                 call["function_name"].lower().replace("_", "") == "websearch"

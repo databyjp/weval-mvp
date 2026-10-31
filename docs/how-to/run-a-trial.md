@@ -8,7 +8,7 @@ Run a trial by specifying an env file, task, agent definition, and the number of
 uv run --env-file .env weval run tasks/<stage>/<scenario> --agent <name> [-n 3] [--local] [--treatment <treatment>] [--draft]
 ```
 
-`--local` runs the Trials on the local Docker daemon instead, at no Modal cost. Use it for Tasks that don't need Docker-in-Docker, such as `investigate/current-practices`.
+`--local` runs the Trials on the local Docker daemon instead, at no Modal cost. Any Agent can run a Task whose `task.toml` sets [`[metadata] docker = false`](../reference.md#tasktoml) locally, such as `investigate/docs-token-usage`: its agent gets no Docker socket. On a Task that uses Docker, the agent's container would hold the host's Docker socket, which is root on the host and reaches the credentials in `.env`, so `weval run` refuses a local run of any Agent but the Oracle unless you also pass `--unsafe-local`. Modal is the isolation boundary for those runs.
 
 `--treatment` gives the Agent a [Treatment](../reference.md#treatments)'s skills, its prompt for the Task, or both, named after a directory in `treatments/`. Run the baseline the same way without it, with the same Agent.
 

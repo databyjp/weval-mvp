@@ -1,0 +1,53 @@
+"""investigate/client-code-examples checks over the snapshot from ``snapshot.py``.
+
+Each check passes by returning and fails by raising ``AssertionError`` whose
+message names the constraint. The check ID is the function name with dashes;
+the docstring is its description. Reward requires every ``REQUIRED`` check.
+Neither prose answers nor code are scored; see the Task page.
+"""
+
+ITEMS = ("deployment", "config_ingestion", "search")
+CODE_ITEMS = ("config_ingestion", "search")
+LANGUAGES = ("python", "typescript", "go")
+
+
+def well_formed(entry: object, item: str) -> bool:
+    if not (
+        isinstance(entry, dict)
+        and isinstance(entry.get("answer"), str)
+        and isinstance(entry.get("sources"), list)
+        and all(isinstance(url, str) for url in entry["sources"])
+    ):
+        return False
+    if item not in CODE_ITEMS:
+        return True
+    snippets = entry.get("code")
+    return isinstance(snippets, dict) and all(
+        isinstance(snippets.get(language), str) for language in LANGUAGES
+    )
+
+
+# --- Required ----------------------------------------------------------------
+
+
+def findings_file(snapshot: dict) -> None:
+    """/app/findings.json is a JSON object with every documented item, each
+    with an answer string and a sources list, and Python, TypeScript, and Go
+    code strings for config_ingestion and search."""
+    submitted = snapshot["findings"]
+    parsed = submitted["parsed"]
+    assert isinstance(parsed, dict), (
+        f"/app/findings.json is a JSON object; {submitted['error'] or 'got ' + type(parsed).__name__}"
+    )
+    missing = [item for item in ITEMS if item not in parsed]
+    malformed = [
+        item for item in ITEMS if item in parsed and not well_formed(parsed[item], item)
+    ]
+    assert not (missing or malformed), (
+        "findings.json has every item with an answer, sources, and code where documented; "
+        f"missing {missing}, malformed {malformed}"
+    )
+
+
+REQUIRED = [findings_file]
+PREFERRED = []
