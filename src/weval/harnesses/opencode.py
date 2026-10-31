@@ -4,14 +4,23 @@ OpenCode reads ``OPENROUTER_API_KEY`` for ``openrouter/`` models, and Harbor
 registers the Agent's model with OpenCode's ``openrouter`` provider. The agent
 has OpenCode's own ``webfetch`` and ``websearch`` tools, so it reads pages
 differently from Pi's ``pi-web-access`` and Claude Code's ``WebFetch``.
+OpenCode is installed into the Trial image for ``--local`` runs
+(``image_layer``).
 
 Harness protocol members are documented in ``weval.harnesses``.
 """
 
 import json
+import shlex
 from pathlib import Path
+from typing import override
 
+from harbor.agents.installed.node_install import nvm_node_install_snippet
+from harbor.agents.installed.opencode import OpenCode
+from harbor.environments.base import BaseEnvironment
 from harbor.models.trial.config import AgentConfig
+
+from weval.harnesses.preinstall import ImageLayer, apt_install, bash, is_preinstalled
 
 # Relative to the Harbor Trial directory. A missing match marks the Trial incomplete.
 EXPECTED_LOGS = (
@@ -23,7 +32,7 @@ EXPECTED_LOGS = (
 def agent_config(agent: dict) -> AgentConfig:
     """Build Harbor's agent config for an OpenCode Agent (``version``, ``model``)."""
     return AgentConfig(
-        import_path="harbor.agents.installed.opencode:OpenCode",
+        import_path=f"{__name__}:PreinstalledOpenCode",
         model_name=agent["model"],
         kwargs={
             "version": agent["version"],
@@ -37,6 +46,28 @@ def agent_config(agent: dict) -> AgentConfig:
         # Harbor resolves the template from the host environment.
         env={"OPENROUTER_API_KEY": "${OPENROUTER_API_KEY}"},
     )
+
+
+def image_layer(agent: dict) -> ImageLayer:
+    """Install OpenCode as Harbor's ``OpenCode.install`` does on a glibc image."""
+    package = shlex.quote(f"opencode-ai@{agent['version']}")
+    return ImageLayer(
+        f"{apt_install(('curl', 'bash', 'coreutils', 'nodejs', 'npm'))}\n"
+        + bash(
+            f"set -euo pipefail; {nvm_node_install_snippet()} && "
+            f"npm i -g {package} && opencode --version"
+        )
+    )
+
+
+class PreinstalledOpenCode(OpenCode):
+    """Harbor's OpenCode, skipping Harbor's install when the Trial image
+    already has the pinned version (``image_layer``)."""
+
+    @override
+    async def install(self, environment: BaseEnvironment) -> None:
+        if not await is_preinstalled(self, environment):
+            await super().install(environment)
 
 
 def agent_record(agent: dict) -> dict:

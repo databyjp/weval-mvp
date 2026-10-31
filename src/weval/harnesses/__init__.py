@@ -11,6 +11,10 @@ Every harness module provides:
 
 And may provide:
 
+- ``image_layer(agent) -> preinstall.ImageLayer``: the Agent's installation
+  as Dockerfile instructions, appended to the Task image for ``--local``
+  runs. The harness's ``install`` must skip what the layer installed and fall
+  back to a full install without it (``preinstall.is_preinstalled``).
 - ``modal_environment(agent, environment) -> EnvironmentConfig``: Modal-only
   environment setup, such as mounting a Volume; not called for ``--local``
   runs.
