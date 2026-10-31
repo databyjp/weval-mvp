@@ -148,8 +148,272 @@ cost, not main-model input alone.
   - The C6 contradiction split the Go answers: 9 of 14 used v6
     `collection.Batch`, 4 the v5 `ObjectsBatcher`, and 1 REST batches. Each
     of those 5 answers repeats the concepts page's claim that Go lacks
-    server-side batching, and both GPT answers name the conflict. GLM 5.3 Flash wrote v5 in both Pi Trials and v6 in both OpenCode
-    Trials, so the harness's page extraction may decide which page wins.
+    server-side batching, and both GPT answers name the conflict. GLM 5.3
+    Flash wrote v5 in both Pi Trials and v6 in both OpenCode Trials, so the
+    harness's page extraction may decide which page wins.
+
+### Fixed-page reading with other sources ruled out
+
+- Change: the index-import-pages prompt adds "Use only these pages: don't
+  fetch other URLs, install packages, or run code to check your answer."
+  (Task fingerprint `4a44ecd7918f`). Same 7 Agents and arms, two Trials
+  per arm, run locally on 2026-10-29.
+- Result: 28 Trials passed. One more OpenCode DeepSeek baseline Trial was
+  killed (exit 137) 13 seconds in, with 10 Trials sharing the Docker VM.
+  It is a non-result, excluded, and rerun. No Trial used a non-docs URL or
+  installed anything, and Trials made 7–16 tool calls.
+- Metric: characters that tool calls returned, read from each transcript,
+  and for Claude Code the input tokens of the Haiku requests in which
+  `WebFetch` summarises pages.
+
+  | Harness | What the model reads | HTML | Markdown |
+  |---|---|---|---|
+  | OpenCode (all 4 models) | `webfetch` output, 5 pages | 146,910–147,019 chars | 116,121–116,154 chars |
+  | OpenCode | context on the turn after the reads | 41–68k tokens | 33–55k tokens |
+  | Claude Code Sonnet | summarizer input | 41.6k tokens | 33.0k tokens |
+  | Claude Code Sonnet, Haiku | `WebFetch` summaries | 8–11k chars | 10–16k chars |
+
+  - The Markdown pages cut what each harness reads by about a fifth, and
+    the figure barely varies between Trials: OpenCode's `webfetch` output
+    is the same for every model.
+  - Total input is that context re-sent on every later turn, so the turn
+    count decides it. OpenCode GPT 6.1 Terra took 9 turns on Markdown
+    (four `todowrite` calls) against 3–4 on HTML, and its mean total input
+    rose from 112k to 268k. OpenCode Sonnet took 4 turns against 3 (155k to
+    196k). OpenCode DeepSeek (187k to 137k) and GLM (178k to 133k) fell.
+  - Claude Code's main model sees only summaries, so its total input
+    barely moved (Sonnet 121k to 117k, Haiku 189k to 183k). One Opus
+    Markdown Trial fetched the `.md` pages with `curl` and read them whole
+    (129k characters in the main context), and Opus's mean rose from 299k
+    to 392k.
+  - OpenCode reported zero cost for both GPT 6.1 Terra Markdown Trials;
+    unexplained.
+- Conclusion: report what the harness read (fetched characters, context
+  after the reads, summarizer input) as the token effect of a page-format
+  change. Total input and cost measure agent behaviour and need many more
+  Trials to compare.
+
+### Iteration 2: per-language code pages (B6), three languages
+
+- Change: the docs repo's `feat/markdown-export-iter2` (3a5fd3b0, from
+  iter1). A tab group whose panels are all languages keeps its Python panels
+  inline under a line linking the same section on each other language's code
+  page, `<route>.<language>.md`. A note under each title links every code
+  page. The build writes 586 code pages, and the landing pages total 19.8%
+  less than iter1's.
+- Run: index-import-pages, `markdown-docs-iter1` against
+  `markdown-docs-iter2`, 7 Agents, two Trials per arm, local, 2026-10-30.
+  The iter2 prompt also allows "the code example pages they link to", since
+  "no others" would forbid the pages holding the TypeScript and Go code.
+- Result: 24 Trials passed. 4 are non-results: both OpenCode GLM iter1
+  Trials (`apt-get` could not reach Debian in setup), and one OpenCode
+  DeepSeek iter1 and one OpenCode Sonnet iter2 Trial (OpenRouter 402, "would
+  exceed your available credits given your current in-flight requests",
+  recorded as `timed-out`).
+
+  | Agent | iter1 input | iter2 input | Code pages fetched |
+  |---|---|---|---|
+  | Claude Code Haiku | 185k, 226k | 284k, 314k | 5–6, with Python |
+  | Claude Code Sonnet | 114k, 118k | 167k, 176k | 6 |
+  | Claude Code Opus | 360k, 380k | 377k, 390k | 7, or none |
+  | OpenCode Sonnet | 130k, 130k | 184k | 8 |
+  | OpenCode DeepSeek | 287k | 195k, 190k | 8 |
+  | OpenCode GLM | (none graded) | 334k, 236k | 7–8 |
+  | OpenCode GPT 6.1 Terra | 270k, 191k | 447k, 324k | 8 |
+
+  - Agents found the code pages, and most fetched every one, including the
+    Python pages, which repeat the landing page, and Go v5. OpenCode made
+    14–15 fetches against 6 and read 125,634–126,038 characters against
+    116,121–116,154.
+  - Both OpenCode DeepSeek iter2 Trials wrote Go v5 code; its graded iter1
+    Trial wrote v6. `import.go.md` has only the server-side batching example
+    and lists 7 sections without a Go example.
+  - The prompt's added phrase may itself invite fetching every code page.
+- Conclusion: for a reader of several languages, the split costs more turns
+  than the smaller pages save. Not shipped.
+
+### Iteration 2 for a Python-only reader: index-import-pages-python
+
+- Run: the new `investigate/index-import-pages-python` (the same pages,
+  Python only), baseline HTML, `markdown-docs-iter1`, and
+  `markdown-docs-iter2`, with prompts that differ only in their URLs. 7
+  Agents, two Trials per arm, local, 2026-10-30.
+- Result: 22 Trials passed. 20 are non-results from Agent setup, on the
+  first run and again on the rerun: `apt-get` and `curl` network errors,
+  then 360-second setup timeouts while deb.debian.org was slow. No OpenCode DeepSeek, GLM, or GPT Trial was
+  graded. No iter2 Trial fetched a code page.
+
+  | Agent | Measure | HTML | iter1 | iter2 |
+  |---|---|---|---|---|
+  | OpenCode Sonnet | `webfetch` output | 146,903 chars | 116,121 | 90,704 |
+  | Claude Code Sonnet | summarizer input | 41.6k | 33.0k | 25.2k |
+  | Claude Code Sonnet | total input | 118k, 120k | 109k, 111k | 102k, 103k |
+  | Claude Code Haiku | total input | 175k | 170k, 172k | 163k, 160k |
+  | OpenCode Sonnet | total input | 150k | 125k, 186k | 105k, 154k |
+  | Claude Code Opus | total input | 216k, 204k | 160k, 535k | 110k, 225k |
+
+- Conclusion: for a single-language reader, iter2 cuts what the harness reads
+  by about a fifth against iter1, and total input by 5–7% where the Trials
+  are consistent. Together with the three-language run, turn count decides
+  total input more than page size does, so iter1 ships and iter2 does not.
+
+### Iteration 3: Go v6 before Go v5, Go v5 labelled legacy (B3)
+
+- Change: the docs repo's `feat/markdown-export-iter3` (880e14ef, from
+  iter1). The export moves each Go v5 panel to just after Go v6; in the
+  build, v6 directly precedes v5 in 208 places and never follows it. The
+  `gov5` label is "Go (v5, legacy)" in the HTML and the Markdown. The
+  build does not include weaviate/docs#587 (C1, C6), so `concepts/data-import`
+  still says "The Go client does not yet support them".
+- Run: index-import-pages, `markdown-docs-iter1` against
+  `markdown-docs-iter3`, OpenCode GPT 6.1 Terra, OpenCode DeepSeek, and
+  Claude Code Sonnet (the Agents that had written v5), two Trials per arm,
+  local, 2026-10-31.
+- Result: 11 Trials passed; one OpenCode GPT iter1 Trial is a non-result
+  (`apt-get` network error). Go client used, read from each `findings.json`:
+
+  | Agent | iter1 import | iter3 import | iter1 collection | iter3 collection |
+  |---|---|---|---|---|
+  | OpenCode GPT 6.1 Terra | v5 | v5, v5 | v5 | v5, v5 |
+  | OpenCode DeepSeek | v5, v6 | v5, v6 | v5, v6 | v5, v6 |
+  | Claude Code Sonnet | v6, v5 | v6, client-side | v5, v5 | v6, v6 |
+
+  - Every v5 or client-side import in iter3 follows the concepts page. Both
+    GPT Trials name the conflict and pick v5 as "the explicitly documented
+    Go v5 fallback". The DeepSeek and Sonnet ones repeat "the Go client does
+    not support server-side batching".
+  - Claude Code Sonnet's iter3 client-side Trial wrote "the docs pages read
+    give no Go batch code": its `WebFetch` summary left out the v6 panel.
+- Conclusion: panel order and the label did not change the import answers;
+  the concepts page's claim drives them. Sonnet's collection code moved to
+  v6 in both iter3 Trials, a weak sign at two Trials. Re-measure on a build
+  that includes weaviate/docs#587.
+
+### HTML against iter1 on the same content, after weaviate/docs#587
+
+- Change: weaviate/docs#587 (C1, C6) reached docs.weaviate.io, so the HTML
+  baseline says Go v6 supports server-side batching. The docs repo's
+  `feat/markdown-export-iter1-main` (7f887cf5) is iter1 rebased onto that
+  `main`, so both arms carry the same content. Its last commit reads the
+  Scalar spec URL from `configuration.url`, which #588 moved; without it the
+  export wrote no API reference pages.
+- Run: index-import-pages, baseline against `markdown-docs-iter1-main`,
+  Claude Code Sonnet and OpenCode Sonnet, DeepSeek, GLM, and GPT 6.1 Terra,
+  three Trials per arm, local, 2026-10-31. This is the run proposed in
+  `plan/docs-experiments-review.md`, with three Trials instead of five, and
+  the GPT arm added. #587 had shipped by then, so it measures format on the
+  corrected content rather than the old sentence.
+- Result: 27 Trials passed. 3 are non-results: OpenCode Sonnet HTML
+  `3JmVLCw` and OpenCode GLM Markdown `GK2kAsa` exited with 137, an
+  out-of-memory kill that Harbor labelled `ApiRateLimitError`, and OpenCode
+  GPT HTML `R8cURuo` failed `apt-get` in setup. Runs:
+  `experiment-outputs/20261031-11*__investigate__index-import-pages__*`.
+
+  | Agent | Import, HTML | Import, Markdown | Input, HTML | Input, Markdown | Turns |
+  |---|---|---|---|---|---|
+  | Claude Code Sonnet | v6 ×3 | v6 ×2, v6 and v5 ×1 | 122k, 122k, 124k | 113k, 114k, 119k | 9 and 9 |
+  | OpenCode Sonnet | v6 ×2 | v6 ×3 | 157k, 155k | 129k, 130k, 128k | 3 and 3 |
+  | OpenCode DeepSeek | v6 ×3 | v6 ×3 | 170k, 168k, 236k | 172k, 201k, 188k | 5–6 and 5–6 |
+  | OpenCode GLM | v6 ×3 | v6 ×2 | 302k, 323k, 290k | 145k, 145k | 6–8 and 5 |
+  | OpenCode GPT 6.1 Terra | v6 ×2 | v6 ×3 | 378k, 436k | 272k, 234k, 272k | 10–11 and 8–9 |
+
+  - Go: every graded Trial in both arms imports with Go v6. Before #587,
+    batch 2 had 4 of 15 HTML and 8 of 14 Markdown Trials using only v6
+    (regex count). Fixing the concepts page removed the v5 imports in both
+    formats, so a format effect on the Go import can no longer be measured.
+    A few collection-creation snippets still use v5 (one in each arm for
+    Claude Code Sonnet and for GPT).
+  - What the harness reads fell as before: OpenCode `webfetch` output
+    146,976 to 116,242 characters (−21%), Claude Code's summarizer input
+    41.6k to 33.1k tokens (−20%). Two OpenCode GLM HTML Trials fetched more
+    (206k and 209k characters).
+  - Total input was lower on Markdown for all five Agents: −2% for DeepSeek
+    and −6% for Claude Code Sonnet, where turns matched; −17% for OpenCode
+    Sonnet; −36% for GPT and −52% for GLM, which also took fewer turns. In
+    batch 2, GPT took more turns on Markdown (9 against 3–4); here it took
+    fewer (8–9 against 10–11), so its turn count varies more between
+    batches than with the format.
+  - OpenCode reported $0 cost for 3 GPT Trials, as before.
+- Conclusion: on the same content, Markdown cuts what each harness reads by
+  about a fifth and did not raise total input for any Agent. The Go import
+  accuracy problem was the content, which #587 fixed.
+
+### Markdown from the normal page URLs (content negotiation)
+
+- Change: none to the build. The `markdown-docs-negotiation` Treatment gives
+  the baseline prompt with the `markdown-docs-iter1-main` host and the normal
+  page URLs, no `.md`. The build offers Markdown three ways: `Accept`
+  negotiation, a `<link rel="alternate" type="text/markdown">`, and a hidden
+  notice that names the `.md` URL on the production host (404 until shipped).
+- Run: index-import-pages, `markdown-docs-negotiation`, Claude Code Sonnet
+  and Opus, OpenCode Sonnet, GLM and GPT 6.1 Terra, Pi Sonnet and GLM, two
+  Trials each, local, 2026-10-31. All 14 passed. Runs:
+  `experiment-outputs/20261031-12*__*+markdown-docs-negotiation`. Analysis:
+  the session scratchpad's `discovery-tabloss/run-a/report.md`.
+- Result: 61 of 98 docs fetches returned Markdown.
+  - Claude Code WebFetch and OpenCode `webfetch` got Markdown on all 50
+    built-in fetches. Claude Code's summarizer input was 33.1k tokens in all
+    four Trials, as with explicit `.md` URLs (HTML: 41.6k). OpenCode received
+    116,242 characters per Trial, the `.md` figure.
+  - Pi got HTML on all 30 fetches, so its extraction still dropped the
+    TypeScript and Go tabs. Both Pi Sonnet Trials wrote v5 Go "from my own
+    knowledge".
+  - Opus also curled every page: one Trial sent `Accept: text/markdown`
+    unprompted and got Markdown, the other got HTML.
+  - No Agent acted on the notice or the `<link>`. Two saw the notice and
+    carried on with HTML. The one Trial that fetched `.md` URLs (OpenCode
+    GLM) cited a truncated `<link>` and the "markdown-export" in the draft's
+    host name.
+  - OpenCode GLM's "middle truncated" re-reads also happen on Markdown: one
+    Trial used 799k input tokens.
+- Conclusion: negotiation alone delivers Markdown to Claude Code and OpenCode
+  with the same savings as `.md` URLs. It does not reach Pi, and the notice
+  and link did not change any Agent's behaviour.
+
+### Tab loss in HTML extraction: Pi against OpenCode
+
+- Question: when a harness's HTML extraction drops the inactive code tabs,
+  do its TypeScript and Go answers get worse? Inactive tabs are wrapped in
+  `style=display:none aria-hidden=true`, which Readability-style extraction
+  removes. Pi's extraction drops them; OpenCode's conversion keeps them.
+  Comparing the two harnesses on HTML and Markdown, with the same models,
+  separates tab loss from other format effects. Python, which every arm sees,
+  is the control.
+- Run: index-import-pages, baseline against `markdown-docs-iter1-main`, Pi
+  and OpenCode each with Sonnet, DeepSeek and GLM, plus Claude Code Sonnet,
+  five Trials per arm, local, 2026-10-31. 74 launched. 70 graded, all
+  passed. 4 non-results: OpenCode Sonnet and DeepSeek HTML exit 137 kills
+  (two each) with two arms running at once; their reruns, one arm at a time,
+  passed. Runs: `experiment-outputs/20261031-125918*` to `20261031-133111*`
+  (the last two are the reruns). Scoring: an
+  offline scorer over `findings.json` (the session scratchpad's
+  `discovery-tabloss/scorer/`; 293 of 294 agreement with the hand labels). A
+  language counts as current when its collection and import code both use
+  the current client API as the pages show it.
+
+  | Harness | Arm | Python | TypeScript | Go |
+  |---|---|---|---|---|
+  | Pi (Sonnet, DeepSeek, GLM) | HTML | 15/15 | 7/15 | 3/15 |
+  | Pi | Markdown | 15/15 | 15/15 | 15/15 |
+  | OpenCode (Sonnet, DeepSeek, GLM) | HTML | 15/15 | 15/15 | 15/15 |
+  | OpenCode | Markdown | 15/15 | 15/15 | 15/15 |
+  | Claude Code Sonnet | HTML | 5/5 | 5/5 | 3/5 |
+  | Claude Code Sonnet | Markdown | 5/5 | 5/5 | 4/5 |
+
+  - Pi HTML against Pi Markdown: Go p = 0.00001, TypeScript p = 0.002
+    (Fisher's exact). OpenCode shows no difference, and Python is 15/15 in
+    every cell.
+  - The 3 Pi HTML Trials with current Go are the 3 that re-fetched a page in
+    `mode: "raw"` and parsed the `codeBlockContainer` elements themselves.
+    The other 12 say the pages showed "only Python" and wrote Go "from
+    memory": v5, or v6 calls under v5 import paths. Pi DeepSeek used Python's
+    `batch.stream` in TypeScript in 4 of 5 HTML Trials.
+  - Claude Code's misses are v5 collection-creation snippets (2 HTML, 1
+    Markdown). Its imports are current in all 10.
+- Conclusion: tab loss is real and large for Pi. Markdown fixes it when the
+  agent fetches `.md` URLs, but Pi does not negotiate (previous entry), so
+  on docs.weaviate.io Pi needs either the `.md` URL or HTML whose inactive
+  tabs survive extraction.
 
 ## Proposals
 
@@ -215,7 +479,10 @@ so each tab's bold label stays next to its fence.
   Trial submitted v5 code. In iteration 0, two of three DeepSeek Markdown
   Trials spent a fetch on `client-libraries/go.md` to decide, and Claude
   Code's `WebFetch` summary of the HTML quickstart returned only the v5 tab.
-- Expected effect (inferred, untested): fewer v5 answers and one fewer fetch.
+- Expected effect (inferred): fewer v5 answers and one fewer fetch.
+- Result: tested in iteration 3 with the relabel. No change in the import
+  answers while `concepts/data-import` still says Go lacks server-side
+  batching (C6).
 
 #### B4. Link to Markdown pages from Markdown pages
 
@@ -256,6 +523,9 @@ so each tab's bold label stays next to its fence.
   limit, so DeepSeek read it in two or three slices.
 - Risk: agents must discover the parameter. Without a link or a note on each
   page, they will not use it.
+- Result: per-language files were tested in iteration 2. Linked from each
+  page, they were found and fetched for every language, which cost more
+  than it saved for a reader of several languages.
 
 ### Content changes (docs text, both HTML and Markdown)
 
